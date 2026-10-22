@@ -1,0 +1,3 @@
+# Documentation
+
+- [Architecture](architecture.md)
