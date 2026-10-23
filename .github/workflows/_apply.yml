@@ -78,7 +78,6 @@ jobs:
         with:
           client-id: ${{ steps.github_app.outputs.client_id }}
           private-key: ${{ steps.github_app.outputs.private_key }}
-          permission-variables: write
 
       - uses: hashicorp/setup-terraform@v3
         with:
