@@ -35,3 +35,9 @@ variable "enable_cluster" {
   type        = bool
   default     = false
 }
+
+variable "node_disk_size_gb" {
+  description = "Boot disk of each GKE node; pd-balanced counts against the regional SSD_TOTAL_GB quota (250 GB)"
+  type        = number
+  default     = 30
+}
