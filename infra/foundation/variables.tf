@@ -18,3 +18,13 @@ variable "vpc_name" {
   description = "VPC Name"
   type        = string
 }
+
+variable "cidr_block2" {
+  description = "CIDR Variable"
+  type        = string
+}
+
+variable "vpc_name2" {
+  description = "VPC Name"
+  type        = string
+}

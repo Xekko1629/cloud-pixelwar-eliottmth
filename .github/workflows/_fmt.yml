@@ -1,0 +1,26 @@
+name: Terraform format
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: Runner label (empty = RUNNER_LABEL variable, then ubuntu-latest)
+        type: string
+        default: ""
+
+env:
+  TF_VERSION: "1.17.0"
+
+jobs:
+  fmt:
+    name: fmt
+    runs-on: ${{ inputs.runner || vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Check formatting
+        run: terraform fmt -check -recursive -diff infra

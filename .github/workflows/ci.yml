@@ -1,0 +1,32 @@
+name: CI
+
+# PR from a feature branch to prod: checks, then plan dev + prd. Nothing is applied.
+on:
+  pull_request:
+    branches: [prod]
+
+permissions:
+  contents: read
+
+jobs:
+  fmt:
+    uses: ./.github/workflows/_fmt.yml
+
+  validate:
+    uses: ./.github/workflows/_validate.yml
+
+  test:
+    uses: ./.github/workflows/_test.yml
+
+  plan:
+    needs: [fmt, validate, test]
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, prd]
+    uses: ./.github/workflows/_plan.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: ${{ matrix.environment }}

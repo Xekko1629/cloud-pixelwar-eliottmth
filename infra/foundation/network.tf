@@ -10,7 +10,14 @@ resource "google_compute_subnetwork" "main" {
   region        = var.region
 }
 
-output "vpc_id" {
-  value       = google_compute_network.main.id
-  description = "The id of the created VPC network"
+resource "google_compute_network" "sub" {
+  name                    = var.vpc_name2
+  auto_create_subnetworks = false
+}
+
+resource "google_compute_subnetwork" "sub" {
+  name          = "${var.vpc_name2}-subnet"
+  network       = google_compute_network.sub.id
+  ip_cidr_range = var.cidr_block2
+  region        = var.region
 }

@@ -1,0 +1,41 @@
+name: Terraform test
+
+on:
+  workflow_call:
+    inputs:
+      stacks:
+        description: JSON list of stack directories under infra/
+        type: string
+        default: '["foundation", "iam"]'
+      runner:
+        description: Runner label (empty = RUNNER_LABEL variable, then ubuntu-latest)
+        type: string
+        default: ""
+
+env:
+  TF_VERSION: "1.17.0"
+
+jobs:
+  test:
+    name: test (${{ matrix.stack }})
+    runs-on: ${{ inputs.runner || vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        stack: ${{ fromJSON(inputs.stacks) }}
+    defaults:
+      run:
+        working-directory: infra/${{ matrix.stack }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Init without backend
+        run: terraform init -backend=false -input=false
+
+      # Runs the *.tftest.hcl files of the stack
+      - name: Terraform test
+        run: terraform test
