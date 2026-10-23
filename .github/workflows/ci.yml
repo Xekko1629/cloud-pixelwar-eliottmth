@@ -1,6 +1,7 @@
 name: CI
 
 # PR from a feature branch to prod: checks, then plan dev + prd. Nothing is applied.
+# Only the stacks whose directory changed are checked; "CI result" is the required check.
 on:
   pull_request:
     branches: [prod]
@@ -9,17 +10,49 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      # JSON list of changed stacks, e.g. ["foundation"] or []
+      stacks: ${{ steps.filter.outputs.changes }}
+    steps:
+      # A workflow change re-checks every stack
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            foundation:
+              - 'infra/foundation/**'
+              - '.github/workflows/**'
+            iam:
+              - 'infra/iam/**'
+              - '.github/workflows/**'
+
   fmt:
+    needs: changes
+    if: needs.changes.outputs.stacks != '[]'
     uses: ./.github/workflows/_fmt.yml
 
   validate:
+    needs: changes
+    if: needs.changes.outputs.stacks != '[]'
     uses: ./.github/workflows/_validate.yml
+    with:
+      stacks: ${{ needs.changes.outputs.stacks }}
 
   test:
+    needs: changes
+    if: needs.changes.outputs.stacks != '[]'
     uses: ./.github/workflows/_test.yml
+    with:
+      stacks: ${{ needs.changes.outputs.stacks }}
 
   plan:
-    needs: [fmt, validate, test]
+    needs: [changes, fmt, validate, test]
+    if: contains(fromJSON(needs.changes.outputs.stacks), 'foundation')
     strategy:
       fail-fast: false
       matrix:
@@ -30,3 +63,17 @@ jobs:
       id-token: write
     with:
       environment: ${{ matrix.environment }}
+
+  # Always reported, even when every other job is skipped: use it as the required status check
+  result:
+    name: CI result
+    needs: [changes, fmt, validate, test, plan]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Jobs results
+        run: echo '${{ toJSON(needs) }}'
+
+      - name: Fail if a job failed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
