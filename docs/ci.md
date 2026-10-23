@@ -37,6 +37,23 @@ Any failure stops the pipeline before plan or apply.
 - Plans are written to the run summary.
 - **Runner**: every job runs on the `runner` input if set, then on the `RUNNER_LABEL` repository variable, then on `ubuntu-latest`. Set `RUNNER_LABEL` to switch to the self-hosted runners (C04).
 
+## Path filtering (pull requests only)
+
+On a PR, `ci.yml` only checks the stacks whose directory changed (job `changes`, `dorny/paths-filter`).
+A change under `.github/workflows/` re-checks every stack.
+
+| PR changes… | fmt | validate / test | plan dev + prd |
+|---|---|---|---|
+| nothing under `infra/` or `.github/workflows/` (e.g. `docs/`) | skipped | skipped | skipped |
+| `infra/iam/**` | ✅ | iam | skipped (never applied by the CI) |
+| `infra/foundation/**` | ✅ | foundation | ✅ |
+| `.github/workflows/**` | ✅ | all stacks | ✅ |
+
+The **`CI result`** job always runs and fails if any other job failed. It is the check to mark as required on `prod`.
+
+To add a stack, add an entry to the `filters` of the `changes` job.
+`deploy.yml` and `destroy.yml` are not filtered: a release always applies every stack (no-op when nothing changed).
+
 ## Authentication: Workload Identity Federation
 
 No cloud key is stored in GitHub. Each job gets a short-lived OIDC token, and GCP exchanges it for temporary credentials only if it comes from this repository **and** the right GitHub environment.
@@ -87,6 +104,6 @@ Every other stack is then deployed by the CI.
 
 ### 3. Branch protection on `prod`
 
-Require a pull request with 1 approval, the `CI` checks passing, and signed commits.
+Require a pull request with 1 approval, the `CI result` check passing, and signed commits.
 
 The **Run workflow** button of `deploy.yml` and `destroy.yml` only appears once they are on `prod`, the default branch.
