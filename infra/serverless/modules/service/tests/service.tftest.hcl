@@ -19,6 +19,16 @@ run "private_service" {
   }
 
   assert {
+    condition     = google_cloud_run_v2_service.main.ingress == "INGRESS_TRAFFIC_INTERNAL_ONLY"
+    error_message = "Workers must use internal ingress by default."
+  }
+
+  assert {
+    condition     = length(google_service_account.invoker) == 1 && google_service_account.invoker[0].account_id != google_service_account.runtime.account_id && google_cloud_run_v2_service_iam_member.push_invoker[0].role == "roles/run.invoker"
+    error_message = "Workers need a separate push identity with a service-scoped invoker grant."
+  }
+
+  assert {
     condition     = google_cloud_run_v2_service.main.template[0].scaling[0].min_instance_count == 0 && google_cloud_run_v2_service.main.template[0].scaling[0].max_instance_count == 5
     error_message = "Default scaling must allow scale-to-zero and cap at 5 instances."
   }
@@ -32,6 +42,32 @@ run "private_service" {
     condition     = google_service_account.runtime.account_id == "discord-proxy" && length(google_project_iam_member.observability) == 3
     error_message = "Each service needs a dedicated runtime identity with observability roles."
   }
+}
+
+run "gateway_proxy" {
+  command = plan
+
+  variables {
+    service_type = "proxy"
+  }
+
+  assert {
+    condition     = google_cloud_run_v2_service.main.ingress == "INGRESS_TRAFFIC_ALL" && google_cloud_run_v2_service.main.invoker_iam_disabled == false
+    error_message = "Proxies must accept gateway traffic but keep IAM authentication."
+  }
+
+  assert {
+    condition     = length(google_service_account.invoker) == 0 && length(google_cloud_run_v2_service_iam_member.push_invoker) == 0
+    error_message = "Proxies must not create a Pub/Sub push identity or invoker grant."
+  }
+}
+
+run "reject_unknown_service_type" {
+  command = plan
+  variables {
+    service_type = "public"
+  }
+  expect_failures = [var.service_type]
 }
 
 run "configured_service" {

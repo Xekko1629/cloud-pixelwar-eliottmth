@@ -28,6 +28,17 @@ variable "image" {
   }
 }
 
+variable "service_type" {
+  description = "worker: internal ingress and dedicated push invoker; proxy: public-network ingress with IAM authentication (ADR-0001/0002)"
+  type        = string
+  default     = "worker"
+
+  validation {
+    condition     = contains(["proxy", "worker"], var.service_type)
+    error_message = "Service type must be proxy or worker."
+  }
+}
+
 variable "labels" {
   description = "Labels applied to the Cloud Run service"
   type        = map(string)

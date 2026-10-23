@@ -1,6 +1,8 @@
 # Stack serverless — SRV-01
 
-Choix retenu : **Cloud Run services**, avec images conteneur promues par digest entre dev et prd. La décision compute est à reporter dans ARCH-01 avec l'équipe.
+Choix retenu : **Cloud Run services**, avec images conteneur promues par digest entre dev et prd, conformément à [ADR-0001](../../docs/adr/0001-compute-cloud-run-typescript.md).
+
+Le module distingue les proxies (`service_type = "proxy"`, ingress public avec IAM) des workers (`service_type = "worker"` par défaut, ingress interne et identité d'invocation Pub/Sub dédiée), conformément aux ADR-0001 et ADR-0002.
 
 Ce squelette ne déploie encore aucun service : les modules seront instanciés lorsque les images des proxies et workers seront disponibles. Le [module service](modules/service/README.md) est prêt à être utilisé.
 
@@ -39,4 +41,6 @@ terraform plan -var-file=dev.tfvars
 
 Remplacer `dev` par `prd` pour la production. Ces commandes ne font pas d'apply. Le bootstrap est persistant et s'applique séparément comme le stack IAM.
 
-La pipeline actuelle cible encore `foundation` pour les plans et déploiements, et valide uniquement `foundation` et `iam`. L'intégration des stacks nouveaux et le build/push des images relèvent de SRV-02 ; ce squelette n'est pas encore automatiquement déployé par les workflows existants.
+La CI de PR détecte désormais `bootstrap`, `serverless` et le module `service` pour le formatage, la validation et les tests sans backend. Le module est testé séparément : Terraform ne découvre pas automatiquement ses tests depuis la racine.
+
+Les plans distants et déploiements ciblent encore `foundation`. L'intégration des nouveaux stacks aux plans dev/prd, le build/push des images et leur déploiement relèvent de SRV-02 ; ce squelette n'est pas encore automatiquement déployé.

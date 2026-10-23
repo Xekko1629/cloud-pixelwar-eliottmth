@@ -16,6 +16,13 @@
 Checks: `terraform fmt -check`, `terraform validate` and `terraform test` (`*.tftest.hcl`) on each stack.
 Any failure stops the pipeline before plan or apply.
 
+PR checks select changed directories: `foundation`, `iam`, `bootstrap`,
+`serverless`, and `serverless/modules/service`. The last entry runs the module's
+mock-provider tests independently, since the root stack does not discover them.
+Remote plans still target `foundation` only, when that stack changes. Deploy and
+destroy also still target `foundation`; serverless image builds and deployment
+integration are tracked in SRV-02. The bootstrap registry is not auto-applied.
+
 ## Workflows
 
 ```

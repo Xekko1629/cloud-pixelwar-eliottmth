@@ -4,6 +4,15 @@ resource "google_service_account" "runtime" {
   display_name = "Runtime identity for ${var.name}"
 }
 
+# Separate identity used by Pub/Sub to call a worker, not by its application code.
+resource "google_service_account" "invoker" {
+  count = var.service_type == "worker" ? 1 : 0
+
+  project      = var.project_id
+  account_id   = "invoke-${substr(sha256(var.name), 0, 20)}"
+  display_name = "Push invoker for ${var.name}"
+}
+
 resource "google_project_iam_member" "observability" {
   for_each = toset([
     "roles/logging.logWriter",
@@ -31,9 +40,9 @@ resource "google_cloud_run_v2_service" "main" {
   location            = var.region
   labels              = var.labels
   deletion_protection = var.deletion_protection
-  # API Gateway reaches this endpoint over the public network with IAM auth.
-  # Network reachability does not grant unauthenticated invocation.
-  ingress              = "INGRESS_TRAFFIC_ALL"
+  # Proxies accept API Gateway over the public network, with IAM authentication.
+  # Workers only accept internal sources, including same-project Pub/Sub push.
+  ingress              = var.service_type == "proxy" ? "INGRESS_TRAFFIC_ALL" : "INGRESS_TRAFFIC_INTERNAL_ONLY"
   invoker_iam_disabled = false
   default_uri_disabled = false
 
@@ -101,4 +110,14 @@ resource "google_cloud_run_v2_service" "main" {
     google_project_iam_member.observability,
     google_secret_manager_secret_iam_member.runtime,
   ]
+}
+
+resource "google_cloud_run_v2_service_iam_member" "push_invoker" {
+  count = var.service_type == "worker" ? 1 : 0
+
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.main.name
+  role     = "roles/run.invoker"
+  member   = google_service_account.invoker[0].member
 }
