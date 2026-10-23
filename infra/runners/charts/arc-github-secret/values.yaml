@@ -1,0 +1,8 @@
+# Set by infra/runners/runners.tf
+projectId: ""
+# Secret Manager secret holding a JSON object:
+# {"github_app_id": "...", "github_app_installation_id": "...", "github_app_private_key": "..."}
+secretManagerSecret: arc-github-app
+# Kubernetes secret read by the runner scale set (githubConfigSecret)
+kubernetesSecret: arc-github-app
+refreshInterval: 1h

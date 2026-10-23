@@ -51,6 +51,11 @@ resource "google_container_cluster" "main" {
     channel = "REGULAR"
   }
 
+  # Removes idle nodes faster than the default profile (cost safety)
+  cluster_autoscaling {
+    autoscaling_profile = "OPTIMIZE_UTILIZATION"
+  }
+
   depends_on = [google_project_service.container]
 }
 

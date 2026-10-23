@@ -30,6 +30,9 @@ jobs:
             iam:
               - 'infra/iam/**'
               - '.github/workflows/**'
+            runners:
+              - 'infra/runners/**'
+              - '.github/workflows/**'
 
   fmt:
     needs: changes
