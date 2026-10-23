@@ -6,6 +6,14 @@ Le module distingue les proxies (`service_type = "proxy"`, ingress public avec I
 
 Ce squelette ne déploie encore aucun service : les modules seront instanciés lorsque les images des proxies et workers seront disponibles. Le [module service](modules/service/README.md) est prêt à être utilisé.
 
+## Secrets applicatifs — SRV-03
+
+`secrets.tf` déclare les conteneurs Secret Manager dans chaque projet, sans
+valeurs ni versions gérées par Terraform. Voir [SECRETS.md](SECRETS.md) pour le
+catalogue, l'alimentation hors Git, les accès par service et la rotation.
+Un destroy supprime les secrets et leurs versions : les valeurs devront être
+réinjectées lors d'une reconstruction, elles ne sont pas sauvegardées dans le state.
+
 ## Organisation des states
 
 | Stack | Préfixe GCS | Rôle |
