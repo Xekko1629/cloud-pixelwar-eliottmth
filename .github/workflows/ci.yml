@@ -30,6 +30,15 @@ jobs:
             iam:
               - 'infra/iam/**'
               - '.github/workflows/**'
+            bootstrap:
+              - 'infra/bootstrap/**'
+              - '.github/workflows/**'
+            serverless:
+              - 'infra/serverless/**'
+              - '.github/workflows/**'
+            'serverless/modules/service':
+              - 'infra/serverless/modules/service/**'
+              - '.github/workflows/**'
             runners:
               - 'infra/runners/**'
               - '.github/workflows/**'

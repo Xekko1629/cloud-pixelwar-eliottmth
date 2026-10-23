@@ -16,6 +16,13 @@
 Checks: `terraform fmt -check`, `terraform validate` and `terraform test` (`*.tftest.hcl`) on each stack.
 Any failure stops the pipeline before plan or apply.
 
+PR checks select changed directories: `foundation`, `iam`, `bootstrap`,
+`serverless`, and `serverless/modules/service`. The last entry runs the module's
+mock-provider tests independently, since the root stack does not discover them.
+Remote plans still target `foundation` only, when that stack changes. Deploy and
+destroy also still target `foundation`; serverless image builds and deployment
+integration are tracked in SRV-02. The bootstrap registry is not auto-applied.
+
 ## Workflows
 
 ```
@@ -168,4 +175,3 @@ and the deploy jobs of `infra/runners` read it in memory to mint a one-hour GitH
 - `system` node pool: one spot `e2-medium` for the controller and system pods.
 - Budget alerts per project (`infra/iam/budget.tf`): 20 EUR by default, emails at 50 %, 90 % and 100 %.
 - Runner activity: Cloud Logging, `resource.type="k8s_container" AND resource.labels.namespace_name=("arc-runners" OR "arc-systems")`.
-
