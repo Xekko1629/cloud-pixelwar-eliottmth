@@ -4,7 +4,7 @@ Ce document décrit le flux de contribution et de déploiement du projet. La bra
 
 ## Branches et pull requests
 
-- Chaque contribution part du dernier commit de `prod` dans une branche courte nommée `feat/<sujet>` (par exemple `feat/discord-draw`). Pour une correction, utiliser `fix/<sujet>`.
+- Chaque contribution part du dernier commit de `prod` dans une branche courte nommée `feature/<sujet>` (par exemple `feature/discord-draw`). Pour une correction, utiliser `fix/<sujet>`.
 - Ouvrir une pull request vers `prod`. La PR doit être relue et tous les contrôles CI requis doivent réussir avant sa fusion.
 - Supprimer la branche de travail après la fusion.
 - Ne pas pousser directement sur `prod` ni réécrire son historique. Protéger la branche dans GitHub : PR obligatoire, review obligatoire et contrôles CI requis. Les commits doivent être signés et vérifiés.
@@ -25,8 +25,8 @@ Un tag publié ne doit pas être déplacé ni réutilisé. Si une release doit �
 
 ## Conventions
 
-- Branches : `feat/<sujet>` pour une fonctionnalité, `fix/<sujet>` pour une correction. Utiliser des noms courts, en minuscules, séparés par des tirets.
-- Commits : suivre [Conventional Commits](https://www.conventionalcommits.org/), par exemple `feat: add pixel drawing command` ou `fix: reject invalid colors`.
+- Branches : `feature/<sujet>` pour une fonctionnalité, `fix/<sujet>` pour une correction. Utiliser des noms courts, en minuscules, séparés par des tirets.
+- Commits : suivre [Conventional Commits](https://www.conventionalcommits.org/), par exemple `feature: add pixel drawing command` ou `fix: reject invalid colors`.
 - Versions : suivre [SemVer](https://semver.org/) sous la forme `vMAJOR.MINOR.PATCH`. Le choix du numéro de version est fait au moment de préparer la release.
 - Signer les commits et les tags ; la clé publique de signature doit être enregistrée sur GitHub.
 
