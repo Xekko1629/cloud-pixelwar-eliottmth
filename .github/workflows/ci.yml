@@ -39,6 +39,9 @@ jobs:
             'serverless/modules/service':
               - 'infra/serverless/modules/service/**'
               - '.github/workflows/**'
+            runners:
+              - 'infra/runners/**'
+              - '.github/workflows/**'
 
   fmt:
     needs: changes

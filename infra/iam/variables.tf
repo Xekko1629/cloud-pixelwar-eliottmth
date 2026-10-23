@@ -31,6 +31,7 @@ variable "deployer_roles" {
   default = [
     "roles/editor",
     "roles/resourcemanager.projectIamAdmin",
+    "roles/container.admin", # Helm charts of the runners create CRDs and cluster RBAC
   ]
 }
 
@@ -58,4 +59,33 @@ variable "deploy_tag_patterns" {
   description = "Tags allowed to deploy to this environment (empty = any)"
   type        = list(string)
   default     = []
+}
+
+variable "enable_runners" {
+  description = "Create the GitHub App secret and identities of the self-hosted runners in this environment"
+  type        = bool
+  default     = false
+}
+
+variable "billing_account" {
+  description = "Billing account ID the budget is attached to"
+  type        = string
+}
+
+variable "budget_amount" {
+  description = "Monthly budget of this project, in budget_currency"
+  type        = number
+  default     = 20
+}
+
+variable "budget_currency" {
+  description = "Currency of the budget, must match the billing account currency"
+  type        = string
+  default     = "EUR"
+}
+
+variable "budget_alert_thresholds" {
+  description = "Spent ratios of the budget that trigger an email alert"
+  type        = list(number)
+  default     = [0.5, 0.9, 1.0]
 }
