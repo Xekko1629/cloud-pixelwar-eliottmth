@@ -1,4 +1,4 @@
-# ADR-0007 · Données : grille infinie, tuiles 64×64, régions 1024×1024, palette de 16 couleurs
+# ADR-0007 · Données : grille infinie ou bornée par un admin, tuiles 64×64, régions 1024×1024, palette de 16 couleurs
 
 - **Statut** : Accepté
 - **Date** : 2026-10-23
@@ -24,6 +24,22 @@
 - `x` et `y` sont des **entiers signés**, de -1 000 000 000 à 1 000 000 000. `x` croît vers la droite, `y` vers le bas, et `(0, 0)` est l'origine où le frontend s'ouvre. Cette borne n'existe que pour valider les entrées : elle donne 2 milliards de pixels par côté, elle tient dans un entier 32 bits et dans les options entières de Discord, et garde des identifiants de documents courts.
 - Rien n'est préalloué : **seules les tuiles où au moins un pixel a été peint existent**. Le coût de stockage dépend de ce qui est dessiné, pas de la taille de la grille.
 - `config/global.bounds` garde le rectangle qui englobe tous les pixels peints. Le `draw-worker` l'agrandit quand un pixel tombe en dehors. Il sert au bouton « voir tout le dessin » du frontend, et au rendu de `/get` et `/snapshot`.
+
+### Taille réglable par un admin : `/admin size`
+
+La grille est infinie par défaut, mais un admin peut la borner, puis la rendre de nouveau infinie, sans redéployer.
+
+- **Commande** : `/admin size [width] [height]`, avec les mêmes contrôles d'autorisation que les autres commandes `/admin` (BOT-08).
+  - Sans option : la grille redevient infinie.
+  - Avec `width` et `height` : la grille devient le rectangle allant de `(0, 0)` à `(width - 1, height - 1)`.
+  - Chaque côté va de 10 000 (le minimum du sujet, §3.3) à 10⁹ (la borne de validation ci-dessus).
+- **Stockage** : `config/global.size`, qui vaut `null` (infinie) ou `{ width, height }`. Le `command-worker` l'écrit, comme il écrit l'état de pause.
+- **Qui vérifie quoi** :
+  - les proxies valident seulement les bornes fixes (±10⁹ et la palette). Ils ne lisent pas Firestore, et restent donc légers ;
+  - le `draw-worker` lit `config/global.size`, comme la pause, et rejette les pixels hors de la grille avec le motif `out_of_bounds` (`pixel-rejected`) ;
+  - le frontend écoute `config/global` (DRAW-04) : il affiche le bord de la grille, limite le déplacement et refuse de dessiner en dehors.
+- **Réduire la grille ne supprime rien.** Les pixels qui sortent du rectangle restent stockés, mais ne sont plus affichés, ni dessinables, ni rendus par `/get` et `/snapshot`. Si on agrandit de nouveau la grille, ils réapparaissent. Pour repartir de zéro, il y a `/admin clear`.
+- `/get` et `/snapshot` rendent l'intersection de `bounds` (la zone peinte) et de `size` (la grille).
 
 ### Palette de 16 couleurs
 
@@ -78,12 +94,12 @@ On ne peut pas afficher une grille infinie d'un coup. Comme une carte en ligne, 
 
 ### `/get` et `/snapshot`
 
-Ils rendent le rectangle `bounds`, c'est-à-dire tout ce qui a été peint, et pas la grille entière. Si ce rectangle dépasse une taille maximale (par exemple 4096 pixels de côté), l'image est réduite, à partir des images de la pyramide quand c'est possible. Cela borne la mémoire du `render-worker` et du `snapshot-worker` (DATA-05b), quelle que soit l'étendue du dessin.
+Ils rendent le rectangle `bounds`, c'est-à-dire tout ce qui a été peint (limité à `size` si la grille est bornée), et pas la grille entière. Si ce rectangle dépasse une taille maximale (par exemple 4096 pixels de côté), l'image est réduite, à partir des images de la pyramide quand c'est possible. Cela borne la mémoire du `render-worker` et du `snapshot-worker` (DATA-05b), quelle que soit l'étendue du dessin.
 
 ### Autres documents
 
 - `deltas/{id auto}` : temps réel, avec un TTL court (ADR-0003).
-- `config/global` : pause, `canvas_version` et `bounds`.
+- `config/global` : pause, `canvas_version`, `bounds` et `size`.
 - `users/{uid}` : quota de la fenêtre en cours, dernier rejet. `uid` = id Discord (ADR-0005).
 - `ratelimit_overrides/{uid}` : limites fixées par `/admin ratelimit`, illisibles depuis le navigateur.
 - Documents de déduplication par `event_id`, avec TTL (DATA-02).
@@ -98,7 +114,9 @@ Ils rendent le rectangle `bounds`, c'est-à-dire tout ce qui a été peint, et p
 
 | Option | Pourquoi elle est écartée |
 |---|---|
-| Grille fixe de 10000×10000 | Suffit pour le sujet, mais une grille infinie est plus intéressante et ne coûte presque rien de plus avec un stockage creux. Ce qui change vraiment, la vue éloignée et le rendu des images, est traité ci-dessus. |
+| Grille fixe de 10000×10000, inscrite dans le code | Suffit pour le sujet, mais une grille infinie est plus intéressante et ne coûte presque rien de plus avec un stockage creux. Avec `/admin size`, on garde de toute façon la possibilité de borner la grille, sans redéployer. |
+| Taille fixée par une variable Terraform | Changer la taille demanderait une release. Une commande admin agit tout de suite et se montre en démo. |
+| Supprimer les pixels qui sortent de la grille quand on la réduit | Opération coûteuse et irréversible, pour un simple réglage. `/admin clear` existe déjà pour repartir de zéro. |
 | Coordonnées sans aucune borne | Les entiers JavaScript perdent en précision au-delà de 2⁵³, et Discord borne lui aussi ses options entières. Une borne à un milliard reste infinie en pratique. |
 | Un document par pixel | Charger un viewport demanderait des centaines de milliers de lectures, donc un coût et une latence inacceptables. |
 | Toute la grille dans un document | Interdit par le sujet (§3.3), et impossible avec la limite de 1 Mio. |
@@ -121,10 +139,12 @@ Ils rendent le rectangle `bounds`, c'est-à-dire tout ce qui a été peint, et p
 - **Dispersion volontaire** : un utilisateur qui peint des pixels très éloignés crée une tuile et une région par pixel. Le rate limit (DATA-03) borne ce coût, et le test de charge doit aussi essayer ce cas.
 - **Pyramide** : un pixel modifié entraîne jusqu'à trois images à régénérer. L'`overview-worker` les regroupe par cycle (DATA-05c) ; la fraîcheur compte peu, puisque les deltas s'appliquent en direct par-dessus.
 - Une tuile très sollicitée (beaucoup de pixels au même endroit pendant le test de charge) peut provoquer des conflits de transaction. À mesurer pendant OBS-05a, et à atténuer en plafonnant la concurrence du worker.
+- `/admin size` ne fait pas partie des commandes imposées par le sujet (§3.2), qui demande d'implémenter « exactly these ». On la présente comme une commande en plus, qui ne modifie aucune des commandes obligatoires. À signaler à l'encadrant, en même temps que la question de l'ADR-0004.
 - Changer la taille des tuiles ou des régions après coup impose de migrer toutes les données. Ces valeurs sont donc fixées ici, et ne changeront que par un nouvel ADR.
 
 ## En soutenance
 
 - « La grille est infinie : on ne stocke que les tuiles de 64×64 où quelque chose a été peint, donc le coût suit le dessin, pas la taille. »
+- « Un admin peut la borner avec `/admin size`, sans redéployer. Le `draw-worker` applique la taille, comme la pause, et le frontend affiche le bord en temps réel. »
 - « On sépare les couleurs, 4 Kio par tuile et chargées par le canvas, des métadonnées, chargées seulement à l'inspection. 64, parce que les métadonnées doivent tenir sous la limite de 1 Mio d'un document Firestore. »
 - « Pour dézoomer, on affiche une pyramide d'images basse résolution, comme une carte. `/get` et `/snapshot` rendent la zone peinte, pas l'infini. »

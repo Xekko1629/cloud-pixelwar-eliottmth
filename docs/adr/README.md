@@ -19,7 +19,7 @@ Un ADR (*Architecture Decision Record*) consigne une décision d'architecture : 
 | [0004](0004-lectures-directes-firestore.md) | Lectures directes de Firestore depuis le navigateur | Proposé (à valider par l'encadrant) |
 | [0005](0005-identite-web-firebase-auth.md) | Identité web : OAuth2 Discord côté serveur, puis custom token Firebase | Accepté |
 | [0006](0006-hebergement-frontend-firebase-hosting.md) | Hébergement du frontend : Firebase Hosting | Accepté |
-| [0007](0007-modele-donnees-grille.md) | Données : grille infinie, tuiles 64×64, régions 1024×1024, palette de 16 couleurs | Accepté |
+| [0007](0007-modele-donnees-grille.md) | Données : grille infinie ou bornée par un admin, tuiles 64×64, régions 1024×1024, palette de 16 couleurs | Accepté |
 
 Décision attendue ailleurs : la stratégie de build des images (FND-06c) fera l'objet de l'ADR suivant.
 
