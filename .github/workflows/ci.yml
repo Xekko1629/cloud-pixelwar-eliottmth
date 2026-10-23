@@ -19,7 +19,7 @@ jobs:
       # JSON list of changed stacks, e.g. ["foundation"] or []
       stacks: ${{ steps.filter.outputs.changes }}
     steps:
-      # A workflow change re-checks every stack
+      # A workflow or .tflint.hcl change re-checks every stack
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -27,17 +27,25 @@ jobs:
             foundation:
               - 'infra/foundation/**'
               - '.github/workflows/**'
+              - '.tflint.hcl'
             iam:
               - 'infra/iam/**'
               - '.github/workflows/**'
+              - '.tflint.hcl'
             runners:
               - 'infra/runners/**'
               - '.github/workflows/**'
+              - '.tflint.hcl'
 
   fmt:
     needs: changes
     if: needs.changes.outputs.stacks != '[]'
     uses: ./.github/workflows/_fmt.yml
+
+  lint:
+    needs: changes
+    if: needs.changes.outputs.stacks != '[]'
+    uses: ./.github/workflows/_lint.yml
 
   validate:
     needs: changes
@@ -54,7 +62,7 @@ jobs:
       stacks: ${{ needs.changes.outputs.stacks }}
 
   plan:
-    needs: [changes, fmt, validate, test]
+    needs: [changes, fmt, lint, validate, test]
     if: contains(fromJSON(needs.changes.outputs.stacks), 'foundation')
     strategy:
       fail-fast: false
@@ -70,7 +78,7 @@ jobs:
   # Always reported, even when every other job is skipped: use it as the required status check
   result:
     name: CI result
-    needs: [changes, fmt, validate, test, plan]
+    needs: [changes, fmt, lint, validate, test, plan]
     if: always()
     runs-on: ubuntu-latest
     steps:

@@ -22,6 +22,11 @@ jobs:
     with:
       runner: ${{ inputs.runner }}
 
+  lint:
+    uses: ./.github/workflows/_lint.yml
+    with:
+      runner: ${{ inputs.runner }}
+
   validate:
     uses: ./.github/workflows/_validate.yml
     with:
@@ -33,7 +38,7 @@ jobs:
       runner: ${{ inputs.runner }}
 
   apply-dev:
-    needs: [fmt, validate, test]
+    needs: [fmt, lint, validate, test]
     uses: ./.github/workflows/_apply.yml
     permissions:
       contents: read
