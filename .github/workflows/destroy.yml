@@ -1,6 +1,7 @@
 name: Destroy
 
 # Manual only. Type the environment name in "confirm" to proceed.
+# prd: the runners are destroyed before the cluster. Always on GitHub-hosted runners.
 on:
   workflow_dispatch:
     inputs:
@@ -13,10 +14,6 @@ on:
         description: Type the environment name again to confirm
         type: string
         required: true
-      runner:
-        description: Runner label (empty = RUNNER_LABEL variable, then ubuntu-latest)
-        type: string
-        default: ""
 
 permissions:
   contents: read
@@ -35,12 +32,27 @@ jobs:
             exit 1
           fi
 
-  destroy:
+  destroy-runners:
     needs: confirm
+    if: inputs.environment == 'prd'
+    uses: ./.github/workflows/_destroy.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: prd
+      stack: runners
+      runner: ubuntu-latest
+      github_app: true
+
+  destroy:
+    needs: [confirm, destroy-runners]
+    # destroy-runners is skipped in dev
+    if: ${{ !failure() && !cancelled() }}
     uses: ./.github/workflows/_destroy.yml
     permissions:
       contents: read
       id-token: write
     with:
       environment: ${{ inputs.environment }}
-      runner: ${{ inputs.runner }}
+      runner: ubuntu-latest

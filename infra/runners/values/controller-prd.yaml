@@ -1,0 +1,14 @@
+# Actions Runner Controller (gha-runner-scale-set-controller), prd.
+# Runs on the "system" node pool: the "runners" pool is tainted for runner pods only.
+replicaCount: 1
+
+flags:
+  logLevel: info
+  logFormat: json
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 256Mi

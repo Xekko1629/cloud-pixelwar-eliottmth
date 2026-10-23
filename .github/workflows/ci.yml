@@ -32,6 +32,10 @@ jobs:
               - 'infra/iam/**'
               - '.github/workflows/**'
               - '.tflint.hcl'
+            runners:
+              - 'infra/runners/**'
+              - '.github/workflows/**'
+              - '.tflint.hcl'
 
   fmt:
     needs: changes

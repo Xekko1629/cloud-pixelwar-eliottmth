@@ -1,7 +1,8 @@
 name: Deploy
 
-# Tag v*: checks, apply dev, then apply prd.
+# Tag v*: checks, apply dev, then apply prd, then the runners (prd).
 # Manual run from any branch: checks, apply dev only.
+# foundation and runners always apply on GitHub-hosted runners: they create the self-hosted ones.
 on:
   push:
     tags: ["v*"]
@@ -44,7 +45,7 @@ jobs:
       id-token: write
     with:
       environment: dev
-      runner: ${{ inputs.runner }}
+      runner: ubuntu-latest
 
   apply-prd:
     needs: apply-dev
@@ -55,3 +56,16 @@ jobs:
       id-token: write
     with:
       environment: prd
+      runner: ubuntu-latest
+
+  apply-runners-prd:
+    needs: apply-prd
+    uses: ./.github/workflows/_apply.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: prd
+      stack: runners
+      runner: ubuntu-latest
+      github_app: true

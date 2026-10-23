@@ -1,5 +1,5 @@
-project_id  = "cloud-pixelwar-prod"
-vpc_name    = "pixelwar-prod-vpc"
-cidr_block  = "10.0.1.0/24"
-vpc_name2   = "pixelwar-prod-vpc-2"
-cidr_block2 = "10.0.2.0/24"
+project_id         = "cloud-pixelwar-prod"
+vpc_cluster_name   = "pixelwar-prod-cluster-vpc"
+cidr_cluster_block = "10.0.1.0/24"
+environment        = "prd"
+enable_cluster     = true

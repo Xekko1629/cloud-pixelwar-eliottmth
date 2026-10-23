@@ -1,0 +1,5 @@
+apiVersion: v2
+name: arc-github-secret
+description: Syncs the GitHub App credentials of the runners from GCP Secret Manager into a Kubernetes secret
+type: application
+version: 0.1.0

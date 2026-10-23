@@ -15,6 +15,10 @@ on:
         description: Runner label (empty = RUNNER_LABEL variable, then ubuntu-latest)
         type: string
         default: ""
+      github_app:
+        description: Give Terraform a GitHub App token (GITHUB_TOKEN) read from the arc-github-app secret
+        type: boolean
+        default: false
 
 env:
   TF_VERSION: "1.17.0"
@@ -50,15 +54,47 @@ jobs:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.DEPLOYER_SA }}
 
+      # Short-lived GitHub App installation token for the Terraform github provider (stacks managing RUNNER_LABEL)
+      - name: Read GitHub App credentials
+        id: github_app
+        if: inputs.github_app
+        run: |
+          creds=$(gcloud secrets versions access latest --secret=arc-github-app --project="$GOOGLE_CLOUD_PROJECT")
+          client_id=$(jq -r .github_app_id <<<"$creds")  # Client ID, also accepted by ARC as github_app_id
+          private_key=$(jq -r .github_app_private_key <<<"$creds")
+          while IFS= read -r line; do
+            [ -n "$line" ] && echo "::add-mask::$line"
+          done <<<"$private_key"
+          echo "client_id=$client_id" >> "$GITHUB_OUTPUT"
+          {
+            echo "private_key<<PRIVATE_KEY_EOF"
+            echo "$private_key"
+            echo "PRIVATE_KEY_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/create-github-app-token@v3
+        id: github_app_token
+        if: inputs.github_app
+        with:
+          client-id: ${{ steps.github_app.outputs.client_id }}
+          private-key: ${{ steps.github_app.outputs.private_key }}
+          permission-variables: write
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
       - name: Init
+        env:
+          GITHUB_TOKEN: ${{ steps.github_app_token.outputs.token }}
         run: terraform init -backend-config="backends/${{ inputs.environment }}.hcl"
 
       - name: Plan
+        env:
+          GITHUB_TOKEN: ${{ steps.github_app_token.outputs.token }}
         run: terraform plan -var-file="${{ inputs.environment }}.tfvars" -out=tfplan
 
       - name: Apply
+        env:
+          GITHUB_TOKEN: ${{ steps.github_app_token.outputs.token }}
         run: terraform apply tfplan

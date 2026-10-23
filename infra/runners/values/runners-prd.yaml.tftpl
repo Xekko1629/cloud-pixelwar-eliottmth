@@ -1,0 +1,35 @@
+# Runner scale set (gha-runner-scale-set), prd.
+# Each job gets an ephemeral runner pod on the "runners" node pool; pending pods make that pool scale up from 0.
+githubConfigUrl: ${github_config_url}
+githubConfigSecret: ${github_config_secret}
+runnerScaleSetName: ${runner_scale_set_name}
+
+minRunners: ${min_runners}
+maxRunners: ${max_runners}
+
+# Explicit, instead of a cluster lookup that fails during plans
+controllerServiceAccount:
+  namespace: ${controller_namespace}
+  name: ${controller_service_account}
+
+template:
+  spec:
+    nodeSelector:
+      pool: runners
+    tolerations:
+      - key: dedicated
+        operator: Equal
+        value: runners
+        effect: NoSchedule
+    containers:
+      - name: runner
+        # Must stay recent: GitHub rejects outdated runner versions, and ephemeral runners do not self-update
+        image: ghcr.io/actions/actions-runner:latest
+        command: ["/home/runner/run.sh"]
+        resources:
+          # About one runner per e2-standard-2 node, so max_runners drives the node count
+          requests:
+            cpu: "1"
+            memory: 2Gi
+          limits:
+            memory: 4Gi
