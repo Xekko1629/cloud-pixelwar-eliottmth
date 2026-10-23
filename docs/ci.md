@@ -197,5 +197,5 @@ and the deploy jobs of `infra/runners` read it in memory to mint a one-hour GitH
 
 - `runners` node pool: `e2-standard-2`, 0 to 3 nodes; runner pods request 1 vCPU / 2 GiB (about one runner per node), `maxRunners: 3`.
 - `system` node pool: one spot `e2-medium` for the controller and system pods.
-- Budget alerts per project (`infra/iam/budget.tf`): 20 EUR by default, emails at 50 %, 90 % and 100 %.
+- Budget alerts per project (`infra/iam/budget.tf`): 20 EUR, emails at 50 %, 90 % and 100 % (see [GCP projects and costs](gcp.md)).
 - Runner activity: Cloud Logging, `resource.type="k8s_container" AND resource.labels.namespace_name=("arc-runners" OR "arc-systems")`.
