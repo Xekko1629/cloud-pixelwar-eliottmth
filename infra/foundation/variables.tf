@@ -9,22 +9,29 @@ variable "region" {
   default     = "europe-west1"
 }
 
-variable "cidr_block" {
-  description = "CIDR Variable"
+variable "vpc_cluster_name" {
+  description = "Name of the VPC hosting the GKE cluster"
   type        = string
 }
 
-variable "vpc_name" {
-  description = "VPC Name"
+variable "cidr_cluster_block" {
+  description = "Primary CIDR of the cluster subnet (nodes)"
   type        = string
 }
 
-variable "cidr_block2" {
-  description = "CIDR Variable"
+variable "environment" {
+  description = "Environment name (dev or prd)"
   type        = string
 }
 
-variable "vpc_name2" {
-  description = "VPC Name"
+variable "zone" {
+  description = "Zone of the GKE cluster"
   type        = string
+  default     = "europe-west1-b"
+}
+
+variable "enable_cluster" {
+  description = "Create the GKE cluster (CI runners) in this environment"
+  type        = bool
+  default     = false
 }
