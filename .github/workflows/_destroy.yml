@@ -1,0 +1,55 @@
+name: Terraform destroy
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: Target environment (dev or prd)
+        type: string
+        required: true
+      stack:
+        description: Stack directory under infra/
+        type: string
+        default: foundation
+      runner:
+        description: Runner label (empty = RUNNER_LABEL variable, then ubuntu-latest)
+        type: string
+        default: ""
+
+env:
+  TF_VERSION: "1.17.0"
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+
+jobs:
+  destroy:
+    name: destroy ${{ inputs.stack }} (${{ inputs.environment }})
+    runs-on: ${{ inputs.runner || vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    environment: ${{ inputs.environment }}
+    # Shares the apply lock: never destroy while an apply runs
+    concurrency:
+      group: terraform-${{ inputs.environment }}-${{ inputs.stack }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: infra/${{ inputs.stack }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOYER_SA }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Init
+        run: terraform init -backend-config="backends/${{ inputs.environment }}.hcl"
+
+      - name: Destroy
+        run: terraform destroy -auto-approve -var-file="${{ inputs.environment }}.tfvars"

@@ -9,8 +9,3 @@ resource "google_compute_subnetwork" "main" {
   ip_cidr_range = var.cidr_block
   region        = var.region
 }
-
-output "vpc_id" {
-  value       = google_compute_network.main.id
-  description = "The id of the created VPC network"
-}

@@ -1,0 +1,46 @@
+name: Destroy
+
+# Manual only. Type the environment name in "confirm" to proceed.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to destroy
+        type: choice
+        options: [dev, prd]
+        default: dev
+      confirm:
+        description: Type the environment name again to confirm
+        type: string
+        required: true
+      runner:
+        description: Runner label (empty = RUNNER_LABEL variable, then ubuntu-latest)
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  confirm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != "$ENVIRONMENT" ]; then
+            echo "::error::Confirmation '$CONFIRM' does not match environment '$ENVIRONMENT'"
+            exit 1
+          fi
+
+  destroy:
+    needs: confirm
+    uses: ./.github/workflows/_destroy.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: ${{ inputs.environment }}
+      runner: ${{ inputs.runner }}
