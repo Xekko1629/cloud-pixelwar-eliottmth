@@ -8,3 +8,13 @@ variable "region" {
   type        = string
   default     = "europe-west1"
 }
+
+variable "cidr_block" {
+  description = "CIDR Variable"
+  type        = string
+}
+
+variable "vpc_name" {
+  description = "VPC Name"
+  type        = string
+}
