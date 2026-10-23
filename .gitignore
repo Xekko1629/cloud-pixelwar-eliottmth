@@ -1,14 +1,11 @@
-.terraform/
-*.json
-.env
-
 # Terraform
+# Le .terraform.lock.hcl de chaque stack reste versionné.
 **/.terraform/*
 *.tfstate
 *.tfstate.*
+*.tfplan
 crash.log
 crash.*.log
-*.tfplan
 override.tf
 override.tf.json
 *_override.tf
@@ -16,5 +13,31 @@ override.tf.json
 .terraformrc
 terraform.rc
 
+# Secrets
+# Clés de service account et identifiants. gitleaks (SEC-02) rattrape le reste.
+.env
+.env.*
+!.env.example
+*-key.json
+*-sa.json
+credentials*.json
+service-account*.json
+application_default_credentials.json
+
+# Node.js / TypeScript
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+npm-debug.log*
+
+# Firebase
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
 # OS / editor
 .DS_Store
+Thumbs.db
