@@ -1,5 +1,20 @@
 {
   "name": "@pixelwar/shared",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "exports": {
+    "./observability": "./src/observability/index.ts",
+    "./observability/google": "./src/observability/google.ts"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "1.10.0",
+    "@opentelemetry/context-async-hooks": "3.0.0",
+    "@opentelemetry/core": "3.0.0",
+    "@opentelemetry/exporter-metrics-otlp-proto": "0.300.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "0.300.0",
+    "@opentelemetry/resources": "3.0.0",
+    "@opentelemetry/sdk-metrics": "3.0.0",
+    "@opentelemetry/sdk-trace": "3.0.0",
+    "google-auth-library": "11.3.2"
+  }
 }

@@ -18,6 +18,7 @@ resource "google_project_iam_member" "observability" {
     "roles/logging.logWriter",
     "roles/cloudtrace.agent",
     "roles/monitoring.metricWriter",
+    "roles/telemetry.tracesWriter",
   ])
 
   project = var.project_id

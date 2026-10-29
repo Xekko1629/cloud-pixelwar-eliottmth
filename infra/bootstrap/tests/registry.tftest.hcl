@@ -27,4 +27,12 @@ run "persistent_registry" {
     condition     = alltrue([for api in google_project_service.serverless : api.disable_on_destroy == false])
     error_message = "Bootstrap destruction must not disable APIs used by other stacks."
   }
+
+  assert {
+    condition = alltrue([
+      for service in ["logging.googleapis.com", "monitoring.googleapis.com", "cloudtrace.googleapis.com", "telemetry.googleapis.com"] :
+      google_project_service.serverless[service].service == service
+    ])
+    error_message = "Structured logs and OTLP exports require the observability APIs."
+  }
 }

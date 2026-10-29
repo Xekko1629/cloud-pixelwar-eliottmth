@@ -3,6 +3,10 @@ resource "google_project_service" "serverless" {
     "artifactregistry.googleapis.com",
     "run.googleapis.com",
     "secretmanager.googleapis.com",
+    "logging.googleapis.com",
+    "monitoring.googleapis.com",
+    "cloudtrace.googleapis.com",
+    "telemetry.googleapis.com",
   ])
 
   project            = var.project_id

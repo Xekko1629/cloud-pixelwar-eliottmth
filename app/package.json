@@ -13,6 +13,7 @@
     "test:integration": "firebase emulators:exec --project demo-pixelwar-test --only firestore,pubsub 'vitest run --config vitest.integration.config.ts'"
   },
   "devDependencies": {
+    "@opentelemetry/api": "1.10.0",
     "@google-cloud/firestore": "9.4.0",
     "@google-cloud/pubsub": "6.3.2",
     "@types/node": "^24.0.0",
