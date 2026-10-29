@@ -76,10 +76,13 @@ jobs:
     with:
       environment: ${{ matrix.environment }}
 
+  application:
+    uses: ./.github/workflows/_app-test.yml
+
   # Always reported, even when every other job is skipped: use it as the required status check
   result:
     name: CI result
-    needs: [changes, fmt, validate, test, plan]
+    needs: [changes, fmt, validate, test, plan, application]
     if: always()
     runs-on: ubuntu-latest
     steps:

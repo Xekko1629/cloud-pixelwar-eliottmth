@@ -1,0 +1,5 @@
+{
+  "name": "@pixelwar/frontend",
+  "private": true,
+  "type": "module"
+}

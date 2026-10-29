@@ -1,0 +1,63 @@
+name: Application tests
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  application:
+    # Node/Java installation stays on a hosted runner until the self-hosted
+    # image provides these prerequisites (no application workloads run on GKE).
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Cache emulator downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}-${{ hashFiles('app/package-lock.json', 'app/firebase.json') }}
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: TypeScript strict checks
+        run: npm run typecheck
+
+      - name: Unit tests and coverage threshold
+        run: npm run test:coverage
+
+      - name: Firestore and PubSub integration tests
+        run: npm run test:integration
+
+      - name: Publish coverage in run summary
+        if: always()
+        run: node testing/coverage-summary.mjs
+
+      - name: Upload coverage and test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: application-test-reports
+          path: |
+            app/coverage/
+            app/test-results/
+          if-no-files-found: warn
+          retention-days: 14
