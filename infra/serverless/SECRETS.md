@@ -29,11 +29,43 @@ du bot : ne pas attribuer cet accès par défaut à tous les notifiers.
 - Les fichiers providers, variables, tfvars et backends proviennent du socle
   SRV-01 désormais fusionné dans `prod`. Les ressources de secrets appartiennent
   au même state `serverless`, pas à un nouveau state.
-- Après intégration de la pipeline serverless (SRV-02), déployer ces définitions
-  via GitHub Actions avant d'injecter leurs premières valeurs. La CI de PR
-  vérifie déjà le stack et ses tests simulés grâce aux filtres ajoutés par SRV-01.
+- Cette PR branche le stack Terraform `serverless` au workflow `Deploy` : manuel
+  → dev uniquement ; tag `v*` → dev puis prd, après succès de chaque étape.
+  Un merge sur `prod` seul ne fait pas d'apply. Le build/push et la promotion des
+  images applicatives restent dans SRV-02. La CI de PR vérifie le stack et ses
+  tests simulés ; les contrôles de release incluent aussi le bootstrap et le module.
 - Activer les cinq conteneurs ne suffit pas à démarrer les services : une version
   référencée doit exister et le compte du service doit avoir les permissions.
+
+### Premier déploiement — validation explicite avant déclenchement
+
+1. Vérifier que l'API Secret Manager est active dans le projet cible, via le
+   bootstrap persistant `infra/bootstrap`. Ne pas ajouter une activation dupliquée
+   au state serverless. Le workflow ne déploie pas automatiquement ce bootstrap.
+2. Vérifier les variables WIF/`DEPLOYER_SA` de l'environnement GitHub, les accès
+   au backend GCS et les droits de gestion des conteneurs de secrets. Ne pas
+   accorder un accès global aux valeurs pour contourner un problème de déploiement.
+3. Avec une identité autorisée, produire et relire un plan **sans apply** depuis
+   `infra/serverless` :
+
+   ```sh
+   terraform init -reconfigure -backend-config=backends/dev.hcl
+   terraform plan -var-file=dev.tfvars
+   ```
+
+   Pour un state serverless vide, attendre cinq créations de secrets, pas de
+   valeurs ni de suppression inattendue. Adapter l'attente si d'autres ressources
+   sont déjà dans ce state. Les plans distants automatiques des PR restent
+   limités à `foundation` ; le workflow `Deploy` planifie puis applique sans pause
+   entre ces deux commandes, ce n'est pas une approbation interactive du plan.
+4. Après merge et accord explicite, déclencher manuellement `Deploy` depuis
+   `prod` pour valider en dev. Attention : ce workflow applique aussi `foundation`.
+   Vérifier les conteneurs dans `cloud-pixelwar-dev`, puis injecter les valeurs.
+5. Avant prd, relire le plan avec le backend et le tfvars prd, puis utiliser la
+   release taguée validée et les approbations de l'environnement GitHub `prd`.
+   La release repasse aussi par dev ; ce n'est pas un déploiement prd isolé.
+
+Aucune de ces opérations GCP n'est effectuée par les tests locaux du ticket.
 
 ## Ajouter une valeur hors du dépôt
 
@@ -96,6 +128,9 @@ encore leurs accès en conditions réelles.
   validation et vérification des besoins de rollback ; ne pas la supprimer à l'aveugle.
 - Destroy : `deletion_policy = "DELETE"` autorise la suppression des conteneurs
   **et de toutes leurs versions**. Le state ne contient pas de copie des valeurs.
+  Le workflow manuel `Destroy` inclut désormais `serverless` avant les runners
+  (prd) et `foundation`. La confirmation du nom d'environnement couvre donc
+  aussi cette perte de valeurs ; `arc-github-app`, géré dans `iam`, n'est pas ciblé.
 - Recréation : Terraform recrée les conteneurs, pas les valeurs. Il faudra les
   réinjecter depuis une source sûre et mettre à jour les références de version.
   Cette étape manuelle doit rester explicite dans le runbook de reconstruction.

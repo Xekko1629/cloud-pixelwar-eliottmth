@@ -51,4 +51,16 @@ Remplacer `dev` par `prd` pour la production. Ces commandes ne font pas d'apply.
 
 La CI de PR détecte désormais `bootstrap`, `serverless` et le module `service` pour le formatage, la validation et les tests sans backend. Le module est testé séparément : Terraform ne découvre pas automatiquement ses tests depuis la racine.
 
-Les plans distants et déploiements ciblent encore `foundation`. L'intégration des nouveaux stacks aux plans dev/prd, le build/push des images et leur déploiement relèvent de SRV-02 ; ce squelette n'est pas encore automatiquement déployé.
+SRV-03 intègre désormais ce stack au déploiement : exécution manuelle →
+`foundation` puis `serverless` en dev ; tag `v*` → même séquence en dev, puis en
+prd, puis `runners` en prd. Un merge/push sur la branche `prod` seul ne déclenche
+pas d'apply. Les contrôles de release incluent aussi `bootstrap`, `serverless`
+et le module `service`. Le bootstrap persistant doit déjà avoir été appliqué
+séparément dans chaque projet pour activer les APIs ; il n'est pas auto-déployé.
+
+Le destroy manuel supprime `serverless` (secrets et toutes leurs versions), puis
+`runners` en prd, puis `foundation`. `iam` et `bootstrap` sont conservés.
+Les plans distants de PR restent limités à `foundation` ; le plan serverless est
+calculé dans le job d'apply avant application. Faire relire un plan serverless
+séparé avant le premier déclenchement, voir [SECRETS.md](SECRETS.md).
+Le build/push des images et la promotion applicative par digest restent dans SRV-02.
