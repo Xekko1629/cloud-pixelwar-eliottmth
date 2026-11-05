@@ -12,6 +12,7 @@ export default defineConfig({
           include: [
             'shared/**/*.test.ts',
             'functions/**/*.test.ts',
+            'tools/**/*.test.ts',
             'testing/**/*.test.ts',
           ],
           exclude: ['**/*.integration.test.ts', '**/node_modules/**'],
@@ -32,6 +33,7 @@ export default defineConfig({
       reporter: ['text', 'json-summary', 'lcov', 'html'],
       include: [
         'functions/*/src/**/*.ts',
+        'tools/*/src/**/*.ts',
         'shared/src/**/*.ts',
         'frontend/src/**/*.ts',
         'testing/emulator-environment.ts',

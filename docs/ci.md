@@ -9,6 +9,12 @@ are used. Coverage is published in the run summary and reports are uploaded as
 artifacts. `CI result` depends on this job, so failures block the required check.
 See [testing.md](testing.md) for local commands, limitations and dependency alerts.
 
+BOT-02 provides the Discord command registration tool and its
+[post-deployment integration contract](discord-commands.md). It is not yet wired
+to this infrastructure workflow; SRV-02 must call it after a successful
+application deployment, with environment-scoped credentials. PR tests never
+register real Discord commands.
+
 ## GitFlow
 
 - `prod`: default branch, always deployable, protected (PR + review + green checks + signed commits).
