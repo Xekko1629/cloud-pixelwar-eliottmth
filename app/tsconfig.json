@@ -13,6 +13,7 @@
   "include": [
     "shared/**/*.ts",
     "functions/**/*.ts",
+    "tools/**/*.ts",
     "frontend/**/*.ts",
     "testing/**/*.ts",
     "vitest*.ts"

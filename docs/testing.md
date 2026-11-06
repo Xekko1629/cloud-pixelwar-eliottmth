@@ -57,6 +57,7 @@ et ne doit pas être déployé avec `firebase deploy`.
 ## Ajouter des tests
 
 - Backend : `shared/**/*.test.ts`, `functions/**/*.test.ts`.
+- Outils : `tools/**/*.test.ts`, dont l'enregistrement Discord simulé (BOT-02).
 - Frontend : `frontend/**/*.test.ts` ; jsdom fournit le DOM, **pas** un navigateur
   réel, ni un moteur de rendu Canvas/WebGL complet. Des tests navigateur viendront
   avec le canvas.
@@ -72,6 +73,7 @@ Le seuil initial est **70 % par fichier** pour lignes, instructions, fonctions
 et branches sur :
 
 - `functions/*/src/**/*.ts` (proxies et workers) ;
+- `tools/*/src/**/*.ts` (outils de déploiement) ;
 - `shared/src/**/*.ts` ;
 - `frontend/src/**/*.ts` ;
 - le garde-fou d'environnement des tests.

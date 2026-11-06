@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
+    "discord:commands": "tsx tools/discord-commands/src/cli.ts",
     "test:coverage": "vitest run --config vitest.config.ts --coverage",
     "emulators": "firebase emulators:start --project demo-pixelwar-test --only firestore,pubsub",
     "test:integration": "firebase emulators:exec --project demo-pixelwar-test --only firestore,pubsub 'vitest run --config vitest.integration.config.ts'"
@@ -20,6 +21,7 @@
     "@vitest/coverage-v8": "5.0.5",
     "firebase-tools": "15.34.2",
     "jsdom": "30.1.3",
+    "tsx": "4.23.15",
     "typescript": "^5.9.0",
     "vitest": "5.0.5"
   }
