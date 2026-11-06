@@ -60,17 +60,20 @@ La grille est infinie par défaut, mais un admin peut la borner, puis la rendre 
 - La grille est découpée en tuiles de 64×64 pixels, indexées par `(tx, ty) = (⌊x/64⌋, ⌊y/64⌋)`. La division arrondit **vers le bas**, y compris pour les coordonnées négatives : le pixel `x = -1` est dans la tuile `tx = -1`, au rang local 63. Cette fonction est écrite une seule fois dans le paquet partagé (ADR-0001), et testée sur les valeurs négatives.
 - Chaque tuile a **deux documents**, pour que le canvas ne charge que ce dont il a besoin :
   - **couleurs** : un champ `Bytes` de 4 096 octets (un par pixel) et `updated_at`. C'est ce que charge le canvas. Une tuile absente est une tuile vide : le frontend n'a rien à télécharger ;
-  - **métadonnées** : auteur (id Discord et pseudo) et date de modification de chaque pixel peint. Elles ne sont chargées que lorsqu'on inspecte un pixel (WEB-04). Ce champ est exclu de l'indexation (exemption d'index), sinon chaque pixel compterait dans la limite de 40 000 entrées d'index et alourdirait chaque écriture.
-- Les identifiants de documents sont préfixés par `canvas_version`, ce qui permet d'effacer toute la grille en temps constant, sans tout supprimer d'un coup (DATA-04). Sur une grille infinie, c'est la seule façon raisonnable d'effacer.
+  - **métadonnées** : une map `pixels` indexée par la position locale `0..4095`, chaque entrée contenant `uid` (id Discord sous forme de chaîne), `name` (pseudo au moment de la modification), `at` (`occurred_at` en Timestamp Firestore) et `eid` (UUID d'événement sur 16 octets, pour départager deux événements de même horodatage). Elles ne sont chargées que lorsqu'on inspecte un pixel (WEB-04). Le champ `pixels` est exclu de l'indexation (exemption d'index), sinon chaque pixel compterait dans la limite de 40 000 entrées d'index et alourdirait chaque écriture.
+- Les deux documents portent le même identifiant `v{canvas_version}_{tx}_{ty}`, ainsi que `canvas_version`, `tx`, `ty`, `region` et `updated_at`. Le préfixe de version permet d'effacer toute la grille en temps constant, sans tout supprimer d'un coup (DATA-04). Sur une grille infinie, c'est la seule façon raisonnable d'effacer.
+- Le format binaire des deltas est décrit dans ADR-0003 ; les index composites et les exemptions de champs sont déclarés dans `app/firestore.indexes.json`.
 
 Pourquoi 64 :
 
-| Taille | Couleurs par tuile | Métadonnées au pire (environ 50 octets par pixel) | Verdict |
+| Taille | Couleurs par tuile | Métadonnées au pire (ID 20 chiffres, pseudo 128 octets UTF-8) | Verdict |
 |---|---|---|---|
-| 32×32 | 1 Kio | environ 50 Ko | Quatre fois plus de documents à lire pour le même viewport. |
-| **64×64** | **4 Kio** | **environ 200 Ko** | Tient largement sous 1 Mio. Un viewport 1920×1080 à 1 pixel d'écran par pixel de grille charge au plus environ 550 tuiles, soit 2,2 Mo, et beaucoup moins là où rien n'est peint. |
-| 128×128 | 16 Kio | environ 800 Ko | Trop près de 1 Mio dès qu'on ajoute le pseudo. |
-| 256×256 | 64 Kio | environ 3,2 Mo | Impossible : dépasse 1 Mio. |
+| 32×32 | 1 Kio | environ 232 Ko | Quatre fois plus de documents à lire pour le même viewport. |
+| **64×64** | **4 Kio** | **928 865 octets** | Tient sous 1 Mio, avec environ 120 Kio de marge. Un viewport 1920×1080 à 1 pixel d'écran par pixel de grille charge au plus environ 550 tuiles, soit 2,2 Mo, et beaucoup moins là où rien n'est peint. |
+| 128×128 | 16 Kio | environ 3,7 Mo | Impossible : dépasse 1 Mio. |
+| 256×256 | 64 Kio | environ 14,9 Mo | Impossible : dépasse 1 Mio. |
+
+Le calcul réel compte les noms de champs, les valeurs et le surcoût de 32 octets par map Firestore. Une tuile pleine avec un pseudo réaliste de 32 octets reste autour de 543 Ko, et environ 445 Ko avec un pseudo de 8 octets : l'ancienne estimation de 200 Ko était trop optimiste. Le code partagé `app/shared/src/grid/metadata.ts` implémente ce calcul et le test le vérifie. La marge n'autorise pas l'ajout d'un nouveau champ par pixel sans re-mesure.
 
 ### Régions de 1024×1024
 
@@ -106,7 +109,8 @@ Ils rendent le rectangle `bounds`, c'est-à-dire tout ce qui a été peint (limi
 
 ### Écriture
 
-- Le `draw-worker` groupe les pixels d'un lot **par tuile** : une seule écriture par tuile et par lot, dans une transaction qui écrit aussi les deltas (ADR-0003).
+- Un lot accepté est plafonné à **500 pixels** par défaut, valeur configurable. Un trait plus long est redécoupé côté client ; un lot qui dépasse les budgets de tuiles, de documents ou d'octets est refusé explicitement, pas appliqué partiellement. Le budget transactionnel exact reste à mesurer avec DATA-02.
+- Le `draw-worker` groupe les pixels d'un lot **par tuile** : une écriture pour le document de couleurs et une pour celui des métadonnées de chaque tuile touchée, dans une transaction qui écrit aussi **un delta par région** (ADR-0003). Un lot touchant `T` tuiles et `R` régions écrit donc `2T + R` documents, avant les documents annexes (déduplication, quota, `bounds`) ; le code partagé expose ce calcul et un budget configurable.
 - La concurrence maximale du worker est plafonnée (DRAW-02), pour rester sous le débit qu'un document de tuile supporte.
 - `bounds` n'est réécrit que si le lot sort du rectangle actuel, ce qui devient vite rare. Ce document ne devient donc pas un point chaud en écriture.
 

@@ -4,6 +4,7 @@
 !app/package-lock.json
 !app/tsconfig.json
 !app/firebase.json
+!app/firestore.indexes.json
 !app/shared/package.json
 !app/frontend/package.json
 !app/functions/*/package.json
