@@ -1,0 +1,131 @@
+name: Dev Discord secret access
+
+# Never called from Deploy/Destroy or on a PR. One approved saved plan per run.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type cloud-pixelwar-dev to request the six dev secret read grants
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-dev-access
+  cancel-in-progress: false
+
+env:
+  TF_VERSION: "1.17.0"
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+
+jobs:
+  plan:
+    if: github.ref == 'refs/heads/prod'
+    runs-on: ubuntu-latest
+    environment: access-dev-plan
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      plan_sha256: ${{ steps.digest.outputs.sha256 }}
+    defaults:
+      run:
+        working-directory: infra/access
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Check explicit dev confirmation
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: test "$CONFIRM" = cloud-pixelwar-dev
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.ACCESS_SA }}
+          project_id: cloud-pixelwar-dev
+
+      - name: Init isolated access state
+        run: terraform init -input=false -lockfile=readonly -backend-config=backends/dev.hcl
+
+      - name: Plan IAM grants only
+        run: terraform plan -input=false -lock-timeout=60s -var-file=dev.tfvars -out=access.tfplan
+
+      - name: Publish plan for admin review
+        run: |
+          terraform show -no-color access.tfplan > access-plan.txt
+          {
+            echo '## Dev secret access — review before approving access-dev'
+            echo "Commit: $GITHUB_SHA"
+            echo '```'
+            cat access-plan.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Digest saved plan
+        id: digest
+        run: echo "sha256=$(sha256sum access.tfplan | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: access-dev-plan
+          path: infra/access/access.tfplan
+          retention-days: 1
+          if-no-files-found: error
+
+  apply:
+    needs: plan
+    runs-on: ubuntu-latest
+    # Required reviewer Xekko1629 and prod-only policy are bootstrapped in iam.
+    environment: access-dev
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: infra/access
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.ACCESS_SA }}
+          project_id: cloud-pixelwar-dev
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: access-dev-plan
+          path: infra/access
+
+      - name: Verify approved plan digest
+        env:
+          PLAN_SHA256: ${{ needs.plan.outputs.plan_sha256 }}
+        run: printf '%s  access.tfplan\n' "$PLAN_SHA256" | sha256sum --check --status
+
+      - name: Init isolated access state
+        run: terraform init -input=false -lockfile=readonly -backend-config=backends/dev.hcl
+
+      - name: Apply the saved plan (never replan after approval)
+        run: terraform apply -input=false -lock-timeout=60s access.tfplan

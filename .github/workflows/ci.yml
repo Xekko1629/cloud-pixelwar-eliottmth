@@ -30,6 +30,9 @@ jobs:
             iam:
               - 'infra/iam/**'
               - '.github/workflows/**'
+            access:
+              - 'infra/access/**'
+              - '.github/workflows/**'
             bootstrap:
               - 'infra/bootstrap/**'
               - '.github/workflows/**'
