@@ -69,6 +69,9 @@ terraform plan -var-file=<env>.tfvars -out=access.tfplan
 terraform apply access.tfplan
 ```
 
+Ou, pour `iam` puis `access` dans les deux environnements, avec confirmation
+avant chaque apply : `just manual` (voir `scripts/apply-manual.sh`).
+
 Relire tout le plan : seules des attributions `editor`, `billing.viewer` (prd)
 et `secretAccessor` (dev) doivent apparaître, sans suppression inattendue.
 Le plan contient des emails : ne pas le committer.
