@@ -1,0 +1,12 @@
+# Vérifications lancées avant chaque commit. Activer une fois : lefthook install
+pre-commit:
+  commands:
+    terraform-fmt:
+      glob: "*.{tf,tfvars}"
+      run: terraform fmt -check -recursive infra
+      fail_text: "Fichiers Terraform mal formatés : lancer just fmt"
+    tflint:
+      glob: "*.tf"
+      run: just lint
+    gitleaks:
+      run: just leaks

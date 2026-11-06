@@ -19,11 +19,7 @@ resource "google_secret_manager_secret" "application" {
     auto {}
   }
 
-  labels = {
-    project     = "pixelwar"
-    environment = var.environment
-    managed_by  = "terraform"
-  }
+  labels = local.labels
 
   # Keep application resources disposable. Destroy also deletes stored versions.
   deletion_policy = "DELETE"

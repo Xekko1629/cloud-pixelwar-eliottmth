@@ -1,0 +1,34 @@
+name: TFLint
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: Runner label (empty = RUNNER_LABEL variable, then ubuntu-latest)
+        type: string
+        default: ""
+
+env:
+  TFLINT_VERSION: "v0.64.0"
+
+jobs:
+  lint:
+    name: tflint
+    runs-on: ${{ inputs.runner || vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: terraform-linters/setup-tflint@v6
+        with:
+          tflint_version: ${{ env.TFLINT_VERSION }}
+          cache: true
+
+      # Downloads the plugins listed in .tflint.hcl (the token avoids the GitHub API rate limit)
+      - name: Init plugins
+        run: tflint --init
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      # With --recursive, tflint looks for the config in each module: pass the root one by absolute path
+      - name: Lint every stack
+        run: tflint --recursive --chdir=infra --config="$GITHUB_WORKSPACE/.tflint.hcl" --format=compact

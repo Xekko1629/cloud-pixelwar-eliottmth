@@ -5,3 +5,4 @@
 - [Tests applicatifs et émulateurs](testing.md)
 - [Observabilité commune des services](observability.md)
 - [Décisions d'architecture (ADR)](adr/README.md)
+- [Outillage du dépôt](outillage.md)

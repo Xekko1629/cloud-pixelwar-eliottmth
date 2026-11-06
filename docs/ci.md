@@ -28,7 +28,7 @@ register real Discord commands.
 | Tag `v*` pushed (`deploy.yml`) | ✅ | — | foundation → serverless | foundation → serverless → runners, after dev |
 | Manual run of `destroy.yml` | — | — | destroy dev or prd: serverless → runners (prd only) → foundation | |
 
-Checks: `terraform fmt -check`, `terraform validate` and `terraform test` (`*.tftest.hcl`) on each stack.
+Checks: `terraform fmt -check`, `tflint` (rules in `.tflint.hcl`), `terraform validate` and `terraform test` (`*.tftest.hcl`) on each stack.
 Any failure stops the pipeline before plan or apply.
 
 PR checks select changed directories: `foundation`, `iam`, `bootstrap`,
@@ -53,6 +53,7 @@ an intervening review pause; PRs do not yet publish serverless remote plans.
 ├── deploy.yml      # foundation + serverless dev, then prd + runners (tag only)
 ├── destroy.yml     # typed confirmation; serverless, runners (prd only), foundation
 ├── _fmt.yml        # reusable steps, never run directly
+├── _lint.yml
 ├── _validate.yml
 ├── _test.yml
 ├── _plan.yml
@@ -70,15 +71,15 @@ an intervening review pause; PRs do not yet publish serverless remote plans.
 ## Path filtering (pull requests only)
 
 On a PR, `ci.yml` only checks the stacks whose directory changed (job `changes`, `dorny/paths-filter`).
-A change under `.github/workflows/` re-checks every stack.
+A change under `.github/workflows/` or to `.tflint.hcl` re-checks every stack.
 
-| PR changes… | fmt | validate / test | plan dev + prd |
+| PR changes… | fmt / lint | validate / test | plan dev + prd |
 |---|---|---|---|
 | nothing under `infra/` or `.github/workflows/` (e.g. `docs/`) | skipped | skipped | skipped |
 | `infra/iam/**` | ✅ | iam | skipped (never applied by the CI) |
 | `infra/foundation/**` | ✅ | foundation | ✅ |
 | `infra/runners/**` | ✅ | runners | skipped (see below) |
-| `.github/workflows/**` | ✅ | all stacks | ✅ |
+| `.github/workflows/**` or `.tflint.hcl` | ✅ | all stacks | ✅ |
 
 The **`CI result`** job always runs and fails if any other job failed. It is the check to mark as required on `prod`.
 
