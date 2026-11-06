@@ -29,7 +29,6 @@ resource "google_storage_bucket" "function_sources" {
     }
   }
 
-  depends_on = [google_project_service.serverless]
 }
 
 # Dedicated Cloud Build identity for source-to-image builds. Never the default
@@ -39,7 +38,6 @@ resource "google_service_account" "function_builder" {
   account_id   = "function-builder"
   display_name = "Cloud Run functions build identity"
 
-  depends_on = [google_project_service.serverless]
 }
 
 resource "google_project_iam_member" "function_builder_logging" {

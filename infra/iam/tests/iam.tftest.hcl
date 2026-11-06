@@ -109,3 +109,21 @@ run "runners_identities_prd" {
     error_message = "The deployer must not be able to delete or modify the External Secrets account."
   }
 }
+
+run "ci_resource_iam_roles" {
+  command = plan
+
+  assert {
+    condition = (
+      contains(google_project_iam_custom_role.deployer_resource_iam_policy.permissions, "run.services.setIamPolicy") &&
+      contains(google_project_iam_custom_role.deployer_resource_iam_policy.permissions, "storage.buckets.setIamPolicy") &&
+      alltrue([for permission in google_project_iam_custom_role.deployer_resource_iam_policy.permissions : endswith(permission, "IamPolicy")])
+    )
+    error_message = "The deployer resource role only manages IAM policies of the resources the CI creates."
+  }
+
+  assert {
+    condition     = alltrue([for permission in google_project_iam_custom_role.planner_resource_iam_read.permissions : endswith(permission, ".getIamPolicy")])
+    error_message = "The planner stays read-only."
+  }
+}

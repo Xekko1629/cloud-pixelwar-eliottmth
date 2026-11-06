@@ -1,7 +1,7 @@
 name: CI
 
 # PR from a feature branch to prod: checks, then plan dev + prd of the stacks the CI deploys
-# (foundation, serverless). Nothing is applied. iam and access are applied by hand; runners
+# (foundation, bootstrap, serverless). Nothing is applied. iam and access are applied by hand; runners
 # are not planned, the read-only planner cannot read the Kubernetes secrets of Helm releases.
 # Only the stacks whose directory changed are checked; "CI result" is the required check.
 on:
@@ -105,13 +105,28 @@ jobs:
       environment: ${{ matrix.environment }}
       stack: serverless
 
+  plan-bootstrap:
+    needs: [changes, fmt, lint, validate, test]
+    if: contains(fromJSON(needs.changes.outputs.stacks), 'bootstrap')
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, prd]
+    uses: ./.github/workflows/_plan.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: ${{ matrix.environment }}
+      stack: bootstrap
+
   application:
     uses: ./.github/workflows/_app-test.yml
 
   # Always reported, even when every other job is skipped: use it as the required status check
   result:
     name: CI result
-    needs: [changes, fmt, lint, validate, test, plan, plan-serverless, application]
+    needs: [changes, fmt, lint, validate, test, plan, plan-serverless, plan-bootstrap, application]
     if: always()
     runs-on: ubuntu-latest
     steps:

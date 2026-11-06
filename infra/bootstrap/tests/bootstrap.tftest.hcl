@@ -9,14 +9,6 @@ run "persistent_serverless_prerequisites" {
   command = plan
 
   assert {
-    condition = alltrue([
-      for service in ["cloudfunctions.googleapis.com", "cloudbuild.googleapis.com", "run.googleapis.com", "artifactregistry.googleapis.com", "storage.googleapis.com"] :
-      google_project_service.serverless[service].service == service
-    ])
-    error_message = "Source-deployed Gen2 functions require Functions, Cloud Build, Cloud Run, Artifact Registry and Storage APIs."
-  }
-
-  assert {
     condition     = google_artifact_registry_repository.containers.format == "DOCKER" && google_artifact_registry_repository.containers.repository_id == "pixelwar"
     error_message = "The bootstrap must create a Docker registry."
   }
@@ -29,19 +21,6 @@ run "persistent_serverless_prerequisites" {
   assert {
     condition     = length(google_artifact_registry_repository.containers.cleanup_policies) == 2
     error_message = "Cleanup needs both an old-image deletion policy and a recent-image retention policy."
-  }
-
-  assert {
-    condition     = alltrue([for api in google_project_service.serverless : api.disable_on_destroy == false])
-    error_message = "Bootstrap destruction must not disable APIs used by other stacks."
-  }
-
-  assert {
-    condition = alltrue([
-      for service in ["logging.googleapis.com", "monitoring.googleapis.com", "cloudtrace.googleapis.com", "telemetry.googleapis.com"] :
-      google_project_service.serverless[service].service == service
-    ])
-    error_message = "Structured logs and OTLP exports require the observability APIs."
   }
 
   assert {

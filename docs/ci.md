@@ -24,9 +24,9 @@ register real Discord commands.
 | Event | Checks | Plan dev + prd | Apply dev | Apply prd |
 |---|---|---|---|---|
 | PR `feature/*` → `prod` (`ci.yml`) | ✅ | ✅ | — | — |
-| Manual run of `deploy.yml` from any branch | ✅ | — | foundation → serverless | — |
-| Tag `v*` pushed (`deploy.yml`) | ✅ | — | foundation → serverless | foundation, then serverless and runners in parallel, after dev |
-| Manual run of `destroy.yml` | — | — | destroy dev or prd: serverless and runners (prd only), then foundation | |
+| Manual run of `deploy.yml` from any branch | ✅ | — | foundation + bootstrap → serverless | — |
+| Tag `v*` pushed (`deploy.yml`) | ✅ | — | foundation + bootstrap → serverless | foundation + bootstrap, then serverless and runners in parallel, after dev |
+| Manual run of `destroy.yml` | — | — | destroy dev or prd: serverless and runners (prd only), then foundation; bootstrap is kept | |
 
 Checks: `terraform fmt -check`, `tflint` (rules in `.tflint.hcl`), `terraform validate` and `terraform test` (`*.tftest.hcl`) on each stack.
 Any failure stops the pipeline before plan or apply.
@@ -92,6 +92,7 @@ A change under `.github/workflows/` or to `.tflint.hcl` re-checks every stack.
 | nothing under `infra/` or `.github/workflows/` (e.g. `docs/`) | skipped | skipped | skipped |
 | `infra/iam/**` | ✅ | iam | skipped (never applied by the CI) |
 | `infra/foundation/**` | ✅ | foundation | ✅ |
+| `infra/bootstrap/**` | ✅ | bootstrap | ✅ |
 | `infra/serverless/**` | ✅ | serverless (+ module) | ✅ |
 | `infra/access/**` | ✅ | access | skipped (applied by hand) |
 | `infra/runners/**` | ✅ | runners | skipped (see below) |
@@ -153,8 +154,11 @@ terraform init -reconfigure -backend-config=backends/prd.hcl
 terraform apply -var-file=prd.tfvars
 ```
 
-Apply `infra/iam` before any CI deploy: `foundation` and `serverless` no longer enable APIs.
-Every other stack except `access` (also applied by hand) is then deployed by the CI.
+Apply `infra/iam` before any CI deploy: it enables every API and gives the deployer the
+`deployerResourceIamPolicy` role (IAM policies of buckets, registries, functions, Cloud Run
+services and Pub/Sub, which `roles/editor` lacks) and the planner `plannerResourceIamRead`.
+Every other stack except `access` (also applied by hand) is then deployed by the CI;
+`bootstrap` is applied by Deploy but never destroyed.
 
 ### 2. Self-hosted runners (prd)
 

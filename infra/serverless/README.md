@@ -19,13 +19,11 @@ l'alimentation hors Git, les accès par service et la rotation.
 
 | Stack | Préfixe GCS | Rôle |
 | --- | --- | --- |
-| `infra/iam` (existant) | `iam` | Identités de CI et Workload Identity |
-| `infra/bootstrap` (SRV-01) | `bootstrap` | APIs serverless, registre d'images, bucket d'archives et identité de build persistants |
+| `infra/iam` (à la main) | `iam` | APIs, identités de CI, secrets, bucket de state |
+| `infra/bootstrap` (CI, jamais détruit) | `bootstrap` | Registre d'images, bucket d'archives et identité de build persistants |
 | `infra/serverless` | `serverless` | Fonctions applicatives et leurs identités |
 
-Les buckets de state sont ceux déjà utilisés par foundation. Ce ticket ne les recrée pas et ne migre aucune ressource IAM. Coordonner ce découpage avec BOOT-05, qui décrit un bootstrap plus large que ce qui est actuellement présent sur prod.
-
-Appliquer le bootstrap avant de publier la première archive. Il crée :
+Le bootstrap est appliqué par `Deploy`, avant `serverless`, en dev puis en prd ; `Destroy` ne le cible jamais. Ses APIs sont activées par `infra/iam`, à appliquer avant. Il crée :
 
 - le registre Artifact Registry qui reçoit les images internes construites par Google ;
 - le bucket `${project_id}-function-sources`, versionné, privé et non vidé par Terraform ;
@@ -54,16 +52,15 @@ terraform init -reconfigure -backend-config=backends/dev.hcl
 terraform plan -var-file=dev.tfvars
 ```
 
-Remplacer `dev` par `prd` pour la production. Ces commandes ne font pas d'apply. Le bootstrap est persistant et s'applique séparément comme le stack IAM.
+Remplacer `dev` par `prd` pour la production. Ces commandes ne font pas d'apply.
 
 La CI de PR détecte désormais `bootstrap`, `serverless` et le module `function` pour le formatage, la validation et les tests sans backend. Le module est testé séparément : Terraform ne découvre pas automatiquement ses tests depuis la racine.
 
-SRV-03 intègre désormais ce stack au déploiement : exécution manuelle →
-`foundation` puis `serverless` en dev ; tag `v*` → même séquence en dev, puis en
-prd, puis `runners` en prd. Un merge/push sur la branche `prod` seul ne déclenche
-pas d'apply. Les contrôles de release incluent aussi `bootstrap`, `serverless`
-et le module `function`. Le bootstrap persistant doit déjà avoir été appliqué
-séparément dans chaque projet pour activer les APIs ; il n'est pas auto-déployé.
+Déploiement : exécution manuelle → `foundation` et `bootstrap`, puis `serverless`
+en dev ; tag `v*` → même séquence en dev, puis en prd, avec `runners` en prd.
+Un merge/push sur la branche `prod` seul ne déclenche pas d'apply. Les contrôles
+de release incluent aussi `bootstrap`, `serverless` et le module `function`.
+`infra/iam` doit avoir été appliqué à la main avant, pour activer les APIs.
 
 Le destroy manuel supprime `serverless` (sans les secrets, gérés par `iam`) et
 `runners` en prd, puis `foundation`. `iam` et `bootstrap` sont conservés : le bucket
