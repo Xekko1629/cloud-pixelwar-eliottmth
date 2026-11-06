@@ -69,6 +69,39 @@ resource "google_secret_manager_secret_iam_member" "dev_access" {
   member    = google_service_account.dev_access[each.value.account].member
 }
 
+# Project IAM of the access stack (team and instructor editors, ACC-01).
+# plan reads the project policy; apply may change it, but only for roles/editor
+# (IAM condition below), so it cannot grant itself or anyone owner or IAM admin.
+resource "google_project_iam_custom_role" "dev_access_project" {
+  for_each = local.dev_access_accounts
+
+  project     = var.project_id
+  role_id     = each.key == "plan" ? "devAccessProjectPlan" : "devAccessProjectApply"
+  title       = "Dev access project IAM ${each.key}"
+  description = "Project IAM policy operations of the access stack; apply is limited to roles/editor by a condition."
+  permissions = each.key == "plan" ? ["resourcemanager.projects.getIamPolicy"] : [
+    "resourcemanager.projects.getIamPolicy",
+    "resourcemanager.projects.setIamPolicy",
+  ]
+}
+
+resource "google_project_iam_member" "dev_access_project" {
+  for_each = local.dev_access_accounts
+
+  project = var.project_id
+  role    = google_project_iam_custom_role.dev_access_project[each.key].name
+  member  = google_service_account.dev_access[each.key].member
+
+  dynamic "condition" {
+    for_each = each.key == "apply" ? [1] : []
+    content {
+      title       = "editor-grants-only"
+      description = "May only add or remove roles/editor bindings"
+      expression  = "api.getAttribute('iam.googleapis.com/modifiedGrantsByRole', []).hasOnly(['roles/editor'])"
+    }
+  }
+}
+
 # Separate bucket: neither workflow identity can read/write the iam/foundation/
 # serverless states through these grants. Both need backend init/lock permissions.
 resource "google_storage_bucket_iam_member" "dev_access_state" {

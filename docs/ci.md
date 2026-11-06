@@ -47,13 +47,16 @@ an intervening review pause; PRs do not yet publish serverless remote plans.
 
 ## Workflows
 
-### Accès humains Discord dev (workflow administratif séparé)
+### Accès humains (workflow administratif séparé)
 
 `access-dev.yml` est manuel, depuis `prod` uniquement. Après initialisation
 unique par l'admin dans `infra/iam` dev : plan des accès, revue par **Xekko1629**
 dans l'environnement protégé `access-dev`, puis application du même plan
-sauvegardé. Deux identités WIF dédiées, aucun rôle de lecture des valeurs au
-niveau projet et aucun droit prd ajouté. Voir le [runbook access](../infra/access/README.md).
+sauvegardé. Il gère en dev la lecture des deux secrets Discord et les rôles
+`editor` de l'équipe et de l'instructeur ; l'identité apply ne peut modifier
+que les attributions `roles/editor` du projet dev. En prd, le même stack est
+appliqué en local par Xekko (rôles `editor` et `billing.viewer` de
+l'instructeur). Voir le [runbook access](../infra/access/README.md).
 Les states IAM/access sont persistants et ne sont ciblés ni par Deploy ni par
 Destroy. L'accès secret disparaît toutefois si la ressource secret elle-même
 est détruite ; le runbook décrit la réinitialisation nécessaire.

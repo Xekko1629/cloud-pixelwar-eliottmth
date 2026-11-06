@@ -28,6 +28,7 @@ run "disabled_by_default" {
       length(google_service_account.dev_access) == 0 &&
       length(google_storage_bucket.dev_access_state) == 0 &&
       length(google_secret_manager_secret_iam_member.dev_access) == 0 &&
+      length(google_project_iam_member.dev_access_project) == 0 &&
       length(github_repository_environment.dev_access) == 0
     )
     error_message = "The new automation must be opt-in, not silently deployed in every environment."
@@ -55,6 +56,17 @@ run "dev_bootstrap_is_scoped" {
       ])
     )
     error_message = "Do not give automation value access, secret writes, project IAM admin or Editor."
+  }
+  assert {
+    condition = (
+      toset(google_project_iam_custom_role.dev_access_project["plan"].permissions) == toset(["resourcemanager.projects.getIamPolicy"]) &&
+      toset(google_project_iam_custom_role.dev_access_project["apply"].permissions) == toset([
+        "resourcemanager.projects.getIamPolicy", "resourcemanager.projects.setIamPolicy",
+      ]) &&
+      length(google_project_iam_member.dev_access_project["plan"].condition) == 0 &&
+      google_project_iam_member.dev_access_project["apply"].condition[0].expression == "api.getAttribute('iam.googleapis.com/modifiedGrantsByRole', []).hasOnly(['roles/editor'])"
+    )
+    error_message = "Project IAM: plan reads only, apply may only change roles/editor bindings."
   }
   assert {
     condition = alltrue([
