@@ -102,10 +102,26 @@ Ils rendent le rectangle `bounds`, c'est-à-dire tout ce qui a été peint (limi
 ### Autres documents
 
 - `deltas/{id auto}` : temps réel, avec un TTL court (ADR-0003).
-- `config/global` : pause, `canvas_version`, `bounds` et `size`.
+- `config/global` : pause, `canvas_version`, `bounds`, `size` et
+  `default_limit_per_minute` (DATA-03, initialisé explicitement à 20).
 - `users/{uid}` : quota de la fenêtre en cours, dernier rejet. `uid` = id Discord (ADR-0005).
 - `ratelimit_overrides/{uid}` : limites fixées par `/admin ratelimit`, illisibles depuis le navigateur.
 - Documents de déduplication par `event_id`, avec TTL (DATA-02).
+
+### Quotas utilisateur — décisions DATA-03 du 6 novembre 2026
+
+- Fenêtre fixe par minute UTC, selon l'heure serveur du worker, pas `occurred_at`.
+  Une rafale à cheval sur deux minutes est acceptée comme limite de ce modèle.
+- Override utilisateur prioritaire sur le défaut Firestore ; changement immédiat
+  sans remise à zéro du compteur. Zéro interdit de dessiner pour la limite
+  effective concernée, indépendamment du contrôle séparé de pause globale.
+- Un lot dépassant le quota est refusé en entier sans consommation. Les refus
+  métier doivent être dédupliqués comme les succès ; une erreur de configuration
+  reste technique et réessayable, sans repli silencieux sur 20.
+- Le calcul partagé est pur ; compteur, dessin et déduplication devront être
+  atomiques dans DATA-02. Aucun mécanisme de réservation séparée.
+
+Voir [le contrat et les limites d'intégration DATA-03](../rate-limits.md).
 
 ### Écriture
 

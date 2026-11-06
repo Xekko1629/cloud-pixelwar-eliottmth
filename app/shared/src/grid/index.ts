@@ -6,3 +6,4 @@ export * from './event-order';
 export * from './model';
 export * from './metadata';
 export * from './batch';
+export * from './rate-limit';
