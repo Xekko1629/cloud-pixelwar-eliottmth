@@ -47,19 +47,16 @@ an intervening review pause; PRs do not yet publish serverless remote plans.
 
 ## Workflows
 
-### Accès humains (workflow administratif séparé)
+### Accès humains (appliqués à la main)
 
-`access-dev.yml` est manuel, depuis `prod` uniquement. Après initialisation
-unique par l'admin dans `infra/iam` dev : plan des accès, revue par **Xekko1629**
-dans l'environnement protégé `access-dev`, puis application du même plan
-sauvegardé. Il gère en dev la lecture des deux secrets Discord et les rôles
-`editor` de l'équipe et de l'instructeur ; l'identité apply ne peut modifier
-que les attributions `roles/editor` du projet dev. En prd, le même stack est
-appliqué en local par Xekko (rôles `editor` et `billing.viewer` de
-l'instructeur). Voir le [runbook access](../infra/access/README.md).
+`infra/access` n'est appliqué par aucun workflow, ni en dev ni en prd : Xekko
+l'applique en local avec ses identifiants, comme `infra/iam`. Il gère les rôles
+`editor` de l'équipe et de l'instructeur, le `billing.viewer` de l'instructeur
+(prd) et la lecture des deux secrets Discord dev. Aucune identité de CI n'a le
+droit de modifier l'IAM d'un projet. Voir le [runbook access](../infra/access/README.md).
 Les states IAM/access sont persistants et ne sont ciblés ni par Deploy ni par
 Destroy. L'accès secret disparaît toutefois si la ressource secret elle-même
-est détruite ; le runbook décrit la réinitialisation nécessaire.
+est détruite ; il faut alors réappliquer `infra/access`.
 
 Le filtre de PR et les contrôles locaux de release incluent maintenant `access`.
 Ils n'appliquent pas de droits ; aucune authentification GCP dans ces tests simulés.
@@ -69,7 +66,6 @@ Ils n'appliquent pas de droits ; aucune authentification GCP dans ces tests simu
 ├── ci.yml          # PR → prod: fmt + validate + test → plan dev + prd
 ├── deploy.yml      # foundation + serverless dev, then prd + runners (tag only)
 ├── destroy.yml     # typed confirmation; serverless, runners (prd only), foundation
-├── access-dev.yml  # manual prod branch only; plan → Xekko approval → saved-plan apply
 ├── _fmt.yml        # reusable steps, never run directly
 ├── _lint.yml
 ├── _validate.yml
