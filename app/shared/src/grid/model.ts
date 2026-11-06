@@ -32,12 +32,15 @@ export interface GlobalConfigDocument {
   canvas_version: number;
   size: GridSize | null;
   bounds: Bounds | null;
+  // Explicitly initialize to 20; a missing/invalid value is a technical failure.
+  default_limit_per_minute: number;
 }
 
-// Contracts to refine/implement with DATA-03; no quota reservation or sub-tasks.
+// DATA-03 usage contract; persisted atomically with drawing/deduplication in DATA-02.
 export interface UserStateDocument {
   window_start: TimestampValue;
   used_pixels: number;
+  // Informational snapshot, not the source of the current effective limit.
   limit_per_minute: number;
   last_rejection: { event_id: string; reason: string; at: TimestampValue } | null;
   updated_at: TimestampValue;
