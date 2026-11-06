@@ -1,5 +1,14 @@
 # CI/CD
 
+## Application tests (TEST-01)
+
+Every PR to `prod` also runs `_app-test.yml`: Node.js 24 strict type checks,
+Vitest unit tests with a 70% per-file coverage threshold, then integration tests
+against local Firestore and Pub/Sub emulators (Java 21). No cloud credentials
+are used. Coverage is published in the run summary and reports are uploaded as
+artifacts. `CI result` depends on this job, so failures block the required check.
+See [testing.md](testing.md) for local commands, limitations and dependency alerts.
+
 ## GitFlow
 
 - `prod`: default branch, always deployable, protected (PR + review + green checks + signed commits).

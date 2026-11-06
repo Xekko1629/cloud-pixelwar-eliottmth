@@ -1,0 +1,5 @@
+{
+  "name": "@pixelwar/shared",
+  "private": true,
+  "type": "module"
+}

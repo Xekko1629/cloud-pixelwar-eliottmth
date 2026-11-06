@@ -1,6 +1,20 @@
 .terraform/
 *.json
+!app/package.json
+!app/package-lock.json
+!app/tsconfig.json
+!app/firebase.json
+!app/shared/package.json
+!app/frontend/package.json
+!app/functions/*/package.json
 .env
+
+# Application dependencies and test artifacts
+node_modules/
+coverage/
+test-results/
+.firebase/
+*-debug.log
 
 # Terraform
 **/.terraform/*
