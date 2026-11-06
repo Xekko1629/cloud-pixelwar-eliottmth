@@ -95,7 +95,9 @@ resource "google_container_node_pool" "runners" {
 
   autoscaling {
     min_node_count = 0
-    max_node_count = 10
+    # 6 x 2 vCPU + 2 shared-core system nodes (1 quota vCPU each) = 14 of the 16 vCPU CPUS_ALL_REGIONS quota,
+    # leaving room for the surge node of an upgrade; see docs/gcp.md
+    max_node_count = 6
   }
 
   node_config {

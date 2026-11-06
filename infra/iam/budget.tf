@@ -1,4 +1,4 @@
-# Budget alerts on this project, emailed to the billing account admins
+# Budget alerts on this project, emailed to the admins and users of the billing account (the 3 team members)
 
 resource "google_project_service" "billingbudgets" {
   service            = "billingbudgets.googleapis.com"
