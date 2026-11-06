@@ -1,8 +1,8 @@
 name: Deploy
 
-# Tag v*: checks, apply dev, then apply prd, then the runners (prd).
-# Manual run from any branch: checks, apply dev only.
-# foundation and runners always apply on GitHub-hosted runners: they create the self-hosted ones.
+# Tag v*: checks, foundation + serverless dev, then foundation + serverless prd, then runners.
+# Manual run from any branch: checks, foundation + serverless dev only.
+# Applies stay on GitHub-hosted runners, independent of the infrastructure being changed.
 on:
   push:
     tags: ["v*"]
@@ -40,10 +40,22 @@ jobs:
       id-token: write
     with:
       environment: dev
+      stack: foundation
+      runner: ubuntu-latest
+
+  apply-serverless-dev:
+    needs: apply-dev
+    uses: ./.github/workflows/_apply.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: dev
+      stack: serverless
       runner: ubuntu-latest
 
   apply-prd:
-    needs: apply-dev
+    needs: apply-serverless-dev
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/_apply.yml
     permissions:
@@ -51,10 +63,22 @@ jobs:
       id-token: write
     with:
       environment: prd
+      stack: foundation
+      runner: ubuntu-latest
+
+  apply-serverless-prd:
+    needs: apply-prd
+    uses: ./.github/workflows/_apply.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: prd
+      stack: serverless
       runner: ubuntu-latest
 
   apply-runners-prd:
-    needs: apply-prd
+    needs: apply-serverless-prd
     uses: ./.github/workflows/_apply.yml
     permissions:
       contents: read

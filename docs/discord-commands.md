@@ -115,6 +115,37 @@ Tests du catalogue, cibles dev/prd, confirmation, PUT répétable, erreurs 4xx/5
 L'enregistrement réel, l'autorisation serveur et l'exécution après déploiement
 restent à vérifier avec BOT-01/SRV-02 ; le ticket n'est pas validé de bout en bout.
 
+### Première validation dev après merge
+
+1. CI verte sur le commit courant de BOT-02, basé sur le `prod` contenant
+   TEST-01, DATA-01, SRV-03 et SRV-08. Vérifier que les trois exports du shared
+   (`grid`, `observability`, `observability/google`) sont conservés et que
+   `npm ci` accepte le lockfile sans le régénérer.
+2. Valider séparément le plan puis le déploiement Terraform dev, suivant
+   [la checklist SRV-03](../infra/serverless/SECRETS.md). Ce workflow applique
+   `foundation` et `serverless` ; il **n'enregistre pas** les commandes Discord.
+   Ne pas pousser de tag `v*` pour ce test, car cela engage aussi prd.
+3. Alimenter les secrets depuis l'application **dev** de BOT-01. Fournir au
+   script son Application ID et l'ID du serveur de test ; garder le token hors
+   des commandes en clair, des logs et du dépôt.
+4. Exécuter la prévisualisation sans `--apply` : contrôler la cible guild dev,
+   les quatre commandes principales, les cinq sous-commandes admin et les
+   seize choix de couleur. À ce stade aucun appel Discord n'est effectué.
+5. Après accord explicite, enregistrer avec `--apply --confirm-application-id`
+   et vérifier le catalogue dans le serveur de test. Répéter le même appel
+   autorisé pour constater l'absence de doublons dans cette portée.
+6. Vérifier la visibilité avec un compte normal et un compte autorisé. Pour
+   le rôle métier Pixelwar Admin sans permission Discord Administrator,
+   configurer explicitement les accès dans les intégrations du serveur.
+
+Ces essais réels ne sont **pas** exécutés par la CI ni lors du développement
+local. Leur résultat devra être consigné après réalisation. Tant que BOT-03 et
+les workers ne sont pas déployés, une commande visible peut échouer lorsqu'on
+l'invoque : aucun test de dessin, signature/PING, quota ou autorisation métier
+n'est validé par le seul enregistrement des commandes. DATA-03 n'est pas un
+prérequis pour créer les secrets ou enregistrer ce catalogue ; il est requis
+pour valider les quotas avant l'ouverture du dessin aux utilisateurs.
+
 ## Sources
 
 Consultées le 5 novembre 2026 :

@@ -39,7 +39,7 @@ run "private_service" {
   }
 
   assert {
-    condition     = google_service_account.runtime.account_id == "discord-proxy" && length(google_project_iam_member.observability) == 3
+    condition     = google_service_account.runtime.account_id == "discord-proxy" && length(google_project_iam_member.observability) == 4 && google_project_iam_member.observability["roles/telemetry.tracesWriter"].role == "roles/telemetry.tracesWriter"
     error_message = "Each service needs a dedicated runtime identity with observability roles."
   }
 }
