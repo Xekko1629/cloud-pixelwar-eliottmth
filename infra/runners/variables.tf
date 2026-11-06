@@ -9,19 +9,13 @@ variable "region" {
   default     = "europe-west1"
 }
 
-variable "zone" {
-  description = "Zone of the GKE cluster created by infra/foundation"
-  type        = string
-  default     = "europe-west1-b"
-}
-
 variable "environment" {
   description = "Environment name (dev or prd), selects the values files"
   type        = string
 }
 
-variable "cluster_name" {
-  description = "Name of the GKE cluster created by infra/foundation"
+variable "state_bucket" {
+  description = "Remote state bucket of this environment, holding the infra/foundation state"
   type        = string
 }
 

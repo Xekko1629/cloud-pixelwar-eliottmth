@@ -59,9 +59,9 @@ pas d'apply. Les contrôles de release incluent aussi `bootstrap`, `serverless`
 et le module `service`. Le bootstrap persistant doit déjà avoir été appliqué
 séparément dans chaque projet pour activer les APIs ; il n'est pas auto-déployé.
 
-Le destroy manuel supprime `serverless` (sans les secrets, gérés par `iam`), puis
+Le destroy manuel supprime `serverless` (sans les secrets, gérés par `iam`) et
 `runners` en prd, puis `foundation`. `iam` et `bootstrap` sont conservés.
-Les plans distants de PR restent limités à `foundation` ; le plan serverless est
-calculé dans le job d'apply avant application. Faire relire un plan serverless
-séparé avant le premier déclenchement, voir [SECRETS.md](../iam/SECRETS.md).
+Chaque PR qui modifie ce stack ou son module publie un plan dev et prd ; le plan serverless est aussi
+calculé dans le job d'apply avant application. Relire ce plan de PR avant le
+premier déclenchement, voir [SECRETS.md](../iam/SECRETS.md).
 Le build/push des images et la promotion applicative par digest restent dans SRV-02.

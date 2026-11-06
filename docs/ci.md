@@ -25,8 +25,8 @@ register real Discord commands.
 |---|---|---|---|---|
 | PR `feature/*` → `prod` (`ci.yml`) | ✅ | ✅ | — | — |
 | Manual run of `deploy.yml` from any branch | ✅ | — | foundation → serverless | — |
-| Tag `v*` pushed (`deploy.yml`) | ✅ | — | foundation → serverless | foundation → serverless → runners, after dev |
-| Manual run of `destroy.yml` | — | — | destroy dev or prd: serverless → runners (prd only) → foundation | |
+| Tag `v*` pushed (`deploy.yml`) | ✅ | — | foundation → serverless | foundation, then serverless and runners in parallel, after dev |
+| Manual run of `destroy.yml` | — | — | destroy dev or prd: serverless and runners (prd only), then foundation | |
 
 Checks: `terraform fmt -check`, `tflint` (rules in `.tflint.hcl`), `terraform validate` and `terraform test` (`*.tftest.hcl`) on each stack.
 Any failure stops the pipeline before plan or apply.
@@ -34,7 +34,7 @@ Any failure stops the pipeline before plan or apply.
 PR checks select changed directories: `foundation`, `iam`, `access`, `runners`,
 `bootstrap`, `serverless`, and `serverless/modules/service`. The last entry runs the module's
 mock-provider tests independently, since the root stack does not discover them.
-Remote PR plans still target `foundation` only, when that stack changes. Release
+Remote PR plans cover `foundation` and `serverless` (dev and prd), when that stack changes. Release
 validation/tests also cover `bootstrap`, `serverless` and its service module by
 default. Deploy now applies `foundation` then `serverless` in each environment;
 destroy removes `serverless` before runners (prd) and `foundation`. Application
@@ -43,7 +43,7 @@ the bootstrap (registry): their values survive a destroy.
 Image builds and application promotion remain in SRV-02.
 See [the secrets runbook](../infra/iam/SECRETS.md) before
 triggering a workflow. Each apply job computes then applies its own plan without
-an intervening review pause; PRs do not yet publish serverless remote plans.
+an intervening review pause; review the PR plans before tagging.
 
 ## Workflows
 
@@ -63,9 +63,9 @@ Ils n'appliquent pas de droits ; aucune authentification GCP dans ces tests simu
 
 ```
 .github/workflows/
-├── ci.yml          # PR → prod: fmt + validate + test → plan dev + prd
-├── deploy.yml      # foundation + serverless dev, then prd + runners (tag only)
-├── destroy.yml     # typed confirmation; serverless, runners (prd only), foundation
+├── ci.yml          # PR → prod: fmt + validate + test → plan dev + prd (foundation, serverless)
+├── deploy.yml      # foundation + serverless dev, then foundation prd → serverless + runners (tag only)
+├── destroy.yml     # typed confirmation; serverless + runners (prd only), then foundation
 ├── _fmt.yml        # reusable steps, never run directly
 ├── _lint.yml
 ├── _validate.yml
@@ -92,6 +92,8 @@ A change under `.github/workflows/` or to `.tflint.hcl` re-checks every stack.
 | nothing under `infra/` or `.github/workflows/` (e.g. `docs/`) | skipped | skipped | skipped |
 | `infra/iam/**` | ✅ | iam | skipped (never applied by the CI) |
 | `infra/foundation/**` | ✅ | foundation | ✅ |
+| `infra/serverless/**` | ✅ | serverless (+ module) | ✅ |
+| `infra/access/**` | ✅ | access | skipped (applied by hand) |
 | `infra/runners/**` | ✅ | runners | skipped (see below) |
 | `.github/workflows/**` or `.tflint.hcl` | ✅ | all stacks | ✅ |
 
