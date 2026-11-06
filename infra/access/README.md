@@ -82,27 +82,26 @@ access n'empêche pas cette suppression. Après recréation des secrets par
 `serverless`, réappliquer `infra/access` dev, puis réinjecter les valeurs
 depuis une source sûre.
 
-## Migration depuis le workflow `access-dev` (une seule fois, dev)
+## Premier apply
 
-L'ancien workflow utilisait un bucket dédié et deux identités WIF créées par
-`infra/iam`. Dans cet ordre :
+Au 06/11, aucun state `access` ne contient de ressource : le workflow
+`access-dev` n'a jamais été initialisé (ni bucket dédié ni identités créés),
+il n'y a donc rien à migrer. Plans attendus au premier apply :
 
-1. Copier le state vers le bucket dev commun :
-   ```sh
-   gcloud storage cp \
-     gs://cloud-pixelwar-eliottmth-dev-access-tfstate/access/default.tfstate \
-     gs://cloud-pixelwar-eliottmth-dev-tfstate/access/default.tfstate
-   ```
-2. Appliquer `infra/access` dev (voir ci-dessus) : le plan doit afficher
-   **0 ajout, 0 changement, 0 destroy**. Sinon, arrêter et comparer les states.
-3. Appliquer `infra/iam` dev à la main : il détruit les comptes
-   `github-dev-access-*`, leurs rôles custom, le pool WIF `github-dev-access` et
-   les environnements GitHub `access-dev*`. Le bucket dédié est seulement retiré
-   du state (`removed.tf`), pas supprimé.
-4. Supprimer le bucket dédié :
-   ```sh
-   gcloud storage rm --recursive gs://cloud-pixelwar-eliottmth-dev-access-tfstate
-   ```
+- dev : **9 ajouts** (6 lectures de secrets, 3 `editor`) ;
+- prd : **4 ajouts** (3 `editor`, 1 `billing.viewer`).
+
+Les rôles `editor` existaient déjà, donnés à la main : l'apply les fait passer
+sous Terraform sans changer les accès réels.
+
+Les préfixes `access-team/` des deux buckets de state viennent de l'ancien
+stack imbriqué `infra/access/team`, supprimé. Leurs states sont vides ; les
+retirer une fois `access` appliqué :
+
+```sh
+gcloud storage rm gs://cloud-pixelwar-eliottmth-dev-tfstate/access-team/default.tfstate
+gcloud storage rm gs://cloud-pixelwar-eliottmth-prod-tfstate/access-team/default.tfstate
+```
 
 ## Vérifications locales sans GCP
 
