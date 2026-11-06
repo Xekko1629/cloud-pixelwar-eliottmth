@@ -1,4 +1,5 @@
-project_id               = "cloud-pixelwar-dev"
-environment              = "dev"
-billing_account          = "0111A1-F02A73-B2E667"
-enable_dev_secret_access = true
+project_id                 = "cloud-pixelwar-dev"
+environment                = "dev"
+billing_account            = "0111A1-F02A73-B2E667"
+state_bucket               = "cloud-pixelwar-eliottmth-dev-tfstate"
+import_application_secrets = true

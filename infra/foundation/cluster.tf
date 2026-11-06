@@ -1,9 +1,13 @@
 # GKE cluster hosting the self-hosted GitHub runners.
-# Only created where enable_cluster = true (prd); the GKE API stays enabled everywhere.
+# Only created where enable_cluster = true (prd). The GKE API is enabled by infra/iam.
 
-resource "google_project_service" "container" {
-  service            = "container.googleapis.com"
-  disable_on_destroy = false
+# The API used to be enabled here; infra/iam owns it now. Forget it, never disable it.
+removed {
+  from = google_project_service.container
+
+  lifecycle {
+    destroy = false
+  }
 }
 
 resource "google_service_account" "gke_nodes" {
@@ -54,8 +58,6 @@ resource "google_container_cluster" "main" {
   cluster_autoscaling {
     autoscaling_profile = "BALANCED"
   }
-
-  depends_on = [google_project_service.container]
 }
 
 # Always-on pool for system pods and the runner controller

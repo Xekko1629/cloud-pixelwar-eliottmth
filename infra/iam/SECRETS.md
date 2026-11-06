@@ -22,51 +22,24 @@ tous les utilisateurs si cette liste est la seule méthode d'autorisation.
 Les callbacks Discord à token d'interaction n'exigent pas nécessairement le token
 du bot : ne pas attribuer cet accès par défaut à tous les notifiers.
 
-## Prérequis et intégration
+## Où vivent les secrets
 
-- Secret Manager doit être activé dans chaque projet. Son activation appartient
-  au bootstrap de SRV-01 ; ne pas déclarer la même activation dans deux states.
-- Les fichiers providers, variables, tfvars et backends proviennent du socle
-  SRV-01 désormais fusionné dans `prod`. Les ressources de secrets appartiennent
-  au même state `serverless`, pas à un nouveau state.
-- Cette PR branche le stack Terraform `serverless` au workflow `Deploy` : manuel
-  → dev uniquement ; tag `v*` → dev puis prd, après succès de chaque étape.
-  Un merge sur `prod` seul ne fait pas d'apply. L'empaquetage, l'upload et la
-  promotion des archives de sources restent dans SRV-02. La CI de PR vérifie le
-  stack et ses tests simulés ; les contrôles de release incluent aussi le
-  bootstrap et le module.
-- Activer les cinq conteneurs ne suffit pas à démarrer les fonctions : une version
+- Les conteneurs sont déclarés dans `infra/iam/secrets.tf`, stack **persistant
+  appliqué à la main**, jamais par Deploy ni Destroy. Secret Manager est la
+  source de vérité des secrets d'exécution (sujet C04 §5) : un destroy de
+  `serverless` ne supprime ni les conteneurs ni les valeurs.
+- `deletion_protection = true` : un apply qui voudrait supprimer un secret échoue.
+- L'API Secret Manager est activée par `infra/iam/apis.tf`.
+- Le deployer de la CI n'a que `getIamPolicy`/`setIamPolicy` sur chacun de ces
+  secrets (`deployer-iam.tf`) : il peut donner `secretAccessor` à une fonction
+  depuis `infra/serverless`, pas lire ni écrire une valeur.
+- Les secrets dev, créés auparavant par `infra/serverless`, sont adoptés par un
+  bloc `import` (`import_application_secrets = true` dans `dev.tfvars`) ; le
+  stack serverless les oublie sans les détruire (`infra/serverless/removed.tf`).
+- Créer un conteneur ne suffit pas à démarrer les fonctions : une version
   référencée doit exister et l'identité d'exécution doit avoir les permissions.
-
-### Premier déploiement — validation explicite avant déclenchement
-
-1. Vérifier que l'API Secret Manager est active dans le projet cible, via le
-   bootstrap persistant `infra/bootstrap`. Ne pas ajouter une activation dupliquée
-   au state serverless. Le workflow ne déploie pas automatiquement ce bootstrap.
-2. Vérifier les variables WIF/`DEPLOYER_SA` de l'environnement GitHub, les accès
-   au backend GCS et les droits de gestion des conteneurs de secrets. Ne pas
-   accorder un accès global aux valeurs pour contourner un problème de déploiement.
-3. Avec une identité autorisée, produire et relire un plan **sans apply** depuis
-   `infra/serverless` :
-
-   ```sh
-   terraform init -reconfigure -backend-config=backends/dev.hcl
-   terraform plan -var-file=dev.tfvars
-   ```
-
-   Pour un state serverless vide, attendre cinq créations de secrets, pas de
-   valeurs ni de suppression inattendue. Adapter l'attente si d'autres ressources
-   sont déjà dans ce state. Les plans distants automatiques des PR restent
-   limités à `foundation` ; le workflow `Deploy` planifie puis applique sans pause
-   entre ces deux commandes, ce n'est pas une approbation interactive du plan.
-4. Après merge et accord explicite, déclencher manuellement `Deploy` depuis
-   `prod` pour valider en dev. Attention : ce workflow applique aussi `foundation`.
-   Vérifier les conteneurs dans `cloud-pixelwar-dev`, puis injecter les valeurs.
-5. Avant prd, relire le plan avec le backend et le tfvars prd, puis utiliser la
-   release taguée validée et les approbations de l'environnement GitHub `prd`.
-   La release repasse aussi par dev ; ce n'est pas un déploiement prd isolé.
-
-Aucune de ces opérations GCP n'est effectuée par les tests locaux du ticket.
+- Coût : quelques centimes par mois de versions actives, conservés après un
+  destroy. Choix assumé : sans eux, la source de vérité disparaîtrait.
 
 ## Ajouter une valeur hors du dépôt
 
@@ -107,15 +80,15 @@ au seul service account d'exécution de cette fonction. Exemple futur :
 ```hcl
 secrets = {
   DISCORD_PUBLIC_KEY = {
-    secret  = google_secret_manager_secret.application["discord-public-key"].secret_id
+    secret  = "discord-public-key"
     version = "1"
   }
 }
 ```
 
 Ce bloc s'ajoute à l'appel du module du proxy, pas seul à la racine du stack.
-Remplacer `1` par le numéro réel de la version ajoutée. La référence à la ressource
-établit aussi la dépendance Terraform ; ne pas donner au proxy accès à tous les
+Remplacer `1` par le numéro réel de la version ajoutée. Le secret existe déjà
+(stack `iam`), seul son ID est passé ; ne pas donner au proxy accès à tous les
 secrets. Le script d'enregistrement aura des accès ciblés définis avec BOT-02/SRV-02.
 
 Les attributions effectives et les tests d'accès positif/négatif seront vérifiés
@@ -127,20 +100,15 @@ encore leurs accès en conditions réelles.
 - Rotation : ajouter une nouvelle version hors Terraform, mettre à jour la
   référence numérique de la fonction et déployer. Désactiver l'ancienne version après
   validation et vérification des besoins de rollback ; ne pas la supprimer à l'aveugle.
-- Destroy : `deletion_policy = "DELETE"` autorise la suppression des conteneurs
-  **et de toutes leurs versions**. Le state ne contient pas de copie des valeurs.
-  Le workflow manuel `Destroy` inclut désormais `serverless` avant les runners
-  (prd) et `foundation`. La confirmation du nom d'environnement couvre donc
-  aussi cette perte de valeurs ; `arc-github-app`, géré dans `iam`, n'est pas ciblé.
-- Recréation : Terraform recrée les conteneurs, pas les valeurs. Il faudra les
-  réinjecter depuis une source sûre et mettre à jour les références de version.
-  Cette étape manuelle doit rester explicite dans le runbook de reconstruction.
+- Destroy : le workflow `Destroy` ne touche pas `infra/iam`, les secrets et leurs
+  valeurs sont conservés. Supprimer un secret demande de retirer d'abord
+  `deletion_protection`, par une PR relue.
 - Facturation : le stockage des versions et les accès Secret Manager peuvent être
-  facturés ; conserver seulement les versions nécessaires selon la politique retenue.
+  facturés ; conserver seulement les versions nécessaires.
 
 ## Vérifications sans GCP
 
-Depuis `infra/serverless` :
+Depuis `infra/iam` :
 
 ```sh
 terraform init -backend=false
@@ -149,5 +117,6 @@ terraform validate
 terraform test
 ```
 
-Les tests utilisent un provider simulé. Ils vérifient le catalogue, les projets,
-les labels et la possibilité de destruction, pas les valeurs ni les accès réels.
+Les tests utilisent un provider simulé. Ils vérifient le catalogue, la
+protection contre la suppression et les droits limités du deployer, pas les
+valeurs ni les accès réels.

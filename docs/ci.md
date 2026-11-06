@@ -25,8 +25,8 @@ register real Discord commands.
 |---|---|---|---|---|
 | PR `feature/*` → `prod` (`ci.yml`) | ✅ | ✅ | — | — |
 | Manual run of `deploy.yml` from any branch | ✅ | — | foundation → serverless | — |
-| Tag `v*` pushed (`deploy.yml`) | ✅ | — | foundation → serverless | foundation → serverless → runners, after dev |
-| Manual run of `destroy.yml` | — | — | destroy dev or prd: serverless → runners (prd only) → foundation | |
+| Tag `v*` pushed (`deploy.yml`) | ✅ | — | foundation → serverless | foundation, then serverless and runners in parallel, after dev |
+| Manual run of `destroy.yml` | — | — | destroy dev or prd: serverless and runners (prd only), then foundation | |
 
 Checks: `terraform fmt -check`, `tflint` (rules in `.tflint.hcl`), `terraform validate` and `terraform test` (`*.tftest.hcl`) on each stack.
 Any failure stops the pipeline before plan or apply.
@@ -34,43 +34,38 @@ Any failure stops the pipeline before plan or apply.
 PR checks select changed directories: `foundation`, `iam`, `access`, `runners`,
 `bootstrap`, `serverless`, and `serverless/modules/function`. The last entry runs the module's
 mock-provider tests independently, since the root stack does not discover them.
-Remote PR plans still target `foundation` only, when that stack changes. Release
+Remote PR plans cover `foundation` and `serverless` (dev and prd), when that stack changes. Release
 validation/tests also cover `bootstrap`, `serverless` and its function module by
 default. Deploy now applies `foundation` then `serverless` in each environment;
-destroy removes `serverless` before runners (prd) and `foundation`. **This also
-deletes application secrets and their versions.** The bootstrap (APIs, registry,
-source bucket and build identity) must be applied separately before the first
-serverless deploy and is preserved, as is `iam`. Source archiving and application
-promotion remain in SRV-02.
-See [the first-deployment checklist](../infra/serverless/SECRETS.md) before
+destroy removes `serverless` before runners (prd) and `foundation`. Application
+secrets, the state bucket and every API live in `iam`, which is preserved, as is
+the bootstrap (registry, source bucket and build identity): their contents survive
+a destroy. Source archiving and application promotion remain in SRV-02.
+See [the secrets runbook](../infra/iam/SECRETS.md) before
 triggering a workflow. Each apply job computes then applies its own plan without
-an intervening review pause; PRs do not yet publish serverless remote plans.
+an intervening review pause; review the PR plans before tagging.
 
 ## Workflows
 
-### Accès humains (workflow administratif séparé)
+### Accès humains (appliqués à la main)
 
-`access-dev.yml` est manuel, depuis `prod` uniquement. Après initialisation
-unique par l'admin dans `infra/iam` dev : plan des accès, revue par **Xekko1629**
-dans l'environnement protégé `access-dev`, puis application du même plan
-sauvegardé. Il gère en dev la lecture des deux secrets Discord et les rôles
-`editor` de l'équipe et de l'instructeur ; l'identité apply ne peut modifier
-que les attributions `roles/editor` du projet dev. En prd, le même stack est
-appliqué en local par Xekko (rôles `editor` et `billing.viewer` de
-l'instructeur). Voir le [runbook access](../infra/access/README.md).
+`infra/access` n'est appliqué par aucun workflow, ni en dev ni en prd : Xekko
+l'applique en local avec ses identifiants, comme `infra/iam`. Il gère les rôles
+`editor` de l'équipe et de l'instructeur, le `billing.viewer` de l'instructeur
+(prd) et la lecture des deux secrets Discord dev. Aucune identité de CI n'a le
+droit de modifier l'IAM d'un projet. Voir le [runbook access](../infra/access/README.md).
 Les states IAM/access sont persistants et ne sont ciblés ni par Deploy ni par
-Destroy. L'accès secret disparaît toutefois si la ressource secret elle-même
-est détruite ; le runbook décrit la réinitialisation nécessaire.
+Destroy, pas plus que les secrets applicatifs (gérés par `infra/iam`) : les
+attributions de lecture survivent donc à un destroy.
 
 Le filtre de PR et les contrôles locaux de release incluent maintenant `access`.
 Ils n'appliquent pas de droits ; aucune authentification GCP dans ces tests simulés.
 
 ```
 .github/workflows/
-├── ci.yml          # PR → prod: fmt + validate + test → plan dev + prd
-├── deploy.yml      # foundation + serverless dev, then prd + runners (tag only)
-├── destroy.yml     # typed confirmation; serverless, runners (prd only), foundation
-├── access-dev.yml  # manual prod branch only; plan → Xekko approval → saved-plan apply
+├── ci.yml          # PR → prod: fmt + validate + test → plan dev + prd (foundation, serverless)
+├── deploy.yml      # foundation + serverless dev, then foundation prd → serverless + runners (tag only)
+├── destroy.yml     # typed confirmation; serverless + runners (prd only), then foundation
 ├── _fmt.yml        # reusable steps, never run directly
 ├── _lint.yml
 ├── _validate.yml
@@ -97,6 +92,8 @@ A change under `.github/workflows/` or to `.tflint.hcl` re-checks every stack.
 | nothing under `infra/` or `.github/workflows/` (e.g. `docs/`) | skipped | skipped | skipped |
 | `infra/iam/**` | ✅ | iam | skipped (never applied by the CI) |
 | `infra/foundation/**` | ✅ | foundation | ✅ |
+| `infra/serverless/**` | ✅ | serverless (+ module) | ✅ |
+| `infra/access/**` | ✅ | access | skipped (applied by hand) |
 | `infra/runners/**` | ✅ | runners | skipped (see below) |
 | `.github/workflows/**` or `.tflint.hcl` | ✅ | all stacks | ✅ |
 
@@ -121,6 +118,11 @@ Each GCP project has two service accounts:
 Both are created by the `infra/iam` stack. Their project roles also give them access to the state bucket
 (GCP grants `projectEditor` write and `projectViewer` read on objects by default).
 
+The deployer also gets two custom roles bound **per resource**, never on the project (`deployer-iam.tf`):
+`getIamPolicy`/`setIamPolicy` on each application secret, so that `infra/serverless` can grant
+`secretAccessor` to a function, and on the `external-secrets` service account, so that `infra/runners`
+can add its Workload Identity binding. It cannot create, update or delete these resources.
+
 PR plans run with the read-only identity and `-lock=false`. A PR can therefore never modify an environment, and `prd` approvals are only requested for real deploys.
 
 ## One-time setup
@@ -129,7 +131,9 @@ PR plans run with the read-only identity and `-lock=false`. A PR can therefore n
 
 The `infra/iam` stack creates, for one environment:
 
-- **in GCP**: the Workload Identity pool and provider, and the `github-terraform` and `github-planner` service accounts;
+- **in GCP**: every API of the project, the state bucket (imported, `prevent_destroy`), the Workload Identity
+  pool and provider, the `github-terraform` and `github-planner` service accounts, the budget, and the
+  Secret Manager containers (application secrets and, in prd, `arc-github-app`), without values;
 - **in GitHub**: the `<env>` and `<env>-plan` environments, with their `WIF_PROVIDER` and `DEPLOYER_SA` variables.
   For `prd`, it also requires a reviewer and only allows deploys from the `prod` branch and `v*` tags (see `prd.tfvars`).
 
@@ -149,7 +153,8 @@ terraform init -reconfigure -backend-config=backends/prd.hcl
 terraform apply -var-file=prd.tfvars
 ```
 
-Every other stack is then deployed by the CI.
+Apply `infra/iam` before any CI deploy: `foundation` and `serverless` no longer enable APIs.
+Every other stack except `access` (also applied by hand) is then deployed by the CI.
 
 ### 2. Self-hosted runners (prd)
 

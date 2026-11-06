@@ -1,6 +1,7 @@
 name: Deploy
 
-# Tag v*: checks, foundation + serverless dev, then foundation + serverless prd, then runners.
+# Tag v*: checks, foundation + serverless dev, then foundation prd, then serverless prd and runners in parallel
+# (runners only depend on the cluster of foundation).
 # Manual run from any branch: checks, foundation + serverless dev only.
 # Applies stay on GitHub-hosted runners, independent of the infrastructure being changed.
 on:
@@ -83,7 +84,7 @@ jobs:
       runner: ubuntu-latest
 
   apply-runners-prd:
-    needs: apply-serverless-prd
+    needs: apply-prd
     uses: ./.github/workflows/_apply.yml
     permissions:
       contents: read

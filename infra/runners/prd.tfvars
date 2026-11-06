@@ -1,3 +1,3 @@
 project_id   = "cloud-pixelwar-prod"
 environment  = "prd"
-cluster_name = "pixelwar-prd"
+state_bucket = "cloud-pixelwar-eliottmth-prod-tfstate"
