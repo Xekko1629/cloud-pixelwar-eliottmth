@@ -4,7 +4,8 @@
   "type": "module",
   "exports": {
     "./observability": "./src/observability/index.ts",
-    "./observability/google": "./src/observability/google.ts"
+    "./observability/google": "./src/observability/google.ts",
+    "./grid": "./src/grid/index.ts"
   },
   "dependencies": {
     "@opentelemetry/api": "1.10.0",
