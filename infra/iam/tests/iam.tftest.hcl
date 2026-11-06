@@ -25,7 +25,7 @@ run "apis_in_one_place" {
 
   assert {
     condition = alltrue([
-      for api in ["container.googleapis.com", "secretmanager.googleapis.com", "sts.googleapis.com", "cloudfunctions.googleapis.com", "pubsub.googleapis.com"] :
+      for api in ["container.googleapis.com", "secretmanager.googleapis.com", "cloudbilling.googleapis.com", "sts.googleapis.com", "cloudfunctions.googleapis.com", "pubsub.googleapis.com"] :
       contains(keys(google_project_service.apis), api)
     ])
     error_message = "Every API of the project, cluster and application included, is enabled by this stack."

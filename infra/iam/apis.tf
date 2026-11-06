@@ -8,8 +8,9 @@ locals {
     "iam.googleapis.com",
     "iamcredentials.googleapis.com",
     "sts.googleapis.com",
-    # Budget
+    # Budget, and billing account IAM of infra/access (this project is its quota project)
     "billingbudgets.googleapis.com",
+    "cloudbilling.googleapis.com",
     # Secrets
     "secretmanager.googleapis.com",
     # Cluster of the self-hosted runners (infra/foundation)

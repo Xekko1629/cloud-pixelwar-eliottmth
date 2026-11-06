@@ -58,7 +58,9 @@ restent gérés par `infra/iam` ; ce stack ne gère que les membres IAM.
 ## Appliquer
 
 Avec ses propres identifiants (`gcloud auth application-default login`), après
-merge sur `prod` :
+merge sur `prod`, **et après `infra/iam`** du même environnement : il active les
+APIs utilisées ici (Cloud Billing pour `billing.viewer`, Resource Manager,
+Secret Manager), avec le projet comme projet de quota :
 
 ```sh
 cd infra/access
