@@ -1,6 +1,6 @@
 # ADR-0001 · Compute : services Cloud Run, en TypeScript sur Node.js 24
 
-- **Statut** : Accepté
+- **Statut** : Remplacé par [ADR-0008](0008-compute-cloud-run-functions.md)
 - **Date** : 2026-10-23
 - **Tickets** : ARCH-01 (#26). Débloque TEST-01, SRV-01, SRV-02, SRV-08, DATA-01, DATA-03 ; lié à FND-06c.
 - **Références** : Sujet §3.1, §5.5 · C05 §1-2 · C06 §1-2

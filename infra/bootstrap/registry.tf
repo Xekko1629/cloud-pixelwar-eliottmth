@@ -2,6 +2,9 @@ resource "google_project_service" "serverless" {
   for_each = toset([
     "artifactregistry.googleapis.com",
     "run.googleapis.com",
+    "cloudfunctions.googleapis.com",
+    "cloudbuild.googleapis.com",
+    "storage.googleapis.com",
     "secretmanager.googleapis.com",
     "logging.googleapis.com",
     "monitoring.googleapis.com",
@@ -18,7 +21,7 @@ resource "google_artifact_registry_repository" "containers" {
   project       = var.project_id
   location      = var.region
   repository_id = "pixelwar"
-  description   = "Container images that survive serverless stack destruction"
+  description   = "Images built internally by Cloud Build for Cloud Run functions"
   format        = "DOCKER"
   labels = {
     environment = var.environment

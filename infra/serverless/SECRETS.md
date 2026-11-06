@@ -9,8 +9,8 @@ les valeurs ne transitent pas dans le plan ni dans le state via ce code.
 | ID du secret | Contenu prévu | Consommateur prévu |
 | --- | --- | --- |
 | `discord-public-key` | Clé publique Ed25519 de l'application Discord | `discord-proxy` |
-| `discord-bot-token` | Token du bot, uniquement si l'appel Discord utilisé le nécessite | À attribuer aux seuls services qui en ont réellement besoin |
-| `discord-application-id` | ID de l'application Discord | Script d'enregistrement des commandes, services qui utilisent cet ID |
+| `discord-bot-token` | Token du bot, uniquement si l'appel Discord utilisé le nécessite | À attribuer aux seules fonctions qui en ont réellement besoin |
+| `discord-application-id` | ID de l'application Discord | Script d'enregistrement des commandes, fonctions qui utilisent cet ID |
 | `discord-oauth-client-secret` | Client secret OAuth2 Discord | `auth-proxy` |
 | `admin-allowlist` | Tableau JSON d'IDs Discord autorisés, par exemple `["123456789"]` | `command-worker` pour les commandes admin |
 
@@ -31,11 +31,12 @@ du bot : ne pas attribuer cet accès par défaut à tous les notifiers.
   au même state `serverless`, pas à un nouveau state.
 - Cette PR branche le stack Terraform `serverless` au workflow `Deploy` : manuel
   → dev uniquement ; tag `v*` → dev puis prd, après succès de chaque étape.
-  Un merge sur `prod` seul ne fait pas d'apply. Le build/push et la promotion des
-  images applicatives restent dans SRV-02. La CI de PR vérifie le stack et ses
-  tests simulés ; les contrôles de release incluent aussi le bootstrap et le module.
-- Activer les cinq conteneurs ne suffit pas à démarrer les services : une version
-  référencée doit exister et le compte du service doit avoir les permissions.
+  Un merge sur `prod` seul ne fait pas d'apply. L'empaquetage, l'upload et la
+  promotion des archives de sources restent dans SRV-02. La CI de PR vérifie le
+  stack et ses tests simulés ; les contrôles de release incluent aussi le
+  bootstrap et le module.
+- Activer les cinq conteneurs ne suffit pas à démarrer les fonctions : une version
+  référencée doit exister et l'identité d'exécution doit avoir les permissions.
 
 ### Premier déploiement — validation explicite avant déclenchement
 
@@ -100,8 +101,8 @@ gcloud secrets versions list discord-bot-token --project=cloud-pixelwar-dev
 ## Accès IAM limités par consommateur
 
 Aucun `roles/secretmanager.secretAccessor` global n'est ajouté par ce ticket.
-Le module `service` de SRV-01 accorde ce rôle **sur chaque secret référencé**,
-au seul service account d'exécution de ce service. Exemple futur :
+Le module `function` de SRV-01 accorde ce rôle **sur chaque secret référencé**,
+au seul service account d'exécution de cette fonction. Exemple futur :
 
 ```hcl
 secrets = {
@@ -118,13 +119,13 @@ Remplacer `1` par le numéro réel de la version ajoutée. La référence à la 
 secrets. Le script d'enregistrement aura des accès ciblés définis avec BOT-02/SRV-02.
 
 Les attributions effectives et les tests d'accès positif/négatif seront vérifiés
-quand les services existeront. Ce ticket prépare les conteneurs ; il ne prouve pas
+quand les fonctions existeront. Ce ticket prépare les conteneurs ; il ne prouve pas
 encore leurs accès en conditions réelles.
 
 ## Rotation et destruction
 
 - Rotation : ajouter une nouvelle version hors Terraform, mettre à jour la
-  référence numérique du service et déployer. Désactiver l'ancienne version après
+  référence numérique de la fonction et déployer. Désactiver l'ancienne version après
   validation et vérification des besoins de rollback ; ne pas la supprimer à l'aveugle.
 - Destroy : `deletion_policy = "DELETE"` autorise la suppression des conteneurs
   **et de toutes leurs versions**. Le state ne contient pas de copie des valeurs.

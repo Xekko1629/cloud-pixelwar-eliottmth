@@ -12,7 +12,7 @@
 - Certains événements ne viennent pas d'un proxy :
   - la fin d'écriture d'un snapshot dans le bucket déclenche son notifier (C07 §2) ;
   - la régénération de la vue éloignée se déclenche régulièrement (DATA-05c).
-- Les workers sont des services Cloud Run privés (ADR-0001).
+- Les workers sont des fonctions HTTP Cloud Run privées (ADR-0008).
 
 ## Décision
 
@@ -36,8 +36,8 @@
 |---|---|
 | répond 2xx | Message acquitté. |
 | rejette pour une raison métier attendue (quota dépassé, pause, coordonnées invalides) | C'est un traitement réussi : il répond 2xx et publie un événement de rejet (`pixel-rejected`). |
-| échoue pour une raison technique (Firestore indisponible, bug) | Il répond une erreur, et Pub/Sub retente avec un backoff exponentiel. |
-| échoue 5 fois de suite | Le message part dans la DLQ de l'abonnement (SRV-05), qui déclenche une alerte dès qu'elle n'est plus vide. |
+| échoue pour une raison technique (Firestore indisponible, bug) | Il répond une erreur non-2xx, Pub/Sub ne l'acquitte pas et retente avec un backoff exponentiel. |
+| atteint le nombre maximal de tentatives de l'abonnement (5 par défaut) | Le message part dans la DLQ de l'abonnement (SRV-05), qui déclenche une alerte dès qu'elle n'est plus vide. |
 
 - La livraison est « au moins une fois », sans ordre garanti. Chaque worker est donc idempotent : déduplication par `event_id`, et règle *last-write-wins* sur `occurred_at` (DATA-02).
 - Le `correlation_id` et le contexte de trace (`traceparent`) voyagent dans les attributs du message (SRV-08).
@@ -68,7 +68,7 @@ Elles passent aussi par Pub/Sub, pour n'avoir qu'un seul mécanisme de livraison
 
 **Ce que ça coûte, et ce qu'il faut surveiller**
 
-- Un service account d'invocation en plus par worker. Le module `service` le crée (SRV-01).
+- Un service account d'invocation en plus par worker. Le module `function` le crée (SRV-01).
 - En push, le worker doit répondre avant la fin du délai d'acquittement (600 s au maximum). Pour les traitements longs, comme le rendu d'image, il faut régler ce délai et le timeout Cloud Run ensemble.
 - L'ordre n'est pas garanti : l'idempotence des workers est obligatoire, pas optionnelle.
 

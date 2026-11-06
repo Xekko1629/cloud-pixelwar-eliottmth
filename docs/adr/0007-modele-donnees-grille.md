@@ -57,7 +57,7 @@ La grille est infinie par défaut, mais un admin peut la borner, puis la rendre 
 
 ### Tuiles de 64×64
 
-- La grille est découpée en tuiles de 64×64 pixels, indexées par `(tx, ty) = (⌊x/64⌋, ⌊y/64⌋)`. La division arrondit **vers le bas**, y compris pour les coordonnées négatives : le pixel `x = -1` est dans la tuile `tx = -1`, au rang local 63. Cette fonction est écrite une seule fois dans le paquet partagé (ADR-0001), et testée sur les valeurs négatives.
+- La grille est découpée en tuiles de 64×64 pixels, indexées par `(tx, ty) = (⌊x/64⌋, ⌊y/64⌋)`. La division arrondit **vers le bas**, y compris pour les coordonnées négatives : le pixel `x = -1` est dans la tuile `tx = -1`, au rang local 63. Cette fonction est écrite une seule fois dans le paquet partagé (ADR-0008), et testée sur les valeurs négatives.
 - Chaque tuile a **deux documents**, pour que le canvas ne charge que ce dont il a besoin :
   - **couleurs** : un champ `Bytes` de 4 096 octets (un par pixel) et `updated_at`. C'est ce que charge le canvas. Une tuile absente est une tuile vide : le frontend n'a rien à télécharger ;
   - **métadonnées** : une map `pixels` indexée par la position locale `0..4095`, chaque entrée contenant `uid` (id Discord sous forme de chaîne), `name` (pseudo au moment de la modification), `at` (`occurred_at` en Timestamp Firestore) et `eid` (UUID d'événement sur 16 octets, pour départager deux événements de même horodatage). Elles ne sont chargées que lorsqu'on inspecte un pixel (WEB-04). Le champ `pixels` est exclu de l'indexation (exemption d'index), sinon chaque pixel compterait dans la limite de 40 000 entrées d'index et alourdirait chaque écriture.

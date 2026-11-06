@@ -41,8 +41,8 @@ jobs:
             serverless:
               - 'infra/serverless/**'
               - '.github/workflows/**'
-            'serverless/modules/service':
-              - 'infra/serverless/modules/service/**'
+            'serverless/modules/function':
+              - 'infra/serverless/modules/function/**'
               - '.github/workflows/**'
             runners:
               - 'infra/runners/**'

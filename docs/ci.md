@@ -32,15 +32,16 @@ Checks: `terraform fmt -check`, `tflint` (rules in `.tflint.hcl`), `terraform va
 Any failure stops the pipeline before plan or apply.
 
 PR checks select changed directories: `foundation`, `iam`, `access`, `runners`,
-`bootstrap`, `serverless`, and `serverless/modules/service`. The last entry runs the module's
+`bootstrap`, `serverless`, and `serverless/modules/function`. The last entry runs the module's
 mock-provider tests independently, since the root stack does not discover them.
 Remote PR plans still target `foundation` only, when that stack changes. Release
-validation/tests also cover `bootstrap`, `serverless` and its service module by
+validation/tests also cover `bootstrap`, `serverless` and its function module by
 default. Deploy now applies `foundation` then `serverless` in each environment;
 destroy removes `serverless` before runners (prd) and `foundation`. **This also
-deletes application secrets and their versions.** The bootstrap (APIs/registry)
-must be applied separately before the first serverless deploy and is preserved,
-as is `iam`. Image builds and application promotion remain in SRV-02.
+deletes application secrets and their versions.** The bootstrap (APIs, registry,
+source bucket and build identity) must be applied separately before the first
+serverless deploy and is preserved, as is `iam`. Source archiving and application
+promotion remain in SRV-02.
 See [the first-deployment checklist](../infra/serverless/SECRETS.md) before
 triggering a workflow. Each apply job computes then applies its own plan without
 an intervening review pause; PRs do not yet publish serverless remote plans.
