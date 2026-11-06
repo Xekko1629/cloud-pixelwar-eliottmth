@@ -122,7 +122,7 @@ restent à vérifier avec BOT-01/SRV-02 ; le ticket n'est pas validé de bout en
    (`grid`, `observability`, `observability/google`) sont conservés et que
    `npm ci` accepte le lockfile sans le régénérer.
 2. Valider séparément le plan puis le déploiement Terraform dev, suivant
-   [la checklist SRV-03](../infra/serverless/SECRETS.md). Ce workflow applique
+   [la checklist SRV-03](../infra/iam/SECRETS.md). Ce workflow applique
    `foundation` et `serverless` ; il **n'enregistre pas** les commandes Discord.
    Ne pas pousser de tag `v*` pour ce test, car cela engage aussi prd.
 3. Alimenter les secrets depuis l'application **dev** de BOT-01. Fournir au

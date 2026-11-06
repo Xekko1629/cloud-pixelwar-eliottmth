@@ -53,7 +53,7 @@ de ses propres attributions. La lecture autorise le contenu de **toutes les
 versions** des deux secrets, pas seulement `latest`.
 
 Aucune version/valeur n'est lue par Terraform. La réplication et les conteneurs
-restent gérés par SRV-03 ; ce stack ne gère que les membres IAM.
+restent gérés par `infra/iam` ; ce stack ne gère que les membres IAM.
 
 ## Appliquer
 
@@ -75,12 +75,10 @@ Ajouter ou retirer un email dans les `tfvars` → PR, CI, revue, merge, puis
 apply local. Retirer un email retire réellement le rôle, même s'il avait été
 donné à la main avant.
 
-## Après un destroy de `serverless`
+## Après un destroy
 
-Le destroy supprime les secrets **et leurs policies IAM** : conserver le state
-access n'empêche pas cette suppression. Après recréation des secrets par
-`serverless`, réappliquer `infra/access` dev, puis réinjecter les valeurs
-depuis une source sûre.
+Les secrets applicatifs sont gérés par `infra/iam`, persistant : un destroy de
+`serverless` ne les supprime pas, et les lectures accordées ici sont conservées.
 
 ## Premier apply
 
