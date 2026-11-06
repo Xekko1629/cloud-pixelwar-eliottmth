@@ -37,6 +37,12 @@ apply env stack="foundation": (_init env stack)
 destroy env stack="foundation": (_init env stack)
     terraform -chdir=infra/{{stack}} destroy {{lock}} -var-file={{env}}.tfvars
 
+# Applique à la main iam puis access (jamais appliqués par la CI), plan par plan avec confirmation
+# Exemples : just manual    |    just manual prd access
+[unix]
+manual env="all" stack="all":
+    scripts/apply-manual.sh {{env}} {{stack}}
+
 # Vérifie le format et la validité, comme la CI
 check stack="foundation":
     terraform -chdir=infra/{{stack}} fmt -check -recursive

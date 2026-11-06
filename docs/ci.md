@@ -141,6 +141,9 @@ The `infra/iam` stack creates, for one environment:
 It lives in its own stack so that destroying `foundation` never removes the CI identities.
 The CI only checks this stack (fmt, validate, test) and never applies it: the CI cannot create the identity it uses to log in.
 Apply it by hand, with your own accounts, once per environment and whenever `infra/iam` changes.
+`just manual` (or `scripts/apply-manual.sh [dev|prd|all] [iam|access|all]`) runs `iam` then `access`
+for each environment: it checks that HEAD is `origin/prod`, sets `GITHUB_TOKEN` from `gh`, shows each
+plan and applies it only after confirmation, and requires typing `destroy` when a plan deletes or replaces.
 The GitHub token must belong to a repository admin.
 
 ```sh
