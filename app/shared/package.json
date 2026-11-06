@@ -1,5 +1,8 @@
 {
   "name": "@pixelwar/shared",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "exports": {
+    "./grid": "./src/grid/index.ts"
+  }
 }

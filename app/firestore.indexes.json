@@ -1,0 +1,36 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "tile_colors",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "canvas_version", "order": "ASCENDING" },
+        { "fieldPath": "region", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "deltas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "canvas_version", "order": "ASCENDING" },
+        { "fieldPath": "region", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "deltas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "canvas_version", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    { "collectionGroup": "tile_colors", "fieldPath": "colors", "indexes": [] },
+    { "collectionGroup": "tile_metadata", "fieldPath": "pixels", "indexes": [] },
+    { "collectionGroup": "deltas", "fieldPath": "pixels", "indexes": [] },
+    { "collectionGroup": "deltas", "fieldPath": "expire_at", "indexes": [] },
+    { "collectionGroup": "processed_events", "fieldPath": "expire_at", "indexes": [] }
+  ]
+}
