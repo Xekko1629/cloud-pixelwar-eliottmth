@@ -44,9 +44,9 @@ variable "min_runners" {
 }
 
 variable "max_runners" {
-  description = "Maximum concurrent runners (bounded by the runners node pool size)"
+  description = "Maximum concurrent runners (one per runners node, so at most the pool max_node_count)"
   type        = number
-  default     = 3
+  default     = 6
 }
 
 variable "arc_chart_version" {
