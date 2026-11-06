@@ -31,8 +31,8 @@ register real Discord commands.
 Checks: `terraform fmt -check`, `tflint` (rules in `.tflint.hcl`), `terraform validate` and `terraform test` (`*.tftest.hcl`) on each stack.
 Any failure stops the pipeline before plan or apply.
 
-PR checks select changed directories: `foundation`, `iam`, `bootstrap`,
-`serverless`, and `serverless/modules/service`. The last entry runs the module's
+PR checks select changed directories: `foundation`, `iam`, `access`, `runners`,
+`bootstrap`, `serverless`, and `serverless/modules/service`. The last entry runs the module's
 mock-provider tests independently, since the root stack does not discover them.
 Remote PR plans still target `foundation` only, when that stack changes. Release
 validation/tests also cover `bootstrap`, `serverless` and its service module by
@@ -47,11 +47,26 @@ an intervening review pause; PRs do not yet publish serverless remote plans.
 
 ## Workflows
 
+### Accès humains Discord dev (workflow administratif séparé)
+
+`access-dev.yml` est manuel, depuis `prod` uniquement. Après initialisation
+unique par l'admin dans `infra/iam` dev : plan des accès, revue par **Xekko1629**
+dans l'environnement protégé `access-dev`, puis application du même plan
+sauvegardé. Deux identités WIF dédiées, aucun rôle de lecture des valeurs au
+niveau projet et aucun droit prd ajouté. Voir le [runbook access](../infra/access/README.md).
+Les states IAM/access sont persistants et ne sont ciblés ni par Deploy ni par
+Destroy. L'accès secret disparaît toutefois si la ressource secret elle-même
+est détruite ; le runbook décrit la réinitialisation nécessaire.
+
+Le filtre de PR et les contrôles locaux de release incluent maintenant `access`.
+Ils n'appliquent pas de droits ; aucune authentification GCP dans ces tests simulés.
+
 ```
 .github/workflows/
 ├── ci.yml          # PR → prod: fmt + validate + test → plan dev + prd
 ├── deploy.yml      # foundation + serverless dev, then prd + runners (tag only)
 ├── destroy.yml     # typed confirmation; serverless, runners (prd only), foundation
+├── access-dev.yml  # manual prod branch only; plan → Xekko approval → saved-plan apply
 ├── _fmt.yml        # reusable steps, never run directly
 ├── _lint.yml
 ├── _validate.yml

@@ -31,6 +31,9 @@ jobs:
             iam:
               - 'infra/iam/**'
               - '.github/workflows/**'
+            access:
+              - 'infra/access/**'
+              - '.github/workflows/**'
               - '.tflint.hcl'
             bootstrap:
               - 'infra/bootstrap/**'
