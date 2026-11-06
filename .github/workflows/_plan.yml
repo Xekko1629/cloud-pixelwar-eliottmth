@@ -47,8 +47,21 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
 
+      # A stack never applied has no remote state: init would create it, which the read-only
+      # planner cannot. Only in that case, plan against an empty local state instead.
       - name: Init
-        run: terraform init -backend-config="backends/${{ inputs.environment }}.hcl"
+        id: init
+        run: |
+          if terraform init -no-color -backend-config="backends/${{ inputs.environment }}.hcl" 2>&1 | tee init.txt; then
+            echo "fresh=false" >> "$GITHUB_OUTPUT"
+          elif grep -q "object doesn't exist" init.txt; then
+            echo "::notice::No remote state yet for ${{ inputs.stack }} (${{ inputs.environment }}): planning against an empty state"
+            printf 'terraform {\n  backend "local" {}\n}\n' > ci_backend_override.tf
+            terraform init -no-color -reconfigure
+            echo "fresh=true" >> "$GITHUB_OUTPUT"
+          else
+            exit 1
+          fi
 
       # No lock: the planner can only read the state bucket
       - name: Plan
@@ -58,6 +71,9 @@ jobs:
         run: |
           {
             echo "## Plan \`${{ inputs.stack }}\` → \`${{ inputs.environment }}\`"
+            if [ "${{ steps.init.outputs.fresh }}" = "true" ]; then
+              echo "> No remote state yet: this is the plan of the first apply, against an empty state."
+            fi
             echo '```'
             cat plan.txt
             echo '```'
