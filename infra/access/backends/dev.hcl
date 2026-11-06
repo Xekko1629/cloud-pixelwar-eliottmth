@@ -1,2 +1,2 @@
-bucket = "cloud-pixelwar-eliottmth-dev-access-tfstate"
+bucket = "cloud-pixelwar-eliottmth-dev-tfstate"
 prefix = "access"
