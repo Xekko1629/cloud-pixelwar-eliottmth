@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: Type cloud-pixelwar-dev to request the six dev secret read grants
+        description: Type cloud-pixelwar-dev to apply the dev human access (secret reads, project editors)
         type: string
         required: true
 
@@ -67,7 +67,7 @@ jobs:
         run: |
           terraform show -no-color access.tfplan > access-plan.txt
           {
-            echo '## Dev secret access — review before approving access-dev'
+            echo '## Dev human access — review before approving access-dev'
             echo "Commit: $GITHUB_SHA"
             echo '```'
             cat access-plan.txt

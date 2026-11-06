@@ -6,7 +6,7 @@ on:
       stacks:
         description: JSON list of stack directories under infra/
         type: string
-        default: '["foundation", "iam", "access", "access/team", "runners", "bootstrap", "serverless", "serverless/modules/service"]'
+        default: '["foundation", "iam", "access", "runners", "bootstrap", "serverless", "serverless/modules/service"]'
       runner:
         description: Runner label (empty = RUNNER_LABEL variable, then ubuntu-latest)
         type: string

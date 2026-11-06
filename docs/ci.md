@@ -31,7 +31,7 @@ register real Discord commands.
 Checks: `terraform fmt -check`, `tflint` (rules in `.tflint.hcl`), `terraform validate` and `terraform test` (`*.tftest.hcl`) on each stack.
 Any failure stops the pipeline before plan or apply.
 
-PR checks select changed directories: `foundation`, `iam`, `access`, `access/team`, `runners`,
+PR checks select changed directories: `foundation`, `iam`, `access`, `runners`,
 `bootstrap`, `serverless`, and `serverless/modules/service`. The last entry runs the module's
 mock-provider tests independently, since the root stack does not discover them.
 Remote PR plans still target `foundation` only, when that stack changes. Release
@@ -47,21 +47,19 @@ an intervening review pause; PRs do not yet publish serverless remote plans.
 
 ## Workflows
 
-### Accès humains Discord dev (workflow administratif séparé)
+### Accès humains (workflow administratif séparé)
 
 `access-dev.yml` est manuel, depuis `prod` uniquement. Après initialisation
 unique par l'admin dans `infra/iam` dev : plan des accès, revue par **Xekko1629**
 dans l'environnement protégé `access-dev`, puis application du même plan
-sauvegardé. Deux identités WIF dédiées, aucun rôle de lecture des valeurs au
-niveau projet et aucun droit prd ajouté. Voir le [runbook access](../infra/access/README.md).
+sauvegardé. Il gère en dev la lecture des deux secrets Discord et les rôles
+`editor` de l'équipe et de l'instructeur ; l'identité apply ne peut modifier
+que les attributions `roles/editor` du projet dev. En prd, le même stack est
+appliqué en local par Xekko (rôles `editor` et `billing.viewer` de
+l'instructeur). Voir le [runbook access](../infra/access/README.md).
 Les states IAM/access sont persistants et ne sont ciblés ni par Deploy ni par
 Destroy. L'accès secret disparaît toutefois si la ressource secret elle-même
 est détruite ; le runbook décrit la réinitialisation nécessaire.
-
-Les rôles de l'équipe et de l'instructeur sur les projets, et le `billing.viewer`
-de l'instructeur, sont dans le stack `infra/access/team` (state `access-team`).
-Aucun workflow ne l'applique : il s'applique en local par un owner, voir son
-[README](../infra/access/team/README.md).
 
 Le filtre de PR et les contrôles locaux de release incluent maintenant `access`.
 Ils n'appliquent pas de droits ; aucune authentification GCP dans ces tests simulés.

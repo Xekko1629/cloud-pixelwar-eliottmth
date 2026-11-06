@@ -1,13 +1,37 @@
-# Accès humains — lecture Discord dev
+# Accès humains (ACC-01)
 
-Extension limitée du chantier ACC-01 (#8), à coordonner avec son responsable :
-ceci ne termine pas les rôles généraux de l'équipe ni les accès de l'instructeur
-et de facturation prévus par ce ticket. Ceux-ci sont dans le sous-stack
-[`team/`](team/README.md), avec un state séparé.
+Stack séparé des workloads (sujet §1.3, §2.1, C03 §9) : un destroy de
+`foundation`, `runners` ou `serverless` ne retire l'accès à personne. Un state
+par environnement :
 
-## Périmètre validé
+| Env | Backend | Appliqué par |
+| --- | --- | --- |
+| dev | bucket `cloud-pixelwar-eliottmth-dev-access-tfstate`, préfixe `access` | workflow `access-dev.yml`, approuvé par Xekko |
+| prd | bucket `cloud-pixelwar-eliottmth-prod-tfstate`, préfixe `access` | Xekko en local (voir [prd](#prd--apply-local-par-xekko)) |
 
-Six attributions **additives** `google_secret_manager_secret_iam_member` :
+## Équipe et instructeur
+
+| Principal | Rôle | Où |
+| --- | --- | --- |
+| Membres de `team_editors` (Benjamin, IncognitoDev) | `roles/editor` | dev et prd |
+| Instructeur `jeremie@jjaouen.com` | `roles/editor` | dev et prd |
+| Instructeur | `roles/billing.viewer` | compte de facturation `0111A1-F02A73-B2E667`, géré par prd seulement (commun aux deux projets) |
+
+Attributions **additives** (`google_project_iam_member`,
+`google_billing_account_iam_member`) : la policy des projets n'est jamais
+remplacée. Le `roles/owner` d'Eliott reste volontairement hors Terraform, pour
+qu'une erreur ici ne puisse pas retirer le dernier accès admin ; les comptes de
+service de la CI sont gérés par `infra/iam`. Ces rôles existaient déjà, donnés à
+la main : le premier apply les fait passer sous Terraform sans changer les accès
+réels (sauf `billing.viewer`).
+
+Retirer un email des `tfvars` retire réellement le rôle, même s'il avait été
+donné à la main avant.
+
+## Lecture des secrets Discord dev
+
+Six attributions **additives** `google_secret_manager_secret_iam_member`, en dev
+uniquement :
 
 | Comptes Google | Secrets dans `cloud-pixelwar-dev` |
 | --- | --- |
@@ -18,7 +42,7 @@ Six attributions **additives** `google_secret_manager_secret_iam_member` :
 Rôle : `roles/secretmanager.secretAccessor`. Les emails sont normalisés en
 minuscules pour éviter les doublons de ressources Terraform.
 
-Pas de nouveau droit sur prd, OAuth, l'allow-list ou les autres secrets. Pas de
+Pas de lecture de secret en prd, ni sur OAuth, l'allow-list ou les autres secrets. Pas de
 permission d'ajout de version, création de ressource ou gestion IAM accordée aux
 développeurs par ce stack. Il ne supprime pas les droits existants/hérités hors
 de ses propres attributions. La lecture autorise le contenu de **toutes les
@@ -31,11 +55,15 @@ restent gérés par SRV-03 ; ce stack ne gère que les membres IAM.
 
 - `infra/iam`, state existant `iam` : initialise l'automatisation persistante.
 - `infra/access`, préfixe `access`, bucket **dédié**
-  `cloud-pixelwar-eliottmth-dev-access-tfstate` : contient les six attributions.
+  `cloud-pixelwar-eliottmth-dev-access-tfstate` : contient les attributions dev.
 - Ni `iam` ni `access` ne sont appelés par le workflow de destruction.
 - Deux nouvelles identités, sans clé GCP persistante :
-  - `github-dev-access-plan` : `getIamPolicy` uniquement sur les deux secrets ;
-  - `github-dev-access-apply` : `getIamPolicy` + `setIamPolicy` sur ces secrets.
+  - `github-dev-access-plan` : `getIamPolicy` uniquement sur les deux secrets
+    et sur le projet dev ;
+  - `github-dev-access-apply` : `getIamPolicy` + `setIamPolicy` sur ces secrets
+    et sur le projet dev. Sur le projet, une condition IAM
+    (`modifiedGrantsByRole` limité à `roles/editor`) l'empêche de donner ou de
+    retirer tout autre rôle, en particulier `owner` ou un rôle d'admin IAM.
 - Les deux ont `storage.objectAdmin` sur **le seul bucket access**, pour
   initialiser le backend, lire le state et gérer les verrous. Le plan est donc
   en lecture seule pour l'IAM des secrets, **pas pour ce backend isolé**.
@@ -68,7 +96,8 @@ GITHUB_TOKEN="$(gh auth token)" terraform plan -var-file=dev.tfvars -out=dev-acc
 ```
 
 Relire **tout le plan IAM**, pas seulement les ajouts : nouveau bucket privé,
-deux comptes, deux rôles limités, WIF et deux environnements GitHub. Aucun rôle
+deux comptes, quatre rôles limités (secrets et IAM du projet dev, apply
+conditionné à `roles/editor`), WIF et deux environnements GitHub. Aucun rôle
 de lecture des valeurs au niveau projet, aucun nouveau droit prd et aucune
 suppression inattendue. Après accord explicite, Xekko peut appliquer ce plan :
 
@@ -97,7 +126,8 @@ Si les protections ne sont pas disponibles ou ne sont pas réellement appliquée
 1. GitHub Actions → **Dev Discord secret access** → **Run workflow**.
 2. Choisir la branche **`prod`** et confirmer **`cloud-pixelwar-dev`**.
 3. Le job plan calcule le plan sur le commit exact du run et le publie dans son
-   résumé. À la première exécution, attendre **6 ajouts, 0 changement, 0 destroy**.
+   résumé. À la première exécution, attendre **9 ajouts (6 lectures de secrets,
+   3 editors), 0 changement, 0 destroy**.
 4. Xekko relit le résumé et approuve l'environnement **`access-dev`**.
 5. Le job apply vérifie le SHA-256 puis applique **le fichier plan sauvegardé**,
    sans recalculer un nouveau plan après approbation.
@@ -130,6 +160,23 @@ si elles ont plus de 30 jours et au moins 20 générations plus récentes. Cela
 ajoute un petit coût GCS à l'usage, pas du compute permanent ni un plafond de
 facturation. `prevent_destroy` protège l'opération Terraform, pas contre tous
 les actes possibles d'un administrateur GCP.
+
+## prd : apply local par Xekko
+
+Pas de workflow en prd : le `billing.viewer` demande un admin du compte de
+facturation, et aucun compte de service de CI ne reçoit ce droit ni l'IAM du
+projet prd. Xekko applique avec ses identifiants
+(`gcloud auth application-default login`) :
+
+```sh
+cd infra/access
+terraform init -reconfigure -backend-config=backends/prd.hcl
+terraform plan -var-file=prd.tfvars -out=prd-access.tfplan
+terraform apply prd-access.tfplan
+```
+
+Plan attendu au premier apply : **4 ajouts (3 editors, 1 `billing.viewer`),
+0 changement, 0 destroy**.
 
 ## Vérifications locales sans GCP
 
