@@ -32,6 +32,15 @@ jobs:
               - 'infra/iam/**'
               - '.github/workflows/**'
               - '.tflint.hcl'
+            bootstrap:
+              - 'infra/bootstrap/**'
+              - '.github/workflows/**'
+            serverless:
+              - 'infra/serverless/**'
+              - '.github/workflows/**'
+            'serverless/modules/service':
+              - 'infra/serverless/modules/service/**'
+              - '.github/workflows/**'
             runners:
               - 'infra/runners/**'
               - '.github/workflows/**'
@@ -75,10 +84,13 @@ jobs:
     with:
       environment: ${{ matrix.environment }}
 
+  application:
+    uses: ./.github/workflows/_app-test.yml
+
   # Always reported, even when every other job is skipped: use it as the required status check
   result:
     name: CI result
-    needs: [changes, fmt, lint, validate, test, plan]
+    needs: [changes, fmt, lint, validate, test, plan, application]
     if: always()
     runs-on: ubuntu-latest
     steps:

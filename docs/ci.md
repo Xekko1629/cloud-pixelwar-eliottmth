@@ -1,5 +1,14 @@
 # CI/CD
 
+## Application tests (TEST-01)
+
+Every PR to `prod` also runs `_app-test.yml`: Node.js 24 strict type checks,
+Vitest unit tests with a 70% per-file coverage threshold, then integration tests
+against local Firestore and Pub/Sub emulators (Java 21). No cloud credentials
+are used. Coverage is published in the run summary and reports are uploaded as
+artifacts. `CI result` depends on this job, so failures block the required check.
+See [testing.md](testing.md) for local commands, limitations and dependency alerts.
+
 ## GitFlow
 
 - `prod`: default branch, always deployable, protected (PR + review + green checks + signed commits).
@@ -9,20 +18,34 @@
 | Event | Checks | Plan dev + prd | Apply dev | Apply prd |
 |---|---|---|---|---|
 | PR `feature/*` → `prod` (`ci.yml`) | ✅ | ✅ | — | — |
-| Manual run of `deploy.yml` from any branch | ✅ | — | ✅ | — |
-| Tag `v*` pushed (`deploy.yml`) | ✅ | — | ✅ | ✅ after dev, then the runners |
-| Manual run of `destroy.yml` | — | — | destroy dev or prd (prd: runners first) | |
+| Manual run of `deploy.yml` from any branch | ✅ | — | foundation → serverless | — |
+| Tag `v*` pushed (`deploy.yml`) | ✅ | — | foundation → serverless | foundation → serverless → runners, after dev |
+| Manual run of `destroy.yml` | — | — | destroy dev or prd: serverless → runners (prd only) → foundation | |
 
 Checks: `terraform fmt -check`, `tflint` (rules in `.tflint.hcl`), `terraform validate` and `terraform test` (`*.tftest.hcl`) on each stack.
 Any failure stops the pipeline before plan or apply.
+
+PR checks select changed directories: `foundation`, `iam`, `bootstrap`,
+`serverless`, and `serverless/modules/service`. The last entry runs the module's
+mock-provider tests independently, since the root stack does not discover them.
+Remote PR plans still target `foundation` only, when that stack changes. Release
+validation/tests also cover `bootstrap`, `serverless` and its service module by
+default. Deploy now applies `foundation` then `serverless` in each environment;
+destroy removes `serverless` before runners (prd) and `foundation`. **This also
+deletes application secrets and their versions.** The bootstrap (APIs/registry)
+must be applied separately before the first serverless deploy and is preserved,
+as is `iam`. Image builds and application promotion remain in SRV-02.
+See [the first-deployment checklist](../infra/serverless/SECRETS.md) before
+triggering a workflow. Each apply job computes then applies its own plan without
+an intervening review pause; PRs do not yet publish serverless remote plans.
 
 ## Workflows
 
 ```
 .github/workflows/
 ├── ci.yml          # PR → prod: fmt + validate + test → plan dev + prd
-├── deploy.yml      # tag v*: … → apply dev → apply prd → apply runners (prd) / manual: … → apply dev
-├── destroy.yml     # manual: destroy dev or prd (typed confirmation; prd: runners, then foundation)
+├── deploy.yml      # foundation + serverless dev, then prd + runners (tag only)
+├── destroy.yml     # typed confirmation; serverless, runners (prd only), foundation
 ├── _fmt.yml        # reusable steps, never run directly
 ├── _lint.yml
 ├── _validate.yml
@@ -55,7 +78,9 @@ A change under `.github/workflows/` or to `.tflint.hcl` re-checks every stack.
 The **`CI result`** job always runs and fails if any other job failed. It is the check to mark as required on `prod`.
 
 To add a stack, add an entry to the `filters` of the `changes` job.
-`deploy.yml` and `destroy.yml` are not filtered: a release always applies every stack (no-op when nothing changed).
+`deploy.yml` and `destroy.yml` are not path-filtered: they process their explicitly
+listed stacks, not every directory under `infra/`. A new directory is not
+automatically deployed. A merge/push to `prod` alone does not trigger Deploy.
 
 ## Authentication: Workload Identity Federation
 
@@ -169,4 +194,3 @@ and the deploy jobs of `infra/runners` read it in memory to mint a one-hour GitH
 - `system` node pool: one spot `e2-medium` for the controller and system pods.
 - Budget alerts per project (`infra/iam/budget.tf`): 20 EUR by default, emails at 50 %, 90 % and 100 %.
 - Runner activity: Cloud Logging, `resource.type="k8s_container" AND resource.labels.namespace_name=("arc-runners" OR "arc-systems")`.
-

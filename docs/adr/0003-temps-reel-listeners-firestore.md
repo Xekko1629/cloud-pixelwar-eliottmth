@@ -20,12 +20,14 @@ Le navigateur s'abonne avec des **listeners Firestore** (`onSnapshot`) à une co
 ### Côté écriture : le `draw-worker`
 
 - Pour chaque lot traité, il écrit **un document de delta par région touchée**, une région faisant 1024×1024 pixels (ADR-0007).
-- Contenu d'un delta : région, `canvas_version`, `created_at` (horodatage serveur), `expire_at` (TTL court, par exemple 1 h) et la liste compacte des pixels modifiés.
+- Contenu d'un delta : `encoding_version: 1`, `canvas_version`, `region`, `event_id` de l'événement source, `created_at` (horodatage serveur), `expire_at` (TTL court, par exemple 1 h) et `pixels`, un champ `Bytes` compact.
+- Format de `pixels` : 5 octets par pixel, concaténés dans l'ordre du lot. `x` et `y` sont les coordonnées **locales à la région** (`0..1023`) en uint16 little-endian ; la couleur est un uint8 de `1` à `16`. Un lot accepté fait au plus 500 pixels, soit 2 500 octets. Le codec partagé valide la longueur, les bornes, les doublons et la version du format.
+- Le champ `pixels`, comme les métadonnées de tuile, est **exclu de l'indexation**. Les index composites `(canvas_version, region, created_at)` et `(canvas_version, created_at)` sont déclarés dans `app/firestore.indexes.json`, référencé par `app/firebase.json`.
 - Il écrit le delta **dans la même transaction que les tuiles** qu'il modifie, avec le même horodatage serveur. Un client ne peut donc pas recevoir un delta sans que la tuile correspondante soit à jour, ni l'inverse.
 
 ### Côté lecture : le navigateur
 
-1. Il ouvre le listener `deltas where region in [régions visibles] and created_at > T0`, au plus 30 régions. Au-delà, en vue éloignée, il écoute le flux global `deltas where created_at > T0`. `T0` est pris un peu dans le passé (par exemple une minute), pour absorber le décalage d'horloge du navigateur : la règle 3 élimine les doublons.
+1. Il ouvre le listener `deltas where canvas_version == [version courante] and region in [régions visibles] and created_at > T0`, au plus 30 régions. Au-delà, en vue éloignée, il écoute le flux global `deltas where canvas_version == [version courante] and created_at > T0`. Le filtre de version empêche un delta antérieur à un `/admin clear` de repeindre la nouvelle toile. `T0` est pris un peu dans le passé (par exemple une minute), pour absorber le décalage d'horloge du navigateur : la règle 3 élimine les doublons.
 2. Il charge ensuite les tuiles du viewport. Chaque tuile porte son `updated_at`. Les deltas qui arrivent avant leur tuile sont gardés en mémoire.
 3. Il n'applique sur une tuile que les deltas dont `created_at` est postérieur à son `updated_at`. Comme une tuile et son delta partagent le même horodatage, aucun pixel ne peut revenir à un état plus ancien.
 4. Quand le viewport change, il recrée le listener avec les nouvelles régions et un nouveau `T0`. Le résultat local de la requête ne grossit donc pas indéfiniment.
