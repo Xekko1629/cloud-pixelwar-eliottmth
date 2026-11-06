@@ -35,6 +35,10 @@ jobs:
               - 'infra/access/**'
               - '.github/workflows/**'
               - '.tflint.hcl'
+            'access/team':
+              - 'infra/access/team/**'
+              - '.github/workflows/**'
+              - '.tflint.hcl'
             bootstrap:
               - 'infra/bootstrap/**'
               - '.github/workflows/**'

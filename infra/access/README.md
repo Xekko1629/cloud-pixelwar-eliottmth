@@ -2,7 +2,8 @@
 
 Extension limitée du chantier ACC-01 (#8), à coordonner avec son responsable :
 ceci ne termine pas les rôles généraux de l'équipe ni les accès de l'instructeur
-et de facturation prévus par ce ticket.
+et de facturation prévus par ce ticket. Ceux-ci sont dans le sous-stack
+[`team/`](team/README.md), avec un state séparé.
 
 ## Périmètre validé
 
