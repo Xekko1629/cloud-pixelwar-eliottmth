@@ -1,18 +1,18 @@
 name: Destroy
 
 # Manual only. Type the environment name in "confirm" to proceed.
-# Serverless first (including secret versions), then runners in prd, then foundation.
-# Always on GitHub-hosted runners; bootstrap and iam are preserved.
+# Serverless and runners (prd) in parallel, then foundation, whose cluster hosts the runners.
+# Always on GitHub-hosted runners; bootstrap, iam (secrets, state bucket, APIs) and access are preserved.
 on:
   workflow_dispatch:
     inputs:
       environment:
-        description: Environment to destroy (includes application secrets and all versions)
+        description: Environment to destroy (application secrets are kept, they live in infra/iam)
         type: choice
         options: [dev, prd]
         default: dev
       confirm:
-        description: Type the environment name again to confirm deletion, including application secret values
+        description: Type the environment name again to confirm deletion
         type: string
         required: true
 
@@ -45,7 +45,7 @@ jobs:
       runner: ubuntu-latest
 
   destroy-runners:
-    needs: destroy-serverless
+    needs: confirm
     if: inputs.environment == 'prd'
     uses: ./.github/workflows/_destroy.yml
     permissions:

@@ -89,3 +89,14 @@ variable "budget_alert_thresholds" {
   type        = list(number)
   default     = [0.5, 0.9, 1.0]
 }
+
+variable "state_bucket" {
+  description = "Remote state bucket of this environment, created by hand then imported"
+  type        = string
+}
+
+variable "import_application_secrets" {
+  description = "Adopt the application secrets that infra/serverless created before they moved here"
+  type        = bool
+  default     = false
+}

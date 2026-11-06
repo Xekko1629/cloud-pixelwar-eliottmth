@@ -24,10 +24,27 @@ provider "google" {
   region  = var.region
 }
 
-# The cluster is created by infra/foundation and read here, so Helm is configured from existing data
+# The cluster is created by infra/foundation: its name and zone come from that stack's
+# state, so renaming or moving it cannot silently break this stack.
+data "terraform_remote_state" "foundation" {
+  backend = "gcs"
+
+  config = {
+    bucket = var.state_bucket
+    prefix = "foundation"
+  }
+}
+
 data "google_container_cluster" "runners" {
-  name     = var.cluster_name
-  location = var.zone
+  name     = data.terraform_remote_state.foundation.outputs.cluster_name
+  location = data.terraform_remote_state.foundation.outputs.cluster_location
+
+  lifecycle {
+    precondition {
+      condition     = data.terraform_remote_state.foundation.outputs.cluster_name != null
+      error_message = "infra/foundation has no cluster in this environment (enable_cluster = false)."
+    }
+  }
 }
 
 data "google_client_config" "current" {}

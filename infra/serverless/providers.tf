@@ -14,4 +14,7 @@ terraform {
 provider "google" {
   project = var.project_id
   region  = var.region
+
+  # Applied to every resource of this stack and of its modules that supports labels
+  default_labels = local.labels
 }

@@ -8,11 +8,12 @@ Ce squelette ne déploie encore aucun service : les modules seront instanciés l
 
 ## Secrets applicatifs — SRV-03
 
-`secrets.tf` déclare les conteneurs Secret Manager dans chaque projet, sans
-valeurs ni versions gérées par Terraform. Voir [SECRETS.md](SECRETS.md) pour le
-catalogue, l'alimentation hors Git, les accès par service et la rotation.
-Un destroy supprime les secrets et leurs versions : les valeurs devront être
-réinjectées lors d'une reconstruction, elles ne sont pas sauvegardées dans le state.
+Les conteneurs Secret Manager sont déclarés par le stack persistant `infra/iam`
+(`secrets.tf`), plus ici : Secret Manager est la source de vérité, un destroy de
+`serverless` ne doit pas effacer les valeurs. Ce stack se contente de donner
+`secretAccessor` à chaque fonction sur les secrets qu'elle utilise (module
+`service`). Voir [SECRETS.md](../iam/SECRETS.md) pour le catalogue,
+l'alimentation hors Git, les accès par service et la rotation.
 
 ## Organisation des states
 
@@ -58,9 +59,9 @@ pas d'apply. Les contrôles de release incluent aussi `bootstrap`, `serverless`
 et le module `service`. Le bootstrap persistant doit déjà avoir été appliqué
 séparément dans chaque projet pour activer les APIs ; il n'est pas auto-déployé.
 
-Le destroy manuel supprime `serverless` (secrets et toutes leurs versions), puis
+Le destroy manuel supprime `serverless` (sans les secrets, gérés par `iam`) et
 `runners` en prd, puis `foundation`. `iam` et `bootstrap` sont conservés.
-Les plans distants de PR restent limités à `foundation` ; le plan serverless est
-calculé dans le job d'apply avant application. Faire relire un plan serverless
-séparé avant le premier déclenchement, voir [SECRETS.md](SECRETS.md).
+Chaque PR qui modifie ce stack ou son module publie un plan dev et prd ; le plan serverless est aussi
+calculé dans le job d'apply avant application. Relire ce plan de PR avant le
+premier déclenchement, voir [SECRETS.md](../iam/SECRETS.md).
 Le build/push des images et la promotion applicative par digest restent dans SRV-02.
