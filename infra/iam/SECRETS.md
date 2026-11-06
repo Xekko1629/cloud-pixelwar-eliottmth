@@ -9,8 +9,8 @@ les valeurs ne transitent pas dans le plan ni dans le state via ce code.
 | ID du secret | Contenu prévu | Consommateur prévu |
 | --- | --- | --- |
 | `discord-public-key` | Clé publique Ed25519 de l'application Discord | `discord-proxy` |
-| `discord-bot-token` | Token du bot, uniquement si l'appel Discord utilisé le nécessite | À attribuer aux seuls services qui en ont réellement besoin |
-| `discord-application-id` | ID de l'application Discord | Script d'enregistrement des commandes, services qui utilisent cet ID |
+| `discord-bot-token` | Token du bot, uniquement si l'appel Discord utilisé le nécessite | À attribuer aux seules fonctions qui en ont réellement besoin |
+| `discord-application-id` | ID de l'application Discord | Script d'enregistrement des commandes, fonctions qui utilisent cet ID |
 | `discord-oauth-client-secret` | Client secret OAuth2 Discord | `auth-proxy` |
 | `admin-allowlist` | Tableau JSON d'IDs Discord autorisés, par exemple `["123456789"]` | `command-worker` pour les commandes admin |
 
@@ -36,6 +36,8 @@ du bot : ne pas attribuer cet accès par défaut à tous les notifiers.
 - Les secrets dev, créés auparavant par `infra/serverless`, sont adoptés par un
   bloc `import` (`import_application_secrets = true` dans `dev.tfvars`) ; le
   stack serverless les oublie sans les détruire (`infra/serverless/removed.tf`).
+- Créer un conteneur ne suffit pas à démarrer les fonctions : une version
+  référencée doit exister et l'identité d'exécution doit avoir les permissions.
 - Coût : quelques centimes par mois de versions actives, conservés après un
   destroy. Choix assumé : sans eux, la source de vérité disparaîtrait.
 
@@ -72,8 +74,8 @@ gcloud secrets versions list discord-bot-token --project=cloud-pixelwar-dev
 ## Accès IAM limités par consommateur
 
 Aucun `roles/secretmanager.secretAccessor` global n'est ajouté par ce ticket.
-Le module `service` de SRV-01 accorde ce rôle **sur chaque secret référencé**,
-au seul service account d'exécution de ce service. Exemple futur :
+Le module `function` de SRV-01 accorde ce rôle **sur chaque secret référencé**,
+au seul service account d'exécution de cette fonction. Exemple futur :
 
 ```hcl
 secrets = {
@@ -90,13 +92,13 @@ Remplacer `1` par le numéro réel de la version ajoutée. Le secret existe déj
 secrets. Le script d'enregistrement aura des accès ciblés définis avec BOT-02/SRV-02.
 
 Les attributions effectives et les tests d'accès positif/négatif seront vérifiés
-quand les services existeront. Ce ticket prépare les conteneurs ; il ne prouve pas
+quand les fonctions existeront. Ce ticket prépare les conteneurs ; il ne prouve pas
 encore leurs accès en conditions réelles.
 
 ## Rotation et destruction
 
 - Rotation : ajouter une nouvelle version hors Terraform, mettre à jour la
-  référence numérique du service et déployer. Désactiver l'ancienne version après
+  référence numérique de la fonction et déployer. Désactiver l'ancienne version après
   validation et vérification des besoins de rollback ; ne pas la supprimer à l'aveugle.
 - Destroy : le workflow `Destroy` ne touche pas `infra/iam`, les secrets et leurs
   valeurs sont conservés. Supprimer un secret demande de retirer d'abord

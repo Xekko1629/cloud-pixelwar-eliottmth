@@ -18,18 +18,64 @@ variable "name" {
   }
 }
 
-variable "image" {
-  description = "Container image pinned to its immutable sha256 digest"
+variable "source_archive" {
+  description = "CI-verified ZIP copied unchanged to each environment; content-addressed object and exact GCS generation, never latest"
+  type = object({
+    bucket     = string
+    object     = string
+    generation = string
+    sha256     = string
+  })
+  nullable = false
+
+  validation {
+    condition = (
+      can(regex("^[a-z0-9][a-z0-9._-]{1,220}[a-z0-9]$", var.source_archive.bucket)) &&
+      can(regex("^[a-f0-9]{64}$", var.source_archive.sha256)) &&
+      can(regex("^[1-9][0-9]*$", var.source_archive.generation)) &&
+      try(tonumber(var.source_archive.generation) <= 9223372036854775807, false) &&
+      (var.source_archive.object == "${var.source_archive.sha256}.zip" ||
+      endswith(var.source_archive.object, "/${var.source_archive.sha256}.zip"))
+    )
+    error_message = "Provide a bucket, <sha256>.zip object, lowercase SHA-256 and positive explicit generation."
+  }
+}
+
+variable "entry_point" {
+  description = "Exported Node.js HTTP handler in the deployment archive"
   type        = string
 
   validation {
-    condition     = can(regex("^.+@sha256:[a-f0-9]{64}$", var.image))
-    error_message = "Image must be pinned to a sha256 digest, not a mutable tag."
+    condition     = can(regex("^[A-Za-z_$][A-Za-z0-9_$]*$", var.entry_point))
+    error_message = "entry_point must be a simple exported JavaScript handler identifier."
+  }
+}
+
+variable "build_service_account" {
+  description = "Existing dedicated build identity: projects/<project>/serviceAccounts/<email>; no default Compute/Cloud Build account"
+  type        = string
+
+  validation {
+    condition = (
+      can(regex("^projects/${var.project_id}/serviceAccounts/[a-z][a-z0-9-]{4,28}[a-z0-9]@${var.project_id}\\.iam\\.gserviceaccount\\.com$", var.build_service_account)) &&
+      var.build_service_account != "projects/${var.project_id}/serviceAccounts/${var.name}@${var.project_id}.iam.gserviceaccount.com"
+    )
+    error_message = "Specify a dedicated build SA in this project, different from the function runtime SA."
+  }
+}
+
+variable "build_repository" {
+  description = "Existing same-project/same-region Artifact Registry repository used internally by Google's function build"
+  type        = string
+
+  validation {
+    condition     = can(regex("^projects/${var.project_id}/locations/${var.region}/repositories/[a-z0-9][a-z0-9_-]*$", var.build_repository))
+    error_message = "build_repository must be a full repository resource name in this project and region."
   }
 }
 
 variable "service_type" {
-  description = "worker: internal ingress and dedicated push invoker; proxy: public-network ingress with IAM authentication (ADR-0001/0002)"
+  description = "HTTP function role: worker uses internal ingress and Pub/Sub push OIDC; proxy accepts API Gateway with IAM (ADR-0008)"
   type        = string
   default     = "worker"
 
@@ -40,7 +86,7 @@ variable "service_type" {
 }
 
 variable "labels" {
-  description = "Labels applied to the Cloud Run service"
+  description = "Labels applied to the Cloud Run function"
   type        = map(string)
   default     = {}
 }
@@ -58,6 +104,11 @@ variable "secrets" {
     version = string
   }))
   default = {}
+
+  validation {
+    condition     = alltrue([for reference in values(var.secrets) : can(regex("^[1-9][0-9]*$", reference.version))])
+    error_message = "Secret environment variables require explicit numeric versions, not latest."
+  }
 }
 
 variable "min_instances" {
@@ -117,7 +168,7 @@ variable "memory" {
 }
 
 variable "deletion_protection" {
-  description = "Protect the service from Terraform destruction; false for disposable stacks"
+  description = "Map to function deletion_policy PREVENT when true, DELETE otherwise; false for disposable stacks"
   type        = bool
   default     = false
 }

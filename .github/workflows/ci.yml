@@ -43,8 +43,8 @@ jobs:
             serverless:
               - 'infra/serverless/**'
               - '.github/workflows/**'
-            'serverless/modules/service':
-              - 'infra/serverless/modules/service/**'
+            'serverless/modules/function':
+              - 'infra/serverless/modules/function/**'
               - '.github/workflows/**'
             runners:
               - 'infra/runners/**'
@@ -92,7 +92,7 @@ jobs:
 
   plan-serverless:
     needs: [changes, fmt, lint, validate, test]
-    if: contains(fromJSON(needs.changes.outputs.stacks), 'serverless') || contains(fromJSON(needs.changes.outputs.stacks), 'serverless/modules/service')
+    if: contains(fromJSON(needs.changes.outputs.stacks), 'serverless') || contains(fromJSON(needs.changes.outputs.stacks), 'serverless/modules/function')
     strategy:
       fail-fast: false
       matrix:

@@ -1,7 +1,7 @@
 # Application secrets (SRV-03): containers only, values are added by hand and never
 # enter Terraform. They live in this persistent stack because Secret Manager is the
 # source of truth: a destroy of serverless must not delete the values. The functions
-# get secretAccessor on the secrets they use from infra/serverless (module service).
+# get secretAccessor on the secrets they use from infra/serverless (module function).
 locals {
   application_secret_ids = toset([
     "discord-public-key",

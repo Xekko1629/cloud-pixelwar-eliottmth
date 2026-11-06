@@ -22,7 +22,7 @@ brew install just tflint gitleaks lefthook hashicorp/tap/terraform
 
 Le Terraform de Homebrew core est bloqué en 1.5 : passer par `hashicorp/tap`. Sans Homebrew, chaque outil publie des binaires dans ses releases GitHub.
 
-Plus tard, l'application demandera aussi Node.js 24 (LTS, voir l'[ADR-0001](adr/0001-compute-cloud-run-typescript.md)), et les déploiements Helm, kubectl et gcloud.
+Plus tard, l'application demandera aussi Node.js 24 (LTS, voir l'[ADR-0008](adr/0008-compute-cloud-run-functions.md)), et les déploiements Helm, kubectl et gcloud.
 
 ### 2. Lancer `just setup`
 

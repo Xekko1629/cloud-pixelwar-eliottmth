@@ -65,7 +65,7 @@ exporteur (logs uniquement). Sans exporteur, aucune donnée de trace/métrique n
 envoyée ; ce n'est pas un mode de production instrumenté complet.
 
 Le paquet expose des **sources TypeScript**, comme le workspace initial.
-SRV-02 devra les compiler ou les bundler dans les images ; ces exemples ne sont
+SRV-02 devra les compiler ou les bundler dans l'archive de sources ; ces exemples ne sont
 pas une promesse d'exécution directe par Node des imports TypeScript actuels.
 
 ## Proxy : générer, publier puis répondre
@@ -187,14 +187,14 @@ Le flush augmente la latence et peut participer au délai de 3 s Discord ; le
 mesurer sur le proxy et revoir batching/Collector si nécessaire. Ne pas supprimer
 simplement le flush et continuer en arrière-plan après la réponse.
 
-À l'arrêt, le point d'entrée du service doit arrêter d'accepter des requêtes,
+À l'arrêt, le point d'entrée de la fonction doit arrêter d'accepter des requêtes,
 attendre celles en cours puis appeler `obs.shutdown()`, notamment sur SIGTERM.
 La bibliothèque n'installe pas de handler global ni de `process.exit` à l'import.
 
 ## Infrastructure et coûts
 
 Le bootstrap active Logging, Monitoring, Trace et Telemetry (sans les désactiver
-au destroy). Le module service conserve les trois rôles demandés par #38 et ajoute
+au destroy). Le module function conserve les trois rôles demandés par #38 et ajoute
 `roles/telemetry.tracesWriter` pour l'ingestion OTLP. Si un quota project ADC
 distinct est configuré, vérifier également `serviceusage.services.use` sur ce
 projet ; ne pas distribuer des droits supplémentaires sans besoin démontré.

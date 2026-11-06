@@ -6,5 +6,5 @@ locals {
   }
 }
 
-# Add one module "service" per proxy or worker here when its image is available.
-# See modules/service/README.md for the module contract and an example.
+# Add one module "function" per HTTP function when its verified ZIP and build SA are available.
+# See modules/function/README.md for the module contract and an example.

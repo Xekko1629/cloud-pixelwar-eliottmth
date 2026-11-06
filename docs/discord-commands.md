@@ -2,7 +2,7 @@
 
 ## Périmètre
 
-`app/tools/discord-commands/` est un outil de déploiement, **pas un service Cloud
+`app/tools/discord-commands/` est un outil de déploiement, **pas une fonction Cloud
 Run** et pas un bot Gateway permanent. Il enregistre quatre commandes HTTP
 Discord API v10 : `/draw`, `/get`, `/snapshot` et `/admin` avec ses cinq sous-commandes.
 Il ne traite aucune interaction et n'implémente aucune action métier.
@@ -81,7 +81,7 @@ Un changement guild/global nécessite une migration explicite.
 
 ## Contrat d'intégration SRV-02 — pas encore branché
 
-Le workflow actuel déploie l'infrastructure, pas les services applicatifs.
+Le workflow actuel déploie l'infrastructure, pas les fonctions applicatives.
 Ne pas y ajouter un appel sans déploiement applicatif préalable.
 SRV-02 devra appeler le script **après chaque déploiement applicatif réussi** :
 

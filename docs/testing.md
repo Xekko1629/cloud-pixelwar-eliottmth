@@ -2,11 +2,11 @@
 
 ## Choix et organisation
 
-- TypeScript strict et Node.js **24**, conformément à ADR-0001.
+- TypeScript strict et Node.js **24**, conformément à ADR-0008.
 - Vitest pour backend (`node`) et frontend (`jsdom`), sans imposer un framework UI.
 - Un workspace npm dans `app/` : `shared`, `functions/*`, `frontend`.
 - Les SDK Google utilisés pour tester les émulateurs sont des dépendances de
-  développement du socle. Chaque service déclarera ses dépendances de production.
+  développement du socle. Chaque fonction déclarera ses dépendances de production.
 - Le code Discord non suivi préexistant n'est pas modifié par ce ticket.
 
 Les tests initiaux valident le socle, pas les futures fonctionnalités : protection
@@ -64,7 +64,7 @@ et ne doit pas être déployé avec `firebase deploy`.
 - Intégration : `*.integration.test.ts`, avec setup de sécurité automatique.
 - Nommer les sources applicatives sous `src/` pour qu'elles soient incluses dans
   la couverture ; les tests peuvent être colocalisés ou dans un répertoire `tests`.
-- Un nouveau service utilise un `package.json` dans `functions/<service>/` pour
+- Une nouvelle fonction utilise un `package.json` dans `functions/<nom>/` pour
   rejoindre le workspace. Ne pas committer `node_modules`.
 
 ## Couverture et échec bloquant
@@ -104,8 +104,8 @@ Les workflows n'utilisent ni WIF ni permissions GCP pour ces émulateurs.
 
 `npm audit` signale des vulnérabilités **modérées** dans des dépendances transitives
 du CLI de développement `firebase-tools` : OpenTelemetry Core (propagation baggage)
-et uuid via gaxios. Elles ne sont pas des dépendances de production des futurs
-services à ce stade. Le CLI est utilisé ici avec des émulateurs locaux et un projet
+et uuid via gaxios. Elles ne sont pas des dépendances de production des futures
+fonctions à ce stade. Le CLI est utilisé ici avec des émulateurs locaux et un projet
 fictif ; cela ne signifie pas que les alertes sont corrigées ou inexploitables.
 Réévaluer lors de SEC-02 et des mises à jour du CLI. Ne pas appliquer
 `npm audit fix --force` sans revue des changements majeurs proposés.
