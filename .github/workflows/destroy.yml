@@ -1,7 +1,7 @@
 name: Destroy
 
 # Manual only. Type the environment name in "confirm" to proceed.
-# Serverless first, then runners in prd, then foundation.
+# Serverless and runners (prd) in parallel, then foundation, whose cluster hosts the runners.
 # Always on GitHub-hosted runners; bootstrap, iam (secrets, state bucket, APIs) and access are preserved.
 on:
   workflow_dispatch:
@@ -45,7 +45,7 @@ jobs:
       runner: ubuntu-latest
 
   destroy-runners:
-    needs: destroy-serverless
+    needs: confirm
     if: inputs.environment == 'prd'
     uses: ./.github/workflows/_destroy.yml
     permissions:
