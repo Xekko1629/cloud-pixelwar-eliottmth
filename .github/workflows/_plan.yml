@@ -42,6 +42,21 @@ jobs:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.DEPLOYER_SA }}
 
+      # infra/serverless zips app/dist/functions/<name> (modules/function-source, ADR-0009).
+      - uses: actions/setup-node@v4
+        if: inputs.stack == 'serverless'
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Build the functions
+        if: inputs.stack == 'serverless'
+        working-directory: app
+        run: |
+          npm ci
+          npm run build:functions
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}

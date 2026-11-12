@@ -71,4 +71,7 @@ bucket est volontairement non vidé par Terraform pour protéger les releases.
 Chaque PR qui modifie ce stack ou son module publie un plan dev et prd ; le plan serverless est aussi
 calculé dans le job d'apply avant application. Relire ce plan de PR avant le
 premier déclenchement, voir [SECRETS.md](../iam/SECRETS.md).
-L'empaquetage déterministe, l'upload et la promotion de l'archive restent dans SRV-02.
+Le build des fonctions, leur archive et leur téléversement sont décrits dans
+[docs/functions.md](../../docs/functions.md) ([ADR-0009](../../docs/adr/0009-sources-fonctions-terraform.md)) :
+la CI lance `npm run build:functions` avant chaque plan et apply, et le module
+[`function-source`](modules/function-source/) zippe et téléverse chaque fonction.

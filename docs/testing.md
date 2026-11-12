@@ -65,7 +65,8 @@ et ne doit pas être déployé avec `firebase deploy`.
 - Nommer les sources applicatives sous `src/` pour qu'elles soient incluses dans
   la couverture ; les tests peuvent être colocalisés ou dans un répertoire `tests`.
 - Une nouvelle fonction utilise un `package.json` dans `functions/<nom>/` pour
-  rejoindre le workspace. Ne pas committer `node_modules`.
+  rejoindre le workspace, avec le contrat décrit dans [functions.md](functions.md).
+  Ne pas committer `node_modules`.
 
 ## Couverture et échec bloquant
 

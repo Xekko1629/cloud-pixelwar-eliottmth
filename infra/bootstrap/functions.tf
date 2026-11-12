@@ -59,3 +59,11 @@ resource "google_artifact_registry_repository_iam_member" "function_builder_writ
   role       = "roles/artifactregistry.writer"
   member     = google_service_account.function_builder.member
 }
+
+# PR plans of infra/serverless refresh the uploaded source objects (modules/function-source):
+# roles/viewer has no storage.objects.get. Read-only: the planner cannot upload or delete.
+resource "google_storage_bucket_iam_member" "planner_source_reader" {
+  bucket = google_storage_bucket.function_sources.name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:github-planner@${var.project_id}.iam.gserviceaccount.com"
+}
