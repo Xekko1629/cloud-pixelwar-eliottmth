@@ -7,6 +7,49 @@ Les décisions détaillées sont dans [les ADR](adr/README.md) ; les modules et
 workflows versionnés déterminent les ressources déclarées pour une installation.
 Ce document décrit les responsabilités et contrats, pas un inventaire GCP.
 
+## Vues d'architecture
+
+### Architecture générale — Draw.io
+
+Le [fichier Draw.io éditable](architecture/pixelwar.drawio) rassemble trois pages.
+Le [modèle sémantique](architecture/pixelwar.ir.json) conserve les références au
+code, aux ADR et aux tickets du [GitHub Project](https://github.com/users/Xekko1629/projects/3).
+Les images ci-dessous se consultent sans installer Draw.io ; ouvrir le fichier
+éditable dans l'application ou l'importer dans [diagrams.net](https://app.diagrams.net/).
+
+| Page | Portée | Aperçu |
+| --- | --- | --- |
+| Application actuelle | Parcours de la sonde dev et bibliothèques implémentées, sans présumer de leur déploiement | [PNG](architecture/pixelwar-actuel.png) |
+| Application cible | Dessin Discord/web, authentification, événements, workers, données, rendus et snapshots | [PNG](architecture/pixelwar-cible.png) |
+| Plateforme et exploitation | CI/CD, identités, construction des fonctions, runners et supervision | [PNG](architecture/pixelwar-plateforme.png) |
+
+La cible suit les ADR actifs lorsqu'un ticket contient un contrat remplacé,
+notamment ADR-0009 pour les sources des fonctions. Les lectures directes du
+navigateur sont signalées comme proposées (ADR-0004), et le mode de lecture des
+images `overview` reste à arbitrer. Grafana est optionnel et n'est pas représenté.
+Draw.io est ici un complément documentaire ; il ne satisfait pas la restriction
+d'outil énoncée dans le ticket [ARCH-02 #27](https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/27).
+
+### Vues détaillées — Archify
+
+Les vues interactives sont générées depuis les spécifications JSON versionnées
+dans `docs/architecture/`. Elles s'ouvrent directement dans un navigateur, sans
+serveur, et décrivent les contrats du dépôt : elles ne constatent pas l'état d'un
+déploiement GCP.
+
+| Vue | Portée | Spécification |
+| --- | --- | --- |
+| [Parcours Discord](architecture/parcours-discord.html) | Callback public de la sonde dev : Gateway, contrôle Ed25519, secret et journal | [JSON](architecture/parcours-discord.json) |
+| [Socle de déploiement](architecture/socle-deploiement.html) | Identités, fédération WIF, state GCS et ordre des stacks Terraform | [JSON](architecture/socle-deploiement.json) |
+| [Séquence du callback](architecture/sequence-callback.html) | PING, commande `hello` et refus d'une signature invalide | [JSON](architecture/sequence-callback.json) |
+
+Les diagrammes ne remplacent pas les ADR ni les runbooks : une relation absente
+d'une vue ne vaut pas autorisation, et une relation représentée ne vaut pas
+preuve de déploiement.
+
+La [procédure de maintenance des diagrammes](architecture/README.md) décrit
+leur consultation, leurs références au code et leur régénération.
+
 ## Composants et frontières
 
 | Composant | Responsabilité | Frontière |

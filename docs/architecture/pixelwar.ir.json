@@ -1,0 +1,2676 @@
+{
+  "schema": "drawio-skill/diagram-ir/v1",
+  "metadata": {
+    "title": "Pixelwar · application et plateforme",
+    "repository": "https://github.com/Xekko1629/cloud-pixelwar-eliottmth",
+    "revision": "8be3b779c28fe49590d66bce59679d00301792c9",
+    "project": "https://github.com/users/Xekko1629/projects/3",
+    "interpretation": "Synthèse des contrats, pas un export de l’état GCP. Les statuts du Project ne prouvent pas le code.",
+    "tooling_note": "Vue complémentaire demandée en Draw.io ; ne prétend pas satisfaire la restriction d’outil du ticket #27."
+  },
+  "nodes": [
+    {
+      "id": "discord",
+      "label": "Discord\nCommandes et réponses",
+      "kind": "external",
+      "icon": "discord",
+      "group": "Clients",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#666666;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "catalogue implémenté ; flux métier cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/49",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/50",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/52",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/53"
+        ],
+        "functional_area": "Clients",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": "app/tools/discord-commands/src/register.ts",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "gateway",
+      "label": "API Gateway\nEntrée HTTPS des proxies",
+      "kind": "gateway",
+      "icon": "gateway",
+      "group": "Entrée HTTP",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#ffe6cc;strokeColor=#d79b00;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "déclaré, routes filtrées par backend",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/32",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/33",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/34"
+        ],
+        "functional_area": "Entrée HTTP",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": "infra/serverless/gateway.tf",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "hello",
+      "label": "discord-hello · dev seulement\nPING /hello nom · Ed25519",
+      "kind": "service",
+      "icon": "run",
+      "group": "Sonde dev",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "implémenté ; non vérifié en GCP",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/39",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/50"
+        ],
+        "functional_area": "Sonde dev",
+        "runtime": "Node.js 24 / TypeScript"
+      },
+      "provenance": {
+        "path": "app/functions/discord-hello/src/index.ts",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "secret",
+      "label": "Secret Manager\nAccès ciblé par runtime",
+      "kind": "security",
+      "icon": "secret",
+      "group": "Sécurité",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#e1d5e7;strokeColor=#9673a6;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "conteneurs et IAM déclarés ; valeurs hors Git",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/31",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/48"
+        ],
+        "functional_area": "Sécurité",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": "infra/iam/secrets.tf",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "logging",
+      "label": "Cloud Logging\nCollecte des journaux stdout",
+      "kind": "service",
+      "icon": "logging",
+      "group": "Observabilité",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "journal JSON implémenté ; collecte GCP non attestée",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/38",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/57"
+        ],
+        "functional_area": "Observabilité",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": "app/shared/src/observability/logger.ts",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "shared",
+      "label": "Bibliothèques partagées\nGrille, codecs, ordre, quotas",
+      "kind": "service",
+      "icon": null,
+      "group": "Code et tests",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "code testé ; pas un service déployé",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/40",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/41",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/42"
+        ],
+        "functional_area": "Code et tests",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": "app/shared/src/grid/index.ts",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "otel",
+      "label": "OpenTelemetry\nLogs, métriques et traces",
+      "kind": "service",
+      "icon": null,
+      "group": "Code et tests",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "bibliothèque implémentée ; pas initialisée par hello",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/38",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/75"
+        ],
+        "functional_area": "Code et tests",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": "app/shared/src/observability/runtime.ts",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "tests",
+      "label": "Vitest et émulateurs Firebase\nTests locaux et intégration",
+      "kind": "service",
+      "icon": "firebase",
+      "group": "Code et tests",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "outillage implémenté",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/80",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/82"
+        ],
+        "functional_area": "Code et tests",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": "app/package.json",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "registration",
+      "label": "Outil de commandes Discord\nPOST guild dev pour --hello",
+      "kind": "service",
+      "icon": null,
+      "group": "Code et tests",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "implémenté",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/49"
+        ],
+        "functional_area": "Code et tests",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": "app/tools/discord-commands/src/register.ts",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "browser",
+      "label": "Navigateur · canvas\nPixels, zoom, pan et brush",
+      "kind": "external",
+      "icon": null,
+      "group": "Clients",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#666666;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/66",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/67",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/68",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/69",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/70",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/71"
+        ],
+        "functional_area": "Clients",
+        "runtime": ""
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/66",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/67",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/68",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/69",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/70",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/71"
+        ]
+      }
+    },
+    {
+      "id": "hosting",
+      "label": "Firebase Hosting\nDistribution du frontend HTTPS",
+      "kind": "service",
+      "icon": "firebase",
+      "group": "Clients",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/65"
+        ],
+        "functional_area": "Clients",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": "docs/adr/0006-hebergement-frontend-firebase-hosting.md",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "firebase-auth",
+      "label": "Firebase Auth\nIdentité applicative / ID token",
+      "kind": "security",
+      "icon": "firebase",
+      "group": "Identité",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#e1d5e7;strokeColor=#9673a6;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/59",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/60"
+        ],
+        "functional_area": "Identité",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": "docs/adr/0005-identite-web-firebase-auth.md",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "auth",
+      "label": "auth-proxy\nOAuth2 Discord → custom token",
+      "kind": "service",
+      "icon": "run",
+      "group": "Entrée HTTP",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/59"
+        ],
+        "functional_area": "Entrée HTTP",
+        "runtime": "Node.js 24 / TypeScript"
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/59"
+        ]
+      }
+    },
+    {
+      "id": "discord-proxy",
+      "label": "discord-proxy\nEd25519 · réponse différée < 3 s",
+      "kind": "service",
+      "icon": "run",
+      "group": "Entrée HTTP",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/50"
+        ],
+        "functional_area": "Entrée HTTP",
+        "runtime": "Node.js 24 / TypeScript"
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/50"
+        ]
+      }
+    },
+    {
+      "id": "web-proxy",
+      "label": "web-proxy\nValidation lots · réponse 202",
+      "kind": "service",
+      "icon": "run",
+      "group": "Entrée HTTP",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/58"
+        ],
+        "functional_area": "Entrée HTTP",
+        "runtime": "Node.js 24 / TypeScript"
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/58"
+        ]
+      }
+    },
+    {
+      "id": "discord-command",
+      "label": "Pub/Sub · discord-command\nInteraction et corrélation",
+      "kind": "queue",
+      "icon": "pubsub",
+      "group": "Événements",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#fff2cc;strokeColor=#d6b656;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/28",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/35",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/50"
+        ],
+        "functional_area": "Événements",
+        "runtime": ""
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/28",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/35",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/50"
+        ]
+      }
+    },
+    {
+      "id": "command-worker",
+      "label": "command-worker\nRoutage et autorisation /admin",
+      "kind": "service",
+      "icon": "run",
+      "group": "Traitement",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/51",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/56"
+        ],
+        "functional_area": "Traitement",
+        "runtime": "Node.js 24 / TypeScript"
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/51",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/56"
+        ]
+      }
+    },
+    {
+      "id": "pixel-draw",
+      "label": "Pub/Sub · pixel-draw\nDessin commun web + Discord",
+      "kind": "queue",
+      "icon": "pubsub",
+      "group": "Événements",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#fff2cc;strokeColor=#d6b656;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/28",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/35",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/46"
+        ],
+        "functional_area": "Événements",
+        "runtime": ""
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/28",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/35",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/46"
+        ]
+      }
+    },
+    {
+      "id": "draw-worker",
+      "label": "draw-worker\nQuotas, pause, idempotence",
+      "kind": "service",
+      "icon": "run",
+      "group": "Traitement",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/41",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/42",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/43",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/46"
+        ],
+        "functional_area": "Traitement",
+        "runtime": "Node.js 24 / TypeScript"
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/41",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/42",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/43",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/46"
+        ]
+      }
+    },
+    {
+      "id": "firestore",
+      "label": "Firestore\nTuiles, deltas, config et users",
+      "kind": "database",
+      "icon": "firestore",
+      "group": "Données",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/36",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/40",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/41",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/46"
+        ],
+        "functional_area": "Données",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": "docs/adr/0007-modele-donnees-grille.md",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "results",
+      "label": "Pub/Sub · résultats de dessin\npixel-processed / pixel-rejected",
+      "kind": "queue",
+      "icon": "pubsub",
+      "group": "Événements",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#fff2cc;strokeColor=#d6b656;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/28",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/46",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/52"
+        ],
+        "functional_area": "Événements",
+        "runtime": ""
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/28",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/46",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/52"
+        ]
+      }
+    },
+    {
+      "id": "discord-notifier",
+      "label": "discord-notifier\nSuccès et rejet métier Discord",
+      "kind": "service",
+      "icon": "run",
+      "group": "Notifications",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/52"
+        ],
+        "functional_area": "Notifications",
+        "runtime": "Node.js 24 / TypeScript"
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/52"
+        ]
+      }
+    },
+    {
+      "id": "render-requested",
+      "label": "Pub/Sub · render-requested\nDemande /get",
+      "kind": "queue",
+      "icon": "pubsub",
+      "group": "Événements",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#fff2cc;strokeColor=#d6b656;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/28",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/53"
+        ],
+        "functional_area": "Événements",
+        "runtime": ""
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/28",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/53"
+        ]
+      }
+    },
+    {
+      "id": "render-worker",
+      "label": "render-worker\nRendu PNG borné · /get",
+      "kind": "service",
+      "icon": "run",
+      "group": "Rendu et snapshots",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/44",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/45",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/53"
+        ],
+        "functional_area": "Rendu et snapshots",
+        "runtime": "Node.js 24 / TypeScript"
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/44",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/45",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/53"
+        ]
+      }
+    },
+    {
+      "id": "snapshot-requested",
+      "label": "Pub/Sub · snapshot-requested\nDemande /snapshot",
+      "kind": "queue",
+      "icon": "pubsub",
+      "group": "Événements",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#fff2cc;strokeColor=#d6b656;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/28",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/54"
+        ],
+        "functional_area": "Événements",
+        "runtime": ""
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/28",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/54"
+        ]
+      }
+    },
+    {
+      "id": "snapshot-worker",
+      "label": "snapshot-worker\nRendu de la zone peinte",
+      "kind": "service",
+      "icon": "run",
+      "group": "Rendu et snapshots",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/45",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/54"
+        ],
+        "functional_area": "Rendu et snapshots",
+        "runtime": "Node.js 24 / TypeScript"
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/45",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/54"
+        ]
+      }
+    },
+    {
+      "id": "snapshots",
+      "label": "Cloud Storage · snapshots\nBucket privé · PNG",
+      "kind": "database",
+      "icon": "storage",
+      "group": "Données",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/37",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/54"
+        ],
+        "functional_area": "Données",
+        "runtime": ""
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/37",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/54"
+        ]
+      }
+    },
+    {
+      "id": "snapshot-ready",
+      "label": "Pub/Sub · snapshot-ready\nNotification GCS OBJECT_FINALIZE",
+      "kind": "queue",
+      "icon": "pubsub",
+      "group": "Événements",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#fff2cc;strokeColor=#d6b656;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/28",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/37",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/55"
+        ],
+        "functional_area": "Événements",
+        "runtime": ""
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/28",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/37",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/55"
+        ]
+      }
+    },
+    {
+      "id": "snapshot-notifier",
+      "label": "snapshot-notifier\nURL signée V4 → Discord",
+      "kind": "service",
+      "icon": "run",
+      "group": "Notifications",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/55"
+        ],
+        "functional_area": "Notifications",
+        "runtime": "Node.js 24 / TypeScript"
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/55"
+        ]
+      }
+    },
+    {
+      "id": "scheduler",
+      "label": "Cloud Scheduler\nRafraîchissement périodique",
+      "kind": "service",
+      "icon": "scheduler",
+      "group": "Vue éloignée",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/47"
+        ],
+        "functional_area": "Vue éloignée",
+        "runtime": ""
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/47"
+        ]
+      }
+    },
+    {
+      "id": "overview-tick",
+      "label": "Pub/Sub · déclenchement overview\nNom de topic à préciser",
+      "kind": "queue",
+      "icon": "pubsub",
+      "group": "Vue éloignée",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#fff2cc;strokeColor=#d6b656;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/28",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/47"
+        ],
+        "functional_area": "Vue éloignée",
+        "runtime": ""
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/28",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/47"
+        ]
+      }
+    },
+    {
+      "id": "overview-worker",
+      "label": "overview-worker et marquage\nRégions modifiées · pyramide PNG",
+      "kind": "service",
+      "icon": "run",
+      "group": "Vue éloignée",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/47"
+        ],
+        "functional_area": "Vue éloignée",
+        "runtime": "Node.js 24 / TypeScript"
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/47"
+        ]
+      }
+    },
+    {
+      "id": "overview",
+      "label": "Cloud Storage · overview\nPyramide privée basse résolution",
+      "kind": "database",
+      "icon": "storage",
+      "group": "Données",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/37",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/47",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/69"
+        ],
+        "functional_area": "Données",
+        "runtime": ""
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/37",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/47",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/69"
+        ]
+      }
+    },
+    {
+      "id": "dlq",
+      "label": "Pub/Sub · DLQ\nUne par abonnement + inspection",
+      "kind": "queue",
+      "icon": "pubsub",
+      "group": "Fiabilité",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#fff2cc;strokeColor=#d6b656;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/35"
+        ],
+        "functional_area": "Fiabilité",
+        "runtime": ""
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/35"
+        ]
+      }
+    },
+    {
+      "id": "github",
+      "label": "GitHub Actions\nPR, tags et lancement manuel",
+      "kind": "external",
+      "icon": "github",
+      "group": "GitHub et CI",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#666666;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "implémenté",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/11",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/12",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/13",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/22"
+        ],
+        "functional_area": "GitHub et CI",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": ".github/workflows/deploy.yml",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "wif",
+      "label": "Workload Identity Federation\nDépôt + environnement GitHub",
+      "kind": "security",
+      "icon": "identity",
+      "group": "Identités GCP",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#e1d5e7;strokeColor=#9673a6;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "déclaré",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/16",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/85"
+        ],
+        "functional_area": "Identités GCP",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": "infra/iam/iam.tf",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "terraform",
+      "label": "Terraform\nApply GitHub hébergé · par stack",
+      "kind": "service",
+      "icon": "terraform",
+      "group": "Déploiement",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "implémenté",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/7",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/12",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/13"
+        ],
+        "functional_area": "Déploiement",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": ".github/workflows/_apply.yml",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "state",
+      "label": "Cloud Storage · state Terraform\nBucket privé persistant",
+      "kind": "database",
+      "icon": "storage",
+      "group": "Socle persistant",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "déclaré",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/3",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/7"
+        ],
+        "functional_area": "Socle persistant",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": "infra/iam/state.tf",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "sources",
+      "label": "Cloud Storage · sources ZIP\nSHA-256 · génération épinglée",
+      "kind": "database",
+      "icon": "storage",
+      "group": "Construction des fonctions",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "implémenté selon ADR-0009",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/30",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/122",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/124"
+        ],
+        "functional_area": "Construction des fonctions",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": "infra/serverless/modules/function-source/main.tf",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "cloud-build",
+      "label": "Cloud Build\nIdentité function-builder",
+      "kind": "service",
+      "icon": "build",
+      "group": "Construction des fonctions",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "déclaré",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/30"
+        ],
+        "functional_area": "Construction des fonctions",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": "infra/bootstrap/functions.tf",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "registry",
+      "label": "Artifact Registry\nImages runtime internes",
+      "kind": "database",
+      "icon": "registry",
+      "group": "Construction des fonctions",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "déclaré",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/30"
+        ],
+        "functional_area": "Construction des fonctions",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": "infra/bootstrap/functions.tf",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "functions",
+      "label": "Cloud Run functions HTTP\nProxies et workers privés",
+      "kind": "service",
+      "icon": "run",
+      "group": "Exécution applicative",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "module implémenté ; cible métier",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/29",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/33",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/35"
+        ],
+        "functional_area": "Exécution applicative",
+        "runtime": "Node.js 24 / TypeScript"
+      },
+      "provenance": {
+        "path": "infra/serverless/modules/function/main.tf",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "network",
+      "label": "VPC · sous-réseau · NAT\nRéseau des runners uniquement",
+      "kind": "service",
+      "icon": null,
+      "group": "Foundation",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "déclaré",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/15"
+        ],
+        "functional_area": "Foundation",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": "infra/foundation/network.tf",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "gke",
+      "label": "GKE prd · node pools\nHébergement CI, pas de backend",
+      "kind": "service",
+      "icon": "gke",
+      "group": "Runners CI",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "déclaré",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/17"
+        ],
+        "functional_area": "Runners CI",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": "infra/foundation/cluster.tf",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "arc",
+      "label": "ARC · pods runners\nContrôles selon RUNNER_LABEL",
+      "kind": "service",
+      "icon": "github",
+      "group": "Runners CI",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "déclaré",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/19",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/20",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/22"
+        ],
+        "functional_area": "Runners CI",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": "infra/runners/runners.tf",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "eso",
+      "label": "External Secrets Operator\nSecret GitHub App ARC",
+      "kind": "security",
+      "icon": "secret",
+      "group": "Runners CI",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#e1d5e7;strokeColor=#9673a6;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "déclaré",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/18"
+        ],
+        "functional_area": "Runners CI",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": "infra/runners/runners.tf",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "monitoring",
+      "label": "Cloud Monitoring\nMétriques, dashboards et alertes",
+      "kind": "service",
+      "icon": "monitoring",
+      "group": "Supervision",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible ; vérifier ressources existantes",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/23",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/73",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/74",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/76"
+        ],
+        "functional_area": "Supervision",
+        "runtime": ""
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/23",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/73",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/74",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/76"
+        ]
+      }
+    },
+    {
+      "id": "trace",
+      "label": "Cloud Trace\nPropagation de trace distribuée",
+      "kind": "service",
+      "icon": "trace",
+      "group": "Supervision",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "bibliothèque ; activation métier cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/38",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/75"
+        ],
+        "functional_area": "Supervision",
+        "runtime": ""
+      },
+      "provenance": {
+        "path": "app/shared/src/observability/runtime.ts",
+        "revision": "8be3b779c28fe49590d66bce59679d00301792c9"
+      }
+    },
+    {
+      "id": "prometheus",
+      "label": "Managed Prometheus\nMétriques GKE / runners",
+      "kind": "service",
+      "icon": null,
+      "group": "Supervision",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/23",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/75"
+        ],
+        "functional_area": "Supervision",
+        "runtime": ""
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/23",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/75"
+        ]
+      }
+    },
+    {
+      "id": "alerts",
+      "label": "Canal d’alertes\nDestination à configurer",
+      "kind": "external",
+      "icon": null,
+      "group": "Supervision",
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=14;align=left;spacingLeft=62;spacingRight=10;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#666666;",
+      "width": 290,
+      "height": 100,
+      "properties": {
+        "evidence": "cible",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/73",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/76"
+        ],
+        "functional_area": "Supervision",
+        "runtime": ""
+      },
+      "provenance": {
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/73",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/76"
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "discord-to-gateway-0",
+      "source": "discord",
+      "target": "gateway",
+      "label": "HTTPS · signature Ed25519",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "actuel"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "gateway-to-hello-1",
+      "source": "gateway",
+      "target": "hello",
+      "label": "ID token Google · run.invoker",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "actuel"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "secret-to-hello-2",
+      "source": "secret",
+      "target": "hello",
+      "label": "Injection clé publique au démarrage",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "actuel"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "hello-to-logging-3",
+      "source": "hello",
+      "target": "logging",
+      "label": "JSON sur stdout",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "actuel"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "hello-to-discord-4",
+      "source": "hello",
+      "target": "discord",
+      "label": "Réponse HTTP via Gateway",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "actuel"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "registration-to-discord-5",
+      "source": "registration",
+      "target": "discord",
+      "label": "API REST · catalogue guild",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "actuel"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "tests-to-shared-6",
+      "source": "tests",
+      "target": "shared",
+      "label": "Exécute les tests",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "actuel"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "tests-to-otel-7",
+      "source": "tests",
+      "target": "otel",
+      "label": "Exécute les tests",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "actuel"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "hosting-to-browser-8",
+      "source": "hosting",
+      "target": "browser",
+      "label": "HTTPS · fichiers statiques",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/65"
+        ]
+      }
+    },
+    {
+      "id": "browser-to-gateway-9",
+      "source": "browser",
+      "target": "gateway",
+      "label": "HTTPS · écritures avec ID token",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/58",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/59"
+        ]
+      }
+    },
+    {
+      "id": "discord-to-gateway-10",
+      "source": "discord",
+      "target": "gateway",
+      "label": "HTTPS · interactions signées",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/50"
+        ]
+      }
+    },
+    {
+      "id": "gateway-to-discord-proxy-11",
+      "source": "gateway",
+      "target": "discord-proxy",
+      "label": "ID token Google · run.invoker",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/33",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/50"
+        ]
+      }
+    },
+    {
+      "id": "gateway-to-web-proxy-12",
+      "source": "gateway",
+      "target": "web-proxy",
+      "label": "ID token Google + claims utilisateur",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/33",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/34",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/58"
+        ]
+      }
+    },
+    {
+      "id": "gateway-to-auth-13",
+      "source": "gateway",
+      "target": "auth",
+      "label": "ID token Google · routes OAuth publiques",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/33",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/59"
+        ]
+      }
+    },
+    {
+      "id": "auth-to-discord-14",
+      "source": "auth",
+      "target": "discord",
+      "label": "HTTPS · code OAuth2 / identify",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/59"
+        ]
+      }
+    },
+    {
+      "id": "auth-to-browser-15",
+      "source": "auth",
+      "target": "browser",
+      "label": "Custom token · réponse via Gateway",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/59"
+        ]
+      }
+    },
+    {
+      "id": "browser-to-firebase-auth-16",
+      "source": "browser",
+      "target": "firebase-auth",
+      "label": "HTTPS · échange custom token / ID token",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/59",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/60"
+        ]
+      }
+    },
+    {
+      "id": "discord-proxy-to-discord-command-17",
+      "source": "discord-proxy",
+      "target": "discord-command",
+      "label": "Publication avant réponse différée",
+      "kind": "async",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;strokeColor=#9c7419;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/28",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/50"
+        ]
+      }
+    },
+    {
+      "id": "discord-command-to-command-worker-18",
+      "source": "discord-command",
+      "target": "command-worker",
+      "label": "Push HTTP OIDC",
+      "kind": "async",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;strokeColor=#9c7419;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/35",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/51"
+        ]
+      }
+    },
+    {
+      "id": "command-worker-to-pixel-draw-19",
+      "source": "command-worker",
+      "target": "pixel-draw",
+      "label": "Publication /draw",
+      "kind": "async",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;strokeColor=#9c7419;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/51"
+        ]
+      }
+    },
+    {
+      "id": "command-worker-to-firestore-20",
+      "source": "command-worker",
+      "target": "firestore",
+      "label": "SDK serveur · /admin autorisé",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/43",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/56"
+        ]
+      }
+    },
+    {
+      "id": "web-proxy-to-pixel-draw-21",
+      "source": "web-proxy",
+      "target": "pixel-draw",
+      "label": "Publication avant 202",
+      "kind": "async",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;strokeColor=#9c7419;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/58"
+        ]
+      }
+    },
+    {
+      "id": "pixel-draw-to-draw-worker-22",
+      "source": "pixel-draw",
+      "target": "draw-worker",
+      "label": "Push HTTP OIDC",
+      "kind": "async",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;strokeColor=#9c7419;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/35",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/46"
+        ]
+      }
+    },
+    {
+      "id": "draw-worker-to-firestore-23",
+      "source": "draw-worker",
+      "target": "firestore",
+      "label": "Transactions · tuiles + deltas + quotas",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/41",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/42",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/46"
+        ]
+      }
+    },
+    {
+      "id": "draw-worker-to-results-24",
+      "source": "draw-worker",
+      "target": "results",
+      "label": "Publication résultat durable",
+      "kind": "async",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;strokeColor=#9c7419;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/46"
+        ]
+      }
+    },
+    {
+      "id": "results-to-discord-notifier-25",
+      "source": "results",
+      "target": "discord-notifier",
+      "label": "Push OIDC · source Discord",
+      "kind": "async",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;strokeColor=#9c7419;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/52"
+        ]
+      }
+    },
+    {
+      "id": "discord-notifier-to-discord-26",
+      "source": "discord-notifier",
+      "target": "discord",
+      "label": "HTTPS · PATCH réponse initiale",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/52"
+        ]
+      }
+    },
+    {
+      "id": "command-worker-to-render-requested-27",
+      "source": "command-worker",
+      "target": "render-requested",
+      "label": "Publication /get",
+      "kind": "async",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;strokeColor=#9c7419;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/51",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/53"
+        ]
+      }
+    },
+    {
+      "id": "render-requested-to-render-worker-28",
+      "source": "render-requested",
+      "target": "render-worker",
+      "label": "Push HTTP OIDC",
+      "kind": "async",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;strokeColor=#9c7419;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/35",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/53"
+        ]
+      }
+    },
+    {
+      "id": "firestore-to-render-worker-29",
+      "source": "firestore",
+      "target": "render-worker",
+      "label": "Lecture tuiles · IAM serveur",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/45",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/53"
+        ]
+      }
+    },
+    {
+      "id": "render-worker-to-discord-30",
+      "source": "render-worker",
+      "target": "discord",
+      "label": "HTTPS · pièce jointe PNG",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/53"
+        ]
+      }
+    },
+    {
+      "id": "command-worker-to-snapshot-requested-31",
+      "source": "command-worker",
+      "target": "snapshot-requested",
+      "label": "Publication /snapshot",
+      "kind": "async",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;strokeColor=#9c7419;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/51",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/54"
+        ]
+      }
+    },
+    {
+      "id": "snapshot-requested-to-snapshot-worker-32",
+      "source": "snapshot-requested",
+      "target": "snapshot-worker",
+      "label": "Push HTTP OIDC",
+      "kind": "async",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;strokeColor=#9c7419;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/35",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/54"
+        ]
+      }
+    },
+    {
+      "id": "firestore-to-snapshot-worker-33",
+      "source": "firestore",
+      "target": "snapshot-worker",
+      "label": "Lecture tuiles · IAM serveur",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/45",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/54"
+        ]
+      }
+    },
+    {
+      "id": "snapshot-worker-to-snapshots-34",
+      "source": "snapshot-worker",
+      "target": "snapshots",
+      "label": "SDK GCS · objet + métadonnées",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/54"
+        ]
+      }
+    },
+    {
+      "id": "snapshots-to-snapshot-ready-35",
+      "source": "snapshots",
+      "target": "snapshot-ready",
+      "label": "Notification OBJECT_FINALIZE",
+      "kind": "async",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;strokeColor=#9c7419;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/37",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/55"
+        ]
+      }
+    },
+    {
+      "id": "snapshot-ready-to-snapshot-notifier-36",
+      "source": "snapshot-ready",
+      "target": "snapshot-notifier",
+      "label": "Push HTTP OIDC",
+      "kind": "async",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;strokeColor=#9c7419;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/35",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/55"
+        ]
+      }
+    },
+    {
+      "id": "snapshot-notifier-to-discord-37",
+      "source": "snapshot-notifier",
+      "target": "discord",
+      "label": "HTTPS · message avec URL signée",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/55"
+        ]
+      }
+    },
+    {
+      "id": "results-to-overview-worker-38",
+      "source": "results",
+      "target": "overview-worker",
+      "label": "Fan-out processed · marquage",
+      "kind": "async",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;strokeColor=#9c7419;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/47"
+        ]
+      }
+    },
+    {
+      "id": "scheduler-to-overview-tick-39",
+      "source": "scheduler",
+      "target": "overview-tick",
+      "label": "Publication périodique",
+      "kind": "async",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;strokeColor=#9c7419;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/47"
+        ]
+      }
+    },
+    {
+      "id": "overview-tick-to-overview-worker-40",
+      "source": "overview-tick",
+      "target": "overview-worker",
+      "label": "Push HTTP OIDC",
+      "kind": "async",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;strokeColor=#9c7419;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/35",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/47"
+        ]
+      }
+    },
+    {
+      "id": "firestore-to-overview-worker-41",
+      "source": "firestore",
+      "target": "overview-worker",
+      "label": "Lecture tuiles / régions à rendre",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/47"
+        ]
+      }
+    },
+    {
+      "id": "overview-worker-to-overview-42",
+      "source": "overview-worker",
+      "target": "overview",
+      "label": "SDK GCS · pyramide PNG",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/47"
+        ]
+      }
+    },
+    {
+      "id": "pixel-draw-to-dlq-43",
+      "source": "pixel-draw",
+      "target": "dlq",
+      "label": "Exemple : échecs persistants",
+      "kind": "async",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;strokeColor=#9c7419;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/35"
+        ]
+      }
+    },
+    {
+      "id": "firestore-to-browser-44",
+      "source": "firestore",
+      "target": "browser",
+      "label": "SDK Firebase · lectures + listeners",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;dashed=1;strokeColor=#9673a6;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "ADR-0004 proposé ; ID token et règles lecture seule",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/36",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/61",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/63",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/67"
+        ]
+      }
+    },
+    {
+      "id": "overview-to-browser-45",
+      "source": "overview",
+      "target": "browser",
+      "label": "HTTPS · images authentifiées",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;dashed=1;strokeColor=#9673a6;",
+      "pages": [
+        "cible"
+      ],
+      "properties": {
+        "condition": "Firebase Storage Rules ou URL signée via Gateway : à choisir",
+        "issues": [
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/47",
+          "https://github.com/Xekko1629/cloud-pixelwar-eliottmth/issues/69"
+        ]
+      }
+    },
+    {
+      "id": "github-to-wif-46",
+      "source": "github",
+      "target": "wif",
+      "label": "OIDC GitHub",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "plateforme"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "wif-to-terraform-47",
+      "source": "wif",
+      "target": "terraform",
+      "label": "Credentials temporaires · github-terraform",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "plateforme"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "terraform-to-state-48",
+      "source": "terraform",
+      "target": "state",
+      "label": "Backend GCS + verrou",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "plateforme"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "terraform-to-sources-49",
+      "source": "terraform",
+      "target": "sources",
+      "label": "Build local CI puis ZIP / upload",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "plateforme"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "sources-to-cloud-build-50",
+      "source": "sources",
+      "target": "cloud-build",
+      "label": "Sources ZIP · génération fixée",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "plateforme"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "cloud-build-to-registry-51",
+      "source": "cloud-build",
+      "target": "registry",
+      "label": "Publication image",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "plateforme"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "registry-to-functions-52",
+      "source": "registry",
+      "target": "functions",
+      "label": "Image interne gérée par Google",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "plateforme"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "terraform-to-functions-53",
+      "source": "terraform",
+      "target": "functions",
+      "label": "Déploiement API GCP",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "plateforme"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "terraform-to-gke-54",
+      "source": "terraform",
+      "target": "gke",
+      "label": "Foundation puis stack runners",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "plateforme"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "network-to-gke-55",
+      "source": "network",
+      "target": "gke",
+      "label": "Réseau du cluster",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "plateforme"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "gke-to-arc-56",
+      "source": "gke",
+      "target": "arc",
+      "label": "Pods et autoscaling runners",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "plateforme"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "arc-to-github-57",
+      "source": "arc",
+      "target": "github",
+      "label": "Jobs de contrôle · HTTPS",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "plateforme"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "secret-to-eso-58",
+      "source": "secret",
+      "target": "eso",
+      "label": "Secret Manager · Workload Identity",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "plateforme"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "eso-to-arc-59",
+      "source": "eso",
+      "target": "arc",
+      "label": "Secret Kubernetes GitHub App",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "plateforme"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "secret-to-functions-60",
+      "source": "secret",
+      "target": "functions",
+      "label": "Secrets injectés · IAM runtime ciblé",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "plateforme"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "functions-to-logging-61",
+      "source": "functions",
+      "target": "logging",
+      "label": "Journaux structurés",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "plateforme"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "functions-to-trace-62",
+      "source": "functions",
+      "target": "trace",
+      "label": "OpenTelemetry · spans",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "plateforme"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "functions-to-monitoring-63",
+      "source": "functions",
+      "target": "monitoring",
+      "label": "Métriques plateforme et applicatives",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "plateforme"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "gke-to-prometheus-64",
+      "source": "gke",
+      "target": "prometheus",
+      "label": "Collecte métriques cluster",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "plateforme"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "prometheus-to-monitoring-65",
+      "source": "prometheus",
+      "target": "monitoring",
+      "label": "PromQL / métriques gérées",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "plateforme"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    },
+    {
+      "id": "monitoring-to-alerts-66",
+      "source": "monitoring",
+      "target": "alerts",
+      "label": "Politiques de notification",
+      "kind": "sync",
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;endFill=1;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;strokeWidth=1.5;",
+      "pages": [
+        "plateforme"
+      ],
+      "properties": {
+        "condition": "",
+        "issues": []
+      }
+    }
+  ],
+  "views": [
+    {
+      "id": "actuel",
+      "name": "1 · Application actuelle",
+      "nodes": [
+        "discord",
+        "gateway",
+        "hello",
+        "secret",
+        "logging",
+        "shared",
+        "otel",
+        "tests",
+        "registration"
+      ],
+      "direction": "LR",
+      "subtitle": "Code du dépôt · pas un inventaire GCP ni une preuve de déploiement",
+      "notes": [
+        "La sonde dev répond directement : aucun pipeline métier Pub/Sub actif dans ce parcours.",
+        "Frontend : squelette de tests, pas de canvas implémenté. Grille et OpenTelemetry : bibliothèques, pas services.",
+        "Les contrôles de signature ne prouvent ni la latence réseau ni le cold start GCP."
+      ],
+      "ranks": [
+        [
+          "discord",
+          "registration",
+          "tests"
+        ],
+        [
+          "gateway",
+          "shared",
+          "otel"
+        ],
+        [
+          "hello",
+          "secret"
+        ],
+        [
+          "logging"
+        ]
+      ]
+    },
+    {
+      "id": "cible",
+      "name": "2 · Application cible",
+      "nodes": [
+        "auth",
+        "browser",
+        "command-worker",
+        "discord",
+        "discord-command",
+        "discord-notifier",
+        "discord-proxy",
+        "dlq",
+        "draw-worker",
+        "firebase-auth",
+        "firestore",
+        "gateway",
+        "hosting",
+        "overview",
+        "overview-tick",
+        "overview-worker",
+        "pixel-draw",
+        "render-requested",
+        "render-worker",
+        "results",
+        "scheduler",
+        "snapshot-notifier",
+        "snapshot-ready",
+        "snapshot-requested",
+        "snapshot-worker",
+        "snapshots",
+        "web-proxy"
+      ],
+      "direction": "LR",
+      "subtitle": "Contrats des tickets et ADR actifs · fonctions HTTP privées · aucun Eventarc",
+      "notes": [
+        "Lecture : de gauche à droite. Ocre : événement asynchrone. Violet pointillé : contrat proposé ou à arbitrer.",
+        "Chaque consommateur : abonnement push OIDC et invoker dédié, distinct du runtime. 2xx après effets durables ; retries techniques.",
+        "Une DLQ par abonnement ; une seule relation illustrée. Traitements idempotents : livraison au moins une fois, sans ordre garanti.",
+        "SDK Firestore navigateur : ID token Firebase + règles lecture seule ; ADR-0004 encore proposé. Aucun accès client en écriture.",
+        "Overview : marquage et rendu périodique regroupés visuellement ; séparation des handlers à préciser. /snapshot : autorisation à arbitrer (#54).",
+        "Les retours HTTP des proxies et échanges détaillés de jetons ne sont pas tous dessinés ; consulter les tickets liés."
+      ],
+      "ranks": [
+        [
+          "hosting"
+        ],
+        [
+          "discord",
+          "browser"
+        ],
+        [
+          "gateway",
+          "firebase-auth"
+        ],
+        [
+          "discord-proxy",
+          "web-proxy",
+          "auth"
+        ],
+        [
+          "discord-command",
+          "scheduler"
+        ],
+        [
+          "command-worker",
+          "overview-tick"
+        ],
+        [
+          "pixel-draw",
+          "render-requested",
+          "snapshot-requested"
+        ],
+        [
+          "draw-worker",
+          "render-worker",
+          "snapshot-worker",
+          "overview-worker"
+        ],
+        [
+          "firestore",
+          "results",
+          "snapshots",
+          "overview",
+          "dlq"
+        ],
+        [
+          "discord-notifier",
+          "snapshot-ready"
+        ],
+        [
+          "snapshot-notifier"
+        ]
+      ]
+    },
+    {
+      "id": "plateforme",
+      "name": "3 · Plateforme et exploitation",
+      "nodes": [
+        "github",
+        "wif",
+        "terraform",
+        "state",
+        "sources",
+        "cloud-build",
+        "registry",
+        "functions",
+        "network",
+        "gke",
+        "arc",
+        "eso",
+        "secret",
+        "logging",
+        "monitoring",
+        "trace",
+        "prometheus",
+        "alerts"
+      ],
+      "direction": "LR",
+      "subtitle": "Socle déclaré et exploitation cible · GKE réservé aux runners CI",
+      "notes": [
+        "Manuel : dev. Tag v* : dev puis prd. Applique foundation/bootstrap/serverless ; runners en prd. IAM et access : application manuelle.",
+        "ADR-0009 : reconstruction par environnement ; pas de copie identique dev → prd ni de manifeste de promotion imposé par #123.",
+        "Un runtime par fonction ; invokers Gateway / Pub/Sub et identité de build séparés. Les liens de déploiement résument plusieurs API GCP.",
+        "Cloud Monitoring reste la référence pour les alertes. Grafana (#79) optionnel, non requis dans cette vue.",
+        "Supervision : mélange de bibliothèques présentes et contrats cible ; ce dessin ne prouve pas une collecte GCP opérationnelle."
+      ],
+      "ranks": [
+        [
+          "github",
+          "secret",
+          "network"
+        ],
+        [
+          "wif",
+          "eso"
+        ],
+        [
+          "terraform"
+        ],
+        [
+          "sources",
+          "state",
+          "gke"
+        ],
+        [
+          "cloud-build",
+          "arc"
+        ],
+        [
+          "registry",
+          "prometheus"
+        ],
+        [
+          "functions"
+        ],
+        [
+          "logging",
+          "trace",
+          "monitoring"
+        ],
+        [
+          "alerts"
+        ]
+      ]
+    }
+  ],
+  "icons": {
+    "run": {
+      "style": "editableCssRules=.*;html=1;shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=data:image/svg+xml,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnY9Imh0dHBzOi8vdmVjdGEuaW8vbmFubyIgd2lkdGg9IjM2NS40NjQ5OTY3NzA0MjQ5MyIgaGVpZ2h0PSIzNzkuMjIyOTk0NDYzNTc3OTUiIHZpZXdCb3g9IjAgMCA5Ni42OTU5OTkxNDU1MDc4MSAxMDAuMzM1OTk4NTM1MTU2MjUiPiYjeGE7PHN0eWxlIHR5cGU9InRleHQvY3NzIj4mI3hhOwkuc3Qwe2ZpbGw6IzQyODVmNDt9JiN4YTsJLnN0MXtmaWxsOiNhZWNiZmE7fSYjeGE7PC9zdHlsZT4mI3hhOwk8cGF0aCBjbGFzcz0ic3QwIiBkPSJNMjkuNzk0IDEwMC4zMzZMNDYuOTIgNTAuMTY4aDQ5Ljc3NnpNMCA5OS42NzFsMTIuOTc2LTQ5LjUwMkgyOS4yMkwxNi44OTcgOTIuMDU0eiIvPiYjeGE7CTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0yOS43OTQgMEw0Ni45MiA1MC4xNjhoNDkuNzc2ek0wIC42NjZsMTIuOTc2IDQ5LjUwMkgyOS4yMkwxNi44OTcgOC4yODN6Ii8+JiN4YTs8L3N2Zz4=;",
+      "w": 20,
+      "h": 20,
+      "title": "Cloud Run",
+      "source": "draw.io shape library; title confirmed via MCP search_shapes"
+    },
+    "gateway": {
+      "style": "sketch=0;html=1;verticalAlign=top;labelPosition=center;verticalLabelPosition=bottom;align=center;spacingTop=-6;fontSize=11;fontStyle=1;fontColor=#999999;shape=image;aspect=fixed;imageAspect=0;image=data:image/svg+xml,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGhlaWdodD0iMzY3LjgxODMyODg1NzQyMTkiIHZpZXdCb3g9IjcuMTA1NDI3MzU3NjAxMDAyZS0xNSAwIDM2Ni40MTAxODY3Njc1NzgxIDM2Ny44MTgzMjg4NTc0MjE5IiBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJ4TWlkWU1pZCBtZWV0IiB3aWR0aD0iMzY2LjQxMDE5Njc2NzU3OTEiIHZlcnNpb249IjEuMSIgaWQ9InN2Zzk4NyIgem9vbUFuZFBhbj0ibWFnbmlmeSI+JiN4YTsgIDxwYXRoIGQ9Im0gNDguMjUxOTYsMTExLjUzOTA2IGMgLTcuNjE4NjQsMmUtNCAtMTMuNzk0NzIsNi4xNzYyOCAtMTMuNzk0OTMsMTMuNzk0OTIgMi4xZS00LDcuNjE4NjQgNi4xNzYyOSwxMy43OTQ3MiAxMy43OTQ5MywxMy43OTQ5MiBoIDE0NS4xNDY5MiB2IC0yNy41ODk4NCB6IG0gMjM4LjYwODU5LDU3LjQ1MTE3IGggNjUuNzU0NjkgYyA3LjYxODY0LC0yLjFlLTQgMTMuNzk0NzEsLTYuMTc2MjggMTMuNzk0OTIsLTEzLjc5NDkyIC0yLjFlLTQsLTcuNjE4NjQgLTYuMTc2MjgsLTEzLjc5NDcxIC0xMy43OTQ5MiwtMTMuNzk0OTIgSCAyODQuODUwNiBaIE0gMTMuNzk0OTIsMTcwLjk3NDYxIEMgNi4xNzYyODAxLDE3MC45NzQ4MiAyLjEwMDkxOWUtNCwxNzcuMTUwODkgOS4xODk5MjFlLTgsMTg0Ljc2OTUzIC04LjY5OTA4MWUtNCwxOTIuMzg4OTMgNi4xNzU1MjAxLDE5OC41NjYxOSAxMy43OTQ5MiwxOTguNTY2NCBIIDE5My4zOTg4OCBWIDE3MC45NzQ2MSBaIE0gMjg0LjMwNzgsMjI3LjU2NjQgaCA2OC4zMDc0NCBjIDcuNjE4NjQsLTIuMWUtNCAxMy43OTQ3MSwtNi4xNzYyOCAxMy43OTQ5MiwtMTMuNzk0OTIgLTIuMWUtNCwtNy42MTg2NCAtNi4xNzYyOCwtMTMuNzk0NzEgLTEzLjc5NDkyLC0xMy43OTQ5MiBoIC02NS45MjE3OCB6IG0gLTIzNi4wNTU4NCwxLjY5NzI3IGMgLTcuNjE4NjQsMmUtNCAtMTMuNzk0NzIsNi4xNzYyOCAtMTMuNzk0OTMsMTMuNzk0OTIgMi4xZS00LDcuNjE4NjQgNi4xNzYyOSwxMy43OTQ3MiAxMy43OTQ5MywxMy43OTQ5MiBIIDE5My4zOTg4OCBWIDIyOS4yNjM2NyBaIE0gMTg5LjUyMTQ5LDAgYyAtMjQuNTc0MTEsMCAtNDkuMTY3MzcsMjAuMDU1MDcgLTU5LjQzNzUsNzUuMzczMDQgaCAzMC41ODAwNyBjIDQuNjE2MzMsLTI0LjE2MjA2IDE1LjM0ODk2LC00Ny41MjE0OCAyNy44NTM1MiwtNDcuNTIxNDggMTIuMTU4OCwwIDM5LjQ1ODk4LDU3LjQ1MDQ0IDM5LjQ1ODk4LDE2MC40MTQwNiAwLDY5LjkxNTEzIC0xOS41NzgwOSwxNTIuMTE1MjQgLTQxLjE3MTg3LDE1Mi4xMTUyMyAtMTUuMjY4ODEsMmUtNSAtMjEuMjE2NjgsLTI4LjMzMzU2IC0yNS40NDMzNiwtNDYuNzE4NzQgbCAtMzAuNDE0MDYsLTAuMDY4NCBjIDQuMjIwNzQsMjAuNTQwODcgMTYuOTA3NjgsNzQuMjI0NiA1Ny43MTI4OSw3NC4yMjQ2IDUzLjQzNjcyLDAgNjguOTEyMTEsLTExMS45OTMwNSA2OC45MTIxMSwtMTgwLjQ2Mjg5IEMgMjU3LjU3MjI3LDkzLjgwMDc2IDIzNi41ODM0LDAgMTg5LjUyMTQ5LDAgWiIgc3R5bGU9ImNvbG9yOiMwMDAwMDA7b3BhY2l0eToxO2ZpbGw6IzQyODVmNDtmaWxsLW9wYWNpdHk6MTtzdHJva2UtbGluZWNhcDpyb3VuZDstaW5rc2NhcGUtc3Ryb2tlOm5vbmUiLz4mI3hhOzwvc3ZnPg==;",
+      "w": 42,
+      "h": 42,
+      "title": "Serverless Api Gateway Application Programming Interface",
+      "source": "draw.io shape library; title confirmed via MCP search_shapes"
+    },
+    "pubsub": {
+      "style": "editableCssRules=.*;html=1;shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=data:image/svg+xml,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnY9Imh0dHBzOi8vdmVjdGEuaW8vbmFubyIgd2lkdGg9IjE4LjMxOTk5OTY5NDgyNDIyIiBoZWlnaHQ9IjIwLjAwMDAwMTkwNzM0ODYzMyIgdmlld0JveD0iMCAwIDE4LjMxOTk5OTY5NDgyNDIyIDIwLjAwMDAwMTkwNzM0ODYzMyI+JiN4YTsJPHN0eWxlIHR5cGU9InRleHQvY3NzIj4mI3hhOwkuc3Qwe2ZpbGw6IzY2OWRmNjt9JiN4YTsJLnN0MXtmaWxsOiM0Mjg1ZjQ7fSYjeGE7CS5zdDJ7ZmlsbDojYWVjYmZhO30mI3hhOwk8L3N0eWxlPiYjeGE7CTxkZWZzPiYjeGE7CQk8ZmlsdGVyIGlkPSJBIiB4PSI0LjY0IiB5PSI0LjE5IiB3aWR0aD0iMTQuNzMiIGhlaWdodD0iMTIuNzYiIGZpbHRlclVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgY29sb3ItaW50ZXJwb2xhdGlvbi1maWx0ZXJzPSJzUkdCIj4mI3hhOwkJCTxmZUZsb29kIGZsb29kLWNvbG9yPSIjZmZmIi8+JiN4YTsJCQk8ZmVCbGVuZCBpbj0iU291cmNlR3JhcGhpYyIvPiYjeGE7CQk8L2ZpbHRlcj4mI3hhOwkJPG1hc2sgaWQ9IkIiIHg9IjQuNjQiIHk9IjQuMTkiIHdpZHRoPSIxNC43MyIgaGVpZ2h0PSIxMi43NiIgbWFza1VuaXRzPSJ1c2VyU3BhY2VPblVzZSI+JiN4YTsJCQk8Y2lyY2xlIGN4PSIxMiIgY3k9IjEyLjIzIiByPSIzLjU4IiBmaWx0ZXI9InVybCgjQSkiLz4mI3hhOwkJPC9tYXNrPiYjeGE7CTwvZGVmcz4mI3hhOwk8ZyBjbGFzcz0ic3QwIj4mI3hhOwkJPGNpcmNsZSBjeD0iMTYuMTMiIGN5PSI2LjIxIiByPSIxLjcyIi8+JiN4YTsJCTxjaXJjbGUgY3g9IjIuMTkiIGN5PSI2LjIxIiByPSIxLjcyIi8+JiN4YTsJCTxjaXJjbGUgY3g9IjkuMTYiIGN5PSIxOC4yOCIgcj0iMS43MiIvPiYjeGE7CTwvZz4mI3hhOwk8ZyBtYXNrPSJ1cmwoI0IpIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMi44NCAtMikiPiYjeGE7CQk8cGF0aCB0cmFuc2Zvcm09Im1hdHJpeCguNSAtLjg3IC44NyAuNSAtNC41OSAyMC41MykiIGQ9Ik0xNC42OSAxMC4yMmgxLjU5djguMDRoLTEuNTl6IiBjbGFzcz0ic3QxIi8+JiN4YTsJCTxwYXRoIHRyYW5zZm9ybT0icm90YXRlKDMzMCA4LjUyMyAxNC4yNDQpIiBkPSJNNC40OSAxMy40NWg4LjA0djEuNTlINC40OXoiIGNsYXNzPSJzdDEiLz4mI3hhOwkJPHBhdGggZD0iTTExLjIgNC4xOWgxLjU5djguMDRIMTEuMnoiIGNsYXNzPSJzdDEiLz4mI3hhOwk8L2c+JiN4YTsJPGcgY2xhc3M9InN0MiI+JiN4YTsJCTxjaXJjbGUgY3g9IjkuMTYiIGN5PSIxMC4yMyIgcj0iMi43OCIvPiYjeGE7CQk8Y2lyY2xlIGN4PSIyLjE5IiBjeT0iMTQuMjUiIHI9IjIuMTkiLz4mI3hhOwkJPGNpcmNsZSBjeD0iMTYuMTMiIGN5PSIxNC4yNSIgcj0iMi4xOSIvPiYjeGE7CQk8Y2lyY2xlIGN4PSI5LjE2IiBjeT0iMi4xOSIgcj0iMi4xOSIvPiYjeGE7CTwvZz4mI3hhOzwvc3ZnPg==;",
+      "w": 36,
+      "h": 40,
+      "title": "Pub Sub",
+      "source": "draw.io shape library; title confirmed via MCP search_shapes"
+    },
+    "firestore": {
+      "style": "editableCssRules=.*;html=1;shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=data:image/svg+xml,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnY9Imh0dHBzOi8vdmVjdGEuaW8vbmFubyIgd2lkdGg9IjMyMy45MDU2MTAzOTg2NzUxNSIgaGVpZ2h0PSIzNzYuNDIyMjk0OTYzNjg0MDciIHZpZXdCb3g9Ii0wLjA5NzAwMDAwMjg2MTAyMjk1IDAuMjg3OTk5OTg3NjAyMjMzOSA4NS42OTk5OTY5NDgyNDIxOSA5OS41OTUwMDEyMjA3MDMxMiI+JiN4YTs8c3R5bGUgdHlwZT0idGV4dC9jc3MiPiYjeGE7CS5zdDB7ZmlsbDojYWVjYmZhO30mI3hhOwkuc3Qxe2ZpbGw6IzY2OWRmNjt9JiN4YTsJLnN0MntmaWxsOiM0Mjg1ZjQ7fSYjeGE7PC9zdHlsZT4mI3hhOwk8cGF0aCBjbGFzcz0ic3QwIiBkPSJNLS4wOTcgNzUuODE1VjU1Ljg3NGw0Mi44NS0yMC4xODN2MTkuMDd6bTAtMzUuNDAzVjIwLjQ3MUw0Mi43NTMuMjg4djE5LjA3eiIvPiYjeGE7CTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik04NS42MDMgNzUuODE1VjU1Ljg3NGwtNDIuODUtMjAuMTgzdjE5LjA3em0wLTM1LjQwM1YyMC40NzFMNDIuNzUzLjI4OHYxOS4wN3oiLz4mI3hhOwk8cGF0aCBjbGFzcz0ic3QyIiBkPSJNNDIuNzUzIDgwLjMxNGwxNi4yMTctNy41MjUgMjEuMDg0IDkuNzE3LTM3LjMwMSAxNy4zNzd6Ii8+JiN4YTs8L3N2Zz4=;",
+      "w": 34,
+      "h": 40,
+      "title": "Firestore",
+      "source": "draw.io shape library; title confirmed via MCP search_shapes"
+    },
+    "storage": {
+      "style": "editableCssRules=.*;html=1;shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=data:image/svg+xml,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnY9Imh0dHBzOi8vdmVjdGEuaW8vbmFubyIgd2lkdGg9IjIwIiBoZWlnaHQ9IjE2IiB2aWV3Qm94PSIwIDAgMjAgMTYiPiYjeGE7CTxzdHlsZSB0eXBlPSJ0ZXh0L2NzcyI+JiN4YTsJLnN0MHtmaWxsOiM0Mjg1ZjQ7fSYjeGE7CS5zdDF7ZmlsbDojNjY5ZGY2O30mI3hhOwkuc3Qye2ZpbGw6I2FlY2JmYTt9JiN4YTsJLnN0M3tmaWxsOiNmZmY7fSYjeGE7CTwvc3R5bGU+JiN4YTsJPHBhdGggY2xhc3M9InN0MiIgZD0iTTAgMGgyMHY3SDB6Ii8+JiN4YTsJPHBhdGggY2xhc3M9InN0MSIgZD0iTTE4IDBoMnY3aC0yeiIvPiYjeGE7CTxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0xOCA3bDItN2gtMnoiLz4mI3hhOwk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMCAwaDJ2N0gweiIvPiYjeGE7CTxnIGNsYXNzPSJzdDMiPiYjeGE7CQk8cGF0aCBkPSJNNCAzaDZ2MUg0eiIvPiYjeGE7CQk8cmVjdCB4PSIxMyIgeT0iMiIgd2lkdGg9IjMiIGhlaWdodD0iMyIgcng9IjEuNSIvPiYjeGE7CTwvZz4mI3hhOwk8cGF0aCBjbGFzcz0ic3QyIiBkPSJNMCA5aDIwdjdIMHoiLz4mI3hhOwk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTggOWgydjdoLTJ6Ii8+JiN4YTsJPHBhdGggY2xhc3M9InN0MCIgZD0iTTE4IDE2bDItN2gtMnoiLz4mI3hhOwk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMCA5aDJ2N0gweiIvPiYjeGE7CTxnIGNsYXNzPSJzdDMiPiYjeGE7CQk8cGF0aCBkPSJNNCAxMmg2djFINHoiLz4mI3hhOwkJPHJlY3QgeD0iMTMiIHk9IjExIiB3aWR0aD0iMyIgaGVpZ2h0PSIzIiByeD0iMS41Ii8+JiN4YTsJPC9nPiYjeGE7PC9zdmc+;",
+      "w": 40,
+      "h": 32,
+      "title": "Cloud Storage",
+      "source": "draw.io shape library; title confirmed via MCP search_shapes"
+    },
+    "secret": {
+      "style": "sketch=0;html=1;verticalAlign=top;labelPosition=center;verticalLabelPosition=bottom;align=center;spacingTop=-6;fontSize=11;fontStyle=1;fontColor=#999999;shape=image;aspect=fixed;imageAspect=0;image=data:image/svg+xml,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGlkPSJzdmc1MzkzNyIgdmVyc2lvbj0iMS4xIiB2aWV3Qm94PSIwIDAgMTc1LjE2MDYzIDEwNC4yNzczNSIgaGVpZ2h0PSIxMDQuMjc3MzVtbSIgd2lkdGg9IjE3NS4xNjA2M21tIj4mI3hhOyAgPHBhdGggZD0ibSAxMjguNTY5MSwzNC4xMTUyMzYgdiAxMi45Nzg1MTYgbCAtMTIuMzM3ODksLTQuMzgwODYgLTIuNTA5NzcsNy4wNjgzNiAxMi41NDEwMiw0LjQ1MzEyNSAtOC41NjA1NSwxMS40MzE2NCA2LjAwMTk2LDQuNDk2MDk0IDguNTk5NjEsLTExLjQ4MDQ2OSA4LjQ5NDE0LDExLjQ2NDg0NCA2LjAyNzM0LC00LjQ2NDg0NCAtOC40NzI2NiwtMTEuNDMzNTkzIDEyLjY0MDYzLC00LjQ2Njc5NyAtMi41LC03LjA3MDMxMyAtMTIuNDIzODMsNC4zOTA2MjUgViAzNC4xMTUyMzYgWiBtIC00NC43NzY4NzIsMCB2IDEyLjk3ODUxNiBsIC0xMi4zMzc4OTEsLTQuMzgwODYgLTIuNTA5NzY1LDcuMDY4MzYgMTIuNTQxMDE1LDQuNDUzMTI1IC04LjU2MDU0NywxMS40MzE2NCA2LjAwMTk1Myw0LjQ5NjA5NCA4LjU5OTYxLC0xMS40ODA0NjkgOC40OTQxNCwxMS40NjQ4NDQgNi4wMjczNDcsLTQuNDY0ODQ0IC04LjQ3MjY1OSwtMTEuNDMzNTkzIDEyLjY0MDYyOSwtNC40NjY3OTcgLTIuNSwtNy4wNzAzMTMgLTEyLjQyMzgzMiw0LjM5MDYyNSBWIDM0LjExNTIzNiBaIG0gLTQ0Ljc3Njg1LDAgdiAxMi45Nzg1MTYgbCAtMTIuMzM3ODkxLC00LjM4MDg2IC0yLjUwOTc2NSw3LjA2ODM2IDEyLjU0MTAxNSw0LjQ1MzEyNSAtOC41NjA1NDcsMTEuNDMxNjQgNi4wMDE5NTMsNC40OTYwOTQgOC41OTk2MSwtMTEuNDgwNDY5IDguNDk0MTQsMTEuNDY0ODQ0IDYuMDI3MzQ0LC00LjQ2NDg0NCAtOC40NzI2NTYsLTExLjQzMzU5MyAxMi42NDA2MjUsLTQuNDY2Nzk3IC0yLjUsLTcuMDcwMzEzIC0xMi40MjM4MjgsNC4zOTA2MjUgViAzNC4xMTUyMzYgWiBNIDE3NS4xNjA2NCwxMGUtNyBWIDEwNC4yNzczNCBoIC0zNy4yNzY4MiBjIC0xLjIwODU3LDAgLTIuMDAyNDgsLTAuNjIzNTQgLTIuMDAyNDgsLTEuODY2MzQgdiAtOS45MjcyMzggYyAwLC0xLjE0ODI1IDAuNzE1OTYsLTEuNzA2NDIgMi4wMDI0OCwtMS43MDY0MiBoIDIzLjc3NjgyIFYgMTMuNSBoIC0yMy45NDQ5OCBjIC0xLjQwODU1LDAgLTEuOTUxNTEsLTAuNzUyMzE3IC0xLjk1MTUxLC0yLjA3NDQ4MiBWIDEuODQyNzI2IGMgMCwtMS4yNjU5NzEgMC42OTgwOCwtMS44NDI3MjUgMS45NTE1MSwtMS44NDI3MjUgeiBNIDAsMCB2IDEwNC4yNzczNSBoIDM3LjI3NjgxNCBjIDEuMjA4NTcxLDAgMi4wMDI0ODMsLTAuNjIzNTQgMi4wMDI0ODMsLTEuODY2MzQgdiAtOS45MjcyMzggYyAwLC0xLjE0ODI1IC0wLjcxNTk1NywtMS43MDY0MiAtMi4wMDI0ODMsLTEuNzA2NDIgSCAxMy41IFYgMTMuNDk5OTk5IGggMjMuOTQ0OTczIGMgMS40MDg1NTIsMCAxLjk1MTUxMSwtMC43NTIzMTcgMS45NTE1MTEsLTIuMDc0NDgyIFYgMS44NDI3MjUgQyAzOS4zOTY0ODQsMC41NzY3NTQgMzguNjk4NDEsMCAzNy40NDQ5NzMsMCBaIiBzdHlsZT0iY29sb3I6IzAwMDAwMDtvcGFjaXR5OjE7ZmlsbDojNDI4NWY0O2ZpbGwtb3BhY2l0eToxOy1pbmtzY2FwZS1zdHJva2U6bm9uZSIvPiYjeGE7PC9zdmc+;",
+      "w": 42,
+      "h": 25,
+      "title": "Security Secret Manager",
+      "source": "draw.io shape library; title confirmed via MCP search_shapes"
+    },
+    "gke": {
+      "style": "editableCssRules=.*;html=1;shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=data:image/svg+xml,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnY9Imh0dHBzOi8vdmVjdGEuaW8vbmFubyIgd2lkdGg9IjMyOS45MjU5OTcyMzE3OTM4IiBoZWlnaHQ9IjM3OC4yODQ5OTAzMTEyNzg4IiB2aWV3Qm94PSIwIDAgODcuMjkyOTk5MjY3NTc4MTIgMTAwLjA4Nzk5NzQzNjUyMzQ0Ij4mI3hhOzxzdHlsZSB0eXBlPSJ0ZXh0L2NzcyI+JiN4YTsJLnN0MHtmaWxsOiNhZWNiZmE7fSYjeGE7CS5zdDF7ZmlsbDojNjY5ZGY2O30mI3hhOwkuc3Qye2ZpbGw6IzQyODVmNDt9JiN4YTs8L3N0eWxlPiYjeGE7CTxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik00My43NTEgMEwwIDI1LjQ2NXYyLjU4OCA0Ni45Mmw0My43NTIgMjUuMTE1IDQzLjU0MS0yNS4xMjFWMjUuNDczem0yLjQzOCAxMS44NTNsMzIuMTAzIDE4Ljc4MlY2OS43N0w0My43MzkgODkuNzA1IDkgNjkuNzYyVjMwLjY0MWwzMi4xOS0xOC43MzZ2MTQuMTU0TDI0LjUwMyAzNi4xNTNsMTkuMTcyIDExLjUwMiAxOC44ODYtMTEuNTU0LTE2LjM3Mi0xMC4wMjR6Ii8+JiN4YTsJPHBhdGggY2xhc3M9InN0MSIgZD0iTTIyLjAyNSA0MC40OTZsLjE2NiAxOS4xNDMtMTMuMjQ3IDcuMzN2Mi43NDJsMi42MzcgMS41MTQgMTIuNjQ4LTYuOTk5IDE2Ljk2MSAxMC42MDJWNTEuOTkzeiIvPiYjeGE7CTxwYXRoIGNsYXNzPSJzdDIiIGQ9Ik02NS4zNDQgNDAuMjZMNDYuMTg5IDUxLjk3OXYyMi44NDdsMTYuODk5LTEwLjU3NiAxMi41MzkgNi45NzQgMi42MDktMS41MDV2LTIuNzY1bC0xMi43ODQtNy4xMTJ6Ii8+JiN4YTs8L3N2Zz4=;",
+      "w": 17,
+      "h": 20,
+      "title": "Kubernetes Engine",
+      "source": "draw.io shape library; title confirmed via MCP search_shapes"
+    },
+    "build": {
+      "style": "editableCssRules=.*;html=1;shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=data:image/svg+xml,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnY9Imh0dHBzOi8vdmVjdGEuaW8vbmFubyIgd2lkdGg9IjE3LjMyOTk5OTkyMzcwNjA1NSIgaGVpZ2h0PSIxOS42MTAwMDA2MTAzNTE1NjIiIHZpZXdCb3g9IjAgMCAxNy4zMjk5OTk5MjM3MDYwNTUgMTkuNjEwMDAwNjEwMzUxNTYyIj4mI3hhOwk8c3R5bGUgdHlwZT0idGV4dC9jc3MiPiYjeGE7CS5zdDB7ZmlsbDojNDI4NWY0O30mI3hhOwkuc3Qxe2ZpbGw6IzY2OWRmNjt9JiN4YTsJLnN0MntmaWxsOiNhZWNiZmE7fSYjeGE7CTwvc3R5bGU+JiN4YTsJPHBhdGggY2xhc3M9InN0MCIgZD0iTTEyLjE4IDcuOThMMTEgNy4yOWwtMy41MiA2LjEgMS4xOC42OCAzLjUyLTIuMDN6IiBmaWxsPSIjNDI4NWY0Ii8+JiN4YTsJPHBhdGggY2xhc3M9InN0MSIgZD0iTTYuMzIgMTIuNzJsMy41My02LjA5LTEuMTktLjY5LTMuNTIgMi4wNHY0LjA2eiIgZmlsbD0iIzY2OWRmNiIvPiYjeGE7CTxwYXRoIGNsYXNzPSJzdDIiIGQ9Ik0zLjc1IDcuOThMMCA1LjgxdjkuMmw3Ljk3IDQuNnYtNC4zM2wtNC4yMi0yLjQ0em05LjEzLTEuMmwzLjc2LTIuMTdMOC42NiAwIC42OCA0LjYxbDMuNzYgMi4xNyA0LjIyLTIuNDR6TTkuMzUgMTkuNjFsNy45OC00LjZ2LTkuMmwtMy43NiAyLjE3djQuODZsLTQuMjIgMi40NHoiIGZpbGw9IiNhZWNiZmEiLz4mI3hhOzwvc3ZnPg==;",
+      "w": 34,
+      "h": 40,
+      "title": "Cloud Build",
+      "source": "draw.io shape library; title confirmed via MCP search_shapes"
+    },
+    "registry": {
+      "style": "editableCssRules=.*;html=1;shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=data:image/svg+xml,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnY9Imh0dHBzOi8vdmVjdGEuaW8vbmFubyIgd2lkdGg9IjIxLjk5OTAwMDU0OTMxNjQwNiIgaGVpZ2h0PSIyMC4zOTM5OTkwOTk3MzE0NDUiIHZpZXdCb3g9IjAgMCAyMS45OTkwMDA1NDkzMTY0MDYgMjAuMzkzOTk5MDk5NzMxNDQ1Ij4mI3hhOwk8c3R5bGUgdHlwZT0idGV4dC9jc3MiPiYjeGE7CS5zdDB7ZmlsbDojNDI4NWY0O2ZpbGwtcnVsZTpldmVub2RkfSYjeGE7CTwvc3R5bGU+JiN4YTsJPHBhdGggY2xhc3M9InN0MCIgZD0iTTUgMHYyLjQ1OEwxLjk5OSA0LjE5N3YxMi4wMUw1IDE3LjkzOHYyLjQ1NmwtNS0yLjg4N1YyLjg4NnptMTIgMGw0Ljk5OSAyLjg4NnYxNC42MjFMMTcgMjAuMzk0di0yLjQ1NmwzLTEuNzMxVjQuMTk3bC0zLTEuNzM5em0tNi4wMTYgNi42NzNsMi45NDctMS42NDYtMi45NDctMS42NDYtMi45NDcgMS42NDZ6bTMuMjY4LTEuMDk2bC0yLjg3MSAxLjY3OHYzLjI4N2wyLjg3MS0xLjY3NnpNNy43NzMgOC44NjZsMi44NzEgMS42NzRWNy4yNTZMNy43NzMgNS41Nzd6bS0uMjEyIDMuODc4bDIuODItMS42NDYtMi44Mi0xLjY0Ni0yLjgyIDEuNjQ2em0zLjEzMi0xLjA5OGwtMi44NzEgMS42Nzh2My4yODdsMi44NzEtMS42NzZ6bS02LjI2NCAzLjI4OUw3LjMgMTYuNjA5di0zLjI4NWwtMi44NzEtMS42Nzl6bTEwLjAyOS0yLjE5MWwyLjgyLTEuNjQ2LTIuODItMS42NDYtMi44MiAxLjY0NnptMy4xMzItMS4wOThsLTIuODcxIDEuNjc4djMuMjg3bDIuODcxLTEuNjc2em0tNi4yNjQgMy4yODlsMi44NzEgMS42NzR2LTMuMjg1bC0yLjg3MS0xLjY3OXoiLz4mI3hhOzwvc3ZnPg==;",
+      "w": 40,
+      "h": 36,
+      "title": "Artifact Registry",
+      "source": "draw.io shape library; title confirmed via MCP search_shapes"
+    },
+    "monitoring": {
+      "style": "sketch=0;html=1;aspect=fixed;strokeColor=none;shadow=0;fillColor=#3B8DF1;verticalAlign=top;labelPosition=center;verticalLabelPosition=bottom;shape=mxgraph.gcp2.cloud_monitoring",
+      "w": 90,
+      "h": 100,
+      "title": "Cloud Monitoring",
+      "source": "draw.io shape library; title confirmed via MCP search_shapes"
+    },
+    "logging": {
+      "style": "editableCssRules=.*;html=1;shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=data:image/svg+xml,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnY9Imh0dHBzOi8vdmVjdGEuaW8vbmFubyIgd2lkdGg9IjIwIiBoZWlnaHQ9IjE5IiB2aWV3Qm94PSIwIDAgMjAgMTkiPiYjeGE7CTxzdHlsZSB0eXBlPSJ0ZXh0L2NzcyI+JiN4YTsJLnN0MHtmaWxsOiM0Mjg1ZjQ7fSYjeGE7CS5zdDF7ZmlsbDojNjY5ZGY2O30mI3hhOwkuc3Qye2ZpbGw6I2FlY2JmYTt9JiN4YTsJPC9zdHlsZT4mI3hhOwk8ZyBjbGFzcz0ic3QwIj4mI3hhOwkJPHBhdGggZD0iTTQgOWg0djJINHptLTIgN2g2djJIMnoiLz4mI3hhOwkJPHBhdGggZD0iTTQgNEgydjEyaDJ6Ii8+JiN4YTsJPC9nPiYjeGE7CTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0yMCAxSDd2NGgxM3ptMCA3SDd2NGgxM3ptMCA3SDd2NGgxM3oiLz4mI3hhOwk8cGF0aCBjbGFzcz0ic3QyIiBkPSJNNiAwSDB2Nmg2eiIvPiYjeGE7PC9zdmc+;",
+      "w": 40,
+      "h": 38,
+      "title": "Cloud Logging",
+      "source": "draw.io shape library; title confirmed via MCP search_shapes"
+    },
+    "trace": {
+      "style": "editableCssRules=.*;html=1;shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=data:image/svg+xml,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnY9Imh0dHBzOi8vdmVjdGEuaW8vbmFubyIgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiB2aWV3Qm94PSIwIDAgMjAgMjAiPiYjeGE7CTxzdHlsZSB0eXBlPSJ0ZXh0L2NzcyI+JiN4YTsJLnN0MHtmaWxsOiM0Mjg1ZjQ7fSYjeGE7CS5zdDF7ZmlsbDojNjY5ZGY2O30mI3hhOwk8L3N0eWxlPiYjeGE7CTxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0yMCA4SDEwdjRoMTB6bTAgOEgxMHY0aDEweiIgZmlsbD0iIzQyODVmNCIvPiYjeGE7CTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xMCAxNkg2djRoNHpNMCAwaDZ2NEgwem0wIDhoMTB2NEgweiIgZmlsbD0iIzY2OWRmNiIvPiYjeGE7PC9zdmc+;",
+      "w": 40,
+      "h": 40,
+      "title": "Trace",
+      "source": "draw.io shape library; title confirmed via MCP search_shapes"
+    },
+    "scheduler": {
+      "style": "editableCssRules=.*;html=1;shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=data:image/svg+xml,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnY9Imh0dHBzOi8vdmVjdGEuaW8vbmFubyIgd2lkdGg9IjM2MC4zMDM3NjY4NjA4MzYzIiBoZWlnaHQ9IjM3OC4wNTExNTgwNzc0MDg4IiB2aWV3Qm94PSItMC4wMDAxNjI0MjExNDM2MTM3NTU3IC0wLjAwMDEwMDAwNTk0OTIwNzExNTkyIDk1LjMzMDI2MTIzMDQ2ODc1IDEwMC4wMjYxMDAxNTg2OTE0Ij4mI3hhOzxzdHlsZSB0eXBlPSJ0ZXh0L2NzcyI+JiN4YTsJLnN0MHtmaWxsOiM0Mjg1ZjQ7fSYjeGE7CS5zdDF7ZmlsbDojYWVjYmZhO30mI3hhOwkuc3Qye2ZpbGw6IzY2OWRmNjt9JiN4YTs8L3N0eWxlPiYjeGE7CTxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik03OS45NzEgNzcuNzE1bC03LjM1OSA3LjQ4OCA4LjYzOSA4LjQ5IDcuMzU5LTcuNDg4em0tNjUuMDk2LjA2MWwtOC42NDEgOC40OTIgNy4zNjEgNy40ODggOC42MzktOC40OXoiLz4mI3hhOwk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNNzkuNTUzLjIyMWE1LjI1IDUuMjUgMCAwIDAtMy42NiA4Ljk4NEw4Ni4zODkgMTkuNThhNS4yNSA1LjI1IDAgMCAwIDguOTQxLTMuNzY1IDUuMjUgNS4yNSAwIDAgMC0xLjU2LTMuNzA0TDgzLjI3NSAxLjczOEE1LjI1IDUuMjUgMCAwIDAgNzkuNTUzLjIyMXpNMTUuOTE2IDBhNS4yNSA1LjI1IDAgMCAwLTMuNzIzIDEuNTE2TDEuNjk5IDExLjg5MWE1LjI1IDUuMjUgMCAwIDAtLjA0MyA3LjQyNCA1LjI1IDUuMjUgMCAwIDAgNy40MjQuMDQzTDE5LjU3NiA4Ljk4MkE1LjI1IDUuMjUgMCAwIDAgMTUuOTE2IDB6Ii8+JiN4YTsJPHBhdGggY2xhc3M9InN0MCIgZD0iTTQ4LjEzOCAyNi4yNGMxMy4zNDcgMCAyNS40MzIgMTEuMTM2IDI1LjMxIDI2LjQ4MSAwIDE1LjExLTEyLjI2NyAyNS42NzMtMjUuMTg5IDI1LjY3My0xMS4xNDkgMC0xOC4zMTctNS4xNzEtMjEuOTYtMTAuNzM4bDIxLjgzOS0xNS4wOTd6Ii8+JiN4YTsJPHBhdGggY2xhc3M9InN0MiIgZD0iTTgxLjI1IDkzLjY5M2w0LjY2NCA0LjU4NmE1LjI1IDUuMjUgMCAxIDAgNy4zNjEtNy40OWwtNC42NjYtNC41ODR6TTYuMjM0IDg2LjI2OEwxLjU3IDkwLjg1MWE1LjI1IDUuMjUgMCAwIDAtLjA2NSA3LjQyNCA1LjI1IDUuMjUgMCAwIDAgNy40MjQuMDY0bDQuNjY2LTQuNTg0ek00Ny4zNzEgNS41NzhDMjEuMzQ5IDUuNTc4LjE0NiAyNi43NzkuMTQ2IDUyLjgwMXMyMS4yMDMgNDcuMjI1IDQ3LjIyNSA0Ny4yMjUgNDcuMjI1LTIxLjIwMyA0Ny4yMjUtNDcuMjI1UzczLjM5MyA1LjU3OCA0Ny4zNzEgNS41Nzh6bTAgMTBhMzcuMTUgMzcuMTUgMCAwIDEgMzcuMjI1IDM3LjIyM2MwIDIwLjYxNy0xNi42MDcgMzcuMjI1LTM3LjIyNSAzNy4yMjVTMTAuMTQ2IDczLjQxOCAxMC4xNDYgNTIuODAxYTM3LjE1IDM3LjE1IDAgMCAxIDM3LjIyNS0zNy4yMjN6Ii8+JiN4YTs8L3N2Zz4=;",
+      "w": 38,
+      "h": 40,
+      "title": "Cloud Scheduler",
+      "source": "draw.io shape library; title confirmed via MCP search_shapes"
+    },
+    "github": {
+      "style": "dashed=0;outlineConnect=0;html=1;align=center;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;shape=mxgraph.webicons.github;gradientColor=#DFDEDE",
+      "w": 102,
+      "h": 102,
+      "title": "Github",
+      "source": "draw.io shape library; title confirmed via MCP search_shapes"
+    },
+    "identity": {
+      "title": "Securityidentity",
+      "w": 45,
+      "h": 50,
+      "style": "sketch=0;html=1;verticalAlign=top;labelPosition=center;verticalLabelPosition=bottom;align=center;fontSize=11;fontStyle=0;fontColor=#000000;aspect=fixed;pointerEvents=1;shape=mxgraph.gcp3.securityidentity;fillColor=#9aa0a6",
+      "source": "Draw.io MCP search_shapes: gcp identity"
+    },
+    "discord": {
+      "title": "Discord",
+      "w": 40,
+      "h": 40,
+      "style": "shape=image;html=1;aspect=fixed;imageAspect=0;image=data:image/svg+xml,PD94bWwgdmVyc2lvbj0iMS4wIj8+PHN2ZyBkYXRhLW5hbWU9IkxheWVyIDIiIGlkPSJMYXllcl8yIiB2aWV3Qm94PSIwIDAgNjQgNjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHRpdGxlLz48cGF0aCBkPSJNMTUuMzgsMTMuMTRIOS4xNWEzLjA4LDMuMDgsMCwwLDAtMy4wNiwyLjguOC44LDAsMCwwLDAsLjE1djcuNzdhNSw1LDAsMCwwLDUsNWgyLjExYTUsNSwwLDAsMCw1LTVWMTYuMDlzMCwwLDAtLjA1LDAtLjA2LDAtLjA5QTIuODEsMi44MSwwLDAsMCwxNS4zOCwxMy4xNFptLjgxLDEwLjcyYTMsMywwLDAsMS0zLDNIMTEuMDdhMywzLDAsMCwxLTMtM3YtM2g1LjE4YTQuOSw0LjksMCwwLDAsMy0xWm0tMTIuOTQuMDZhMy4yNSwzLjI1LDAsMCwxLDAtNi41LDEsMSwwLDAsMSwxLDF2NC41QTEsMSwwLDAsMSwzLjI1LDIzLjkyWm0xNi45LS40N2ExLjA2LDEuMDYsMCwwLDEtLjE1LS41M3YtNC41YTEsMSwwLDAsMSwxLTEsMy4yMywzLjIzLDAsMCwxLDIuMDguNzVBNy4zMiw3LjMyLDAsMCwwLDIwLjE1LDIzLjQ1Wk0yLjI1LDE0LjE0YzAtMy4yNywyLjU5LTUuNjQsNi4xNi01LjY0aDcuNDNjMy41NywwLDYuMTYsMi4zNyw2LjE2LDUuNjRhMSwxLDAsMCwxLTIsMGMwLTIuNS0yLjE2LTMuNjQtNC4xNi0zLjY0SDguNDFjLTIsMC00LjE2LDEuMTQtNC4xNiwzLjY0YTEsMSwwLDAsMS0yLDBaTTYuMTYsMjcuNWExLDEsMCwwLDEtMSwxSDQuNzVBMi41LDIuNSwwLDAsMSwyLjI1LDI2YTEsMSwwLDAsMSwyLDAsLjUuNSwwLDAsMCwuNS41aC40MUExLDEsMCwwLDEsNi4xNiwyNy41Wm00OS0xNC4zNkg0OC45YTMuMDgsMy4wOCwwLDAsMC0zLjA2LDIuOC44LjgsMCwwLDAsMCwuMTV2Ny43N2E1LDUsMCwwLDAsNSw1aDIuMTFhNSw1LDAsMCwwLDUtNVYxNi4wOXMwLDAsMC0uMDUsMC0uMDYsMC0uMDlBMi44MSwyLjgxLDAsMCwwLDU1LjEzLDEzLjE0Wm0uODEsMTAuNzJhMywzLDAsMCwxLTMsM0g1MC44MmEzLDMsMCwwLDEtMy0zdi0zSDUzYTQuOSw0LjksMCwwLDAsMi45NS0xWm0tMTIuMDktLjQxYTcuMzIsNy4zMiwwLDAsMC0yLjkzLTUuMjhBMy4yMywzLjIzLDAsMCwxLDQzLDE3LjQyYTEsMSwwLDAsMSwxLDF2NC41QTEuMDYsMS4wNiwwLDAsMSw0My44NSwyMy40NVpNNjQsMjAuNjdhMy4yNiwzLjI2LDAsMCwxLTMuMjUsMy4yNSwxLDEsMCwwLDEtMS0xdi00LjVhMSwxLDAsMCwxLDEtMUEzLjI1LDMuMjUsMCwwLDEsNjQsMjAuNjdaTTQ4LjE2LDguNWg3LjQzYzMuNTcsMCw2LjE2LDIuMzcsNi4xNiw1LjY0YTEsMSwwLDAsMS0yLDBjMC0yLjUtMi4xNi0zLjY0LTQuMTYtMy42NEg0OC4xNmMtMiwwLTQuMTYsMS4xNC00LjE2LDMuNjRhMSwxLDAsMCwxLTIsMEM0MiwxMC44Nyw0NC41OSw4LjUsNDguMTYsOC41Wk02Mi44OCwzNi41N1Y1MC4xNUEzLjg2LDMuODYsMCwwLDEsNTksNTRINDVWNDYuNTdhNy43NSw3Ljc1LDAsMCwwLTQuMTItNi44NVYzNi41N2E0LjYzLDQuNjMsMCwwLDEsMC0uNjUsNS4yNCw1LjI0LDAsMCwwLDUuMTktNS4wOCw0LjQxLDQuNDEsMCwwLDEsLjUyLDBINTcuMTJBNS43Nyw1Ljc3LDAsMCwxLDYyLjg4LDM2LjU3Wk00My4yMywyNmEyLjg3LDIuODcsMCwwLDAsLjQzLS43NEExLDEsMCwwLDEsNDQsMjZhLjUuNSwwLDAsMCwuNS41aC40MWExLDEsMCwwLDEsMSwxLDEsMSwwLDAsMS0uMzguNzhBNS4wNSw1LjA1LDAsMCwwLDQzLjIzLDI2Wm0tOC0yLjg1SDI5QTMuMDgsMy4wOCwwLDAsMCwyNiwyNS45NGEuOC44LDAsMCwwLDAsLjE1djcuNzdhNSw1LDAsMCwwLDUsNWgyLjFhNSw1LDAsMCwwLDUtNVYyNi4wOXMwLDAsMC0uMDUsMC0uMDYsMC0uMDlBMi44MSwyLjgxLDAsMCwwLDM1LjI2LDIzLjE0Wm0uOCwxMC43MmEzLDMsMCwwLDEtMywzSDMxYTMsMywwLDAsMS0zLTN2LTNoNS4xN2E0Ljg4LDQuODgsMCwwLDAsMy0xWk0xOS44OCwzMC42N2EzLjI0LDMuMjQsMCwwLDEsMy4yNS0zLjI1LDEsMSwwLDAsMSwxLDF2NC41YTEsMSwwLDAsMS0xLDFBMy4yNSwzLjI1LDAsMCwxLDE5Ljg4LDMwLjY3Wm0yMCwyLjI1di00LjVhMSwxLDAsMCwxLDEtMSwzLjI1LDMuMjUsMCwxLDEsMCw2LjVBMSwxLDAsMCwxLDM5Ljg4LDMyLjkyWk0zNS43MSwyMC41SDI4LjI5Yy0yLDAtNC4xNiwxLjE0LTQuMTYsMy42NGExLDEsMCwwLDEtMiwwYzAtMy4yNywyLjU5LTUuNjQsNi4xNi01LjY0aDcuNDJjMy41NywwLDYuMTcsMi4zNyw2LjE3LDUuNjRhMSwxLDAsMSwxLTIsMEMzOS44OCwyMS42NCwzNy43MiwyMC41LDM1LjcxLDIwLjVaTTQzLDQ2LjU3VjYwLjE1QTMuODYsMy44NiwwLDAsMSwzOS4xNSw2NEgyNC44NUEzLjg2LDMuODYsMCwwLDEsMjEsNjAuMTVWNDYuNTdhNS43Nyw1Ljc3LDAsMCwxLDUuNzYtNS43NkgzNy4yNEE1Ljc3LDUuNzcsMCwwLDEsNDMsNDYuNTdabS0yNCwwVjU0SDVhMy44NiwzLjg2LDAsMCwxLTMuODYtMy44NVYzNi41N2E1Ljc3LDUuNzcsMCwwLDEsNS43Ni01Ljc2SDE3LjM3bC41MiwwYTUuMjMsNS4yMywwLDAsMCwyLjM4LDQuMjQsMi44MywyLjgzLDAsMCwwLS4xNS45Myw0LjUsNC41LDAsMCwwLDIuNTIsNEE3LjcyLDcuNzIsMCwwLDAsMTksNDYuNTdaTTIyLjEzLDM2YTEsMSwwLDAsMSwyLDAsLjUuNSwwLDAsMCwuNS41SDI1YTEsMSwwLDAsMSwwLDJoLS40QTIuNSwyLjUsMCwwLDEsMjIuMTMsMzZaTTE5Ljk0LDYuNjZIMjMuMXY0LjE5YTIuMywyLjMsMCwwLDAsMi4zLDIuMzFoNS4wNmwxLjM1LDIuNjRhLjIyLjIyLDAsMCwwLC4zOCwwbDEuMzUtMi42NGg1LjA1YTIuMzEsMi4zMSwwLDAsMCwyLjMxLTIuMzFWNi42NmgzLjE1YS4zLjMsMCwwLDAsLjE5LS41Mkw0MC45LDMuMzJ2LTFBMi4zMSwyLjMxLDAsMCwwLDM4LjU5LDBIMjUuNGEyLjMsMi4zLDAsMCwwLTIuMywyLjN2MUwxOS43Niw2LjE0QS4yOS4yOSwwLDAsMCwxOS45NCw2LjY2Wm01LjU2LDEsMS41Ni0zLjI3YTEuOTMsMS45MywwLDAsMSwxLjczLTEuMDloNi40MmExLjkzLDEuOTMsMCwwLDEsMS43MywxLjA5TDM4LjUsNy42OGExLjg3LDEuODcsMCwwLDEtLjg4LDIuNDhsLS4xNy4wN0ExLjg2LDEuODYsMCwwLDEsMzUsOS4zNmwtLjA3LS4xNkExLDEsMCwwLDAsMzQsOC42M0gzMGExLDEsMCwwLDAtLjkuNTdMMjksOS4zNmExLjg2LDEuODYsMCwwLDEtMi40Ny44OGwtLjE3LS4wOEExLjg3LDEuODcsMCwwLDEsMjUuNSw3LjY4Wk0zNC4zNyw0LjlhLjQ0LjQ0LDAsMSwxLC40NC40NEEuNDQuNDQsMCwwLDEsMzQuMzcsNC45Wm0wLDEuODFhLjQ0LjQ0LDAsMSwxLC40NC40NEEuNDQuNDQsMCwwLDEsMzQuMzcsNi43MVptLjkxLS45YS40NC40NCwwLDEsMSwuODcsMCwuNDQuNDQsMCwxLDEtLjg3LDBabS0xLjgxLDBhLjQ0LjQ0LDAsMSwxLC44NywwLC40NC40NCwwLDEsMS0uODcsMFpNMjcuNTQsNlY1LjU3YS4yLjIsMCwwLDEsLjItLjJoLjUxYS4yLjIsMCwwLDAsLjItLjJWNC42NmEuMi4yLDAsMCwxLC4yLS4yaC40N2EuMi4yLDAsMCwxLC4yLjJ2LjUxYS4yLjIsMCwwLDAsLjIxLjJIMzBhLjIuMiwwLDAsMSwuMi4yVjZhLjIuMiwwLDAsMS0uMi4yMWgtLjVhLjIuMiwwLDAsMC0uMjEuMlY3YS4yLjIsMCwwLDEtLjIuMmgtLjQ3YS4yLjIsMCwwLDEtLjItLjJ2LS41YS4yLjIsMCwwLDAtLjItLjJoLS41MUEuMi4yLDAsMCwxLDI3LjU0LDZaIi8+PC9zdmc+;",
+      "source": "https://icons.diagrams.net/icon-cache1/Discord-2148/discord_1-603.svg",
+      "verified_style": "shape=image;html=1;aspect=fixed;imageAspect=0;image=data:image/svg+xml,PHN2ZyBmaWxsPSIjNTg2NUYyIiByb2xlPSJpbWciIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGl0bGU+RGlzY29yZDwvdGl0bGU+PHBhdGggZD0iTTIwLjMxNyA0LjM2OThhMTkuNzkxMyAxOS43OTEzIDAgMDAtNC44ODUxLTEuNTE1Mi4wNzQxLjA3NDEgMCAwMC0uMDc4NS4wMzcxYy0uMjExLjM3NTMtLjQ0NDcuODY0OC0uNjA4MyAxLjI0OTUtMS44NDQ3LS4yNzYyLTMuNjgtLjI3NjItNS40ODY4IDAtLjE2MzYtLjM5MzMtLjQwNTgtLjg3NDItLjYxNzctMS4yNDk1YS4wNzcuMDc3IDAgMDAtLjA3ODUtLjAzNyAxOS43MzYzIDE5LjczNjMgMCAwMC00Ljg4NTIgMS41MTUuMDY5OS4wNjk5IDAgMDAtLjAzMjEuMDI3N0MuNTMzNCA5LjA0NTgtLjMxOSAxMy41Nzk5LjA5OTIgMTguMDU3OGEuMDgyNC4wODI0IDAgMDAuMDMxMi4wNTYxYzIuMDUyOCAxLjUwNzYgNC4wNDEzIDIuNDIyOCA1Ljk5MjkgMy4wMjk0YS4wNzc3LjA3NzcgMCAwMC4wODQyLS4wMjc2Yy40NjE2LS42MzA0Ljg3MzEtMS4yOTUyIDEuMjI2LTEuOTk0MmEuMDc2LjA3NiAwIDAwLS4wNDE2LS4xMDU3Yy0uNjUyOC0uMjQ3Ni0xLjI3NDMtLjU0OTUtMS44NzIyLS44OTIzYS4wNzcuMDc3IDAgMDEtLjAwNzYtLjEyNzdjLjEyNTgtLjA5NDMuMjUxNy0uMTkyMy4zNzE4LS4yOTE0YS4wNzQzLjA3NDMgMCAwMS4wNzc2LS4wMTA1YzMuOTI3OCAxLjc5MzMgOC4xOCAxLjc5MzMgMTIuMDYxNCAwYS4wNzM5LjA3MzkgMCAwMS4wNzg1LjAwOTVjLjEyMDIuMDk5LjI0Ni4xOTgxLjM3MjguMjkyNGEuMDc3LjA3NyAwIDAxLS4wMDY2LjEyNzYgMTIuMjk4NiAxMi4yOTg2IDAgMDEtMS44NzMuODkxNC4wNzY2LjA3NjYgMCAwMC0uMDQwNy4xMDY3Yy4zNjA0LjY5OC43NzE5IDEuMzYyOCAxLjIyNSAxLjk5MzJhLjA3Ni4wNzYgMCAwMC4wODQyLjAyODZjMS45NjEtLjYwNjcgMy45NDk1LTEuNTIxOSA2LjAwMjMtMy4wMjk0YS4wNzcuMDc3IDAgMDAuMDMxMy0uMDU1MmMuNTAwNC01LjE3Ny0uODM4Mi05LjY3MzktMy41NDg1LTEzLjY2MDRhLjA2MS4wNjEgMCAwMC0uMDMxMi0uMDI4NnpNOC4wMiAxNS4zMzEyYy0xLjE4MjUgMC0yLjE1NjktMS4wODU3LTIuMTU2OS0yLjQxOSAwLTEuMzMzMi45NTU1LTIuNDE4OSAyLjE1Ny0yLjQxODkgMS4yMTA4IDAgMi4xNzU3IDEuMDk1MiAyLjE1NjggMi40MTkgMCAxLjMzMzItLjk1NTUgMi40MTg5LTIuMTU2OSAyLjQxODl6bTcuOTc0OCAwYy0xLjE4MjUgMC0yLjE1NjktMS4wODU3LTIuMTU2OS0yLjQxOSAwLTEuMzMzMi45NTU0LTIuNDE4OSAyLjE1NjktMi40MTg5IDEuMjEwOCAwIDIuMTc1NyAxLjA5NTIgMi4xNTY4IDIuNDE5IDAgMS4zMzMyLS45NDYgMi40MTg5LTIuMTU2OCAyLjQxODlaIi8+PC9zdmc+;",
+      "verified_source": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/discord.svg"
+    },
+    "firebase": {
+      "title": "Firebase",
+      "w": 40,
+      "h": 40,
+      "style": "shape=image;html=1;aspect=fixed;imageAspect=0;image=data:image/svg+xml,PD94bWwgdmVyc2lvbj0iMS4wIj8+PHN2ZyBoZWlnaHQ9IjI0IiB2aWV3Qm94PSIwIDAgMjQgMjQiIHdpZHRoPSIyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNNS4yMzkgMTUuMDYzIDcuMjEgMi4zODFhLjQ1My40NTMgMCAwIDEgLjg0Ny0uMTQ1bDIuMTIgMy45NzktNC45MzggOC44NDh6TTE5LjI0IDE4LjE0IDE3LjM2MyA2LjQ2OWEuNDU0LjQ1NCAwIDAgMC0uNzY2LS4yNDZMNC43NiAxOC4xNGw2LjU1IDMuNjkxYy40MTEuMjMuOTEyLjIzIDEuMzIzIDBsNi42MDctMy42OTF6TTEzLjkxNyA3Ljk1NSAxMi40IDUuMDUyYS40NTIuNDUyIDAgMCAwLS44IDBMNC45MzkgMTYuOTg5bDguOTc4LTkuMDM0eiIvPjwvc3ZnPg==;",
+      "source": "https://icons.diagrams.net/icon-cache1/Boxicons_Logos-2642/bxl-firebase-1290.svg"
+    },
+    "terraform": {
+      "title": "Terraform",
+      "w": 40,
+      "h": 40,
+      "style": "shape=image;html=1;aspect=fixed;imageAspect=0;image=data:image/svg+xml,PHN2ZyBmaWxsPSIjODQ0RkJBIiByb2xlPSJpbWciIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGl0bGU+VGVycmFmb3JtPC90aXRsZT48cGF0aCBkPSJNMS40NCAwdjcuNTc1bDYuNTYxIDMuNzlWMy43ODd6bTIxLjEyIDQuMjI3bC02LjU2MSAzLjc5MXY3LjU3NGw2LjU2LTMuNzg3ek04LjcyIDQuMjN2Ny41NzVsNi41NjEgMy43ODdWOC4wMTh6bTAgOC40MDV2Ny41NzVMMTUuMjggMjR2LTcuNTc4eiIvPjwvc3ZnPg==;",
+      "source": "https://cdn.simpleicons.org/terraform/844FBA"
+    }
+  }
+}
