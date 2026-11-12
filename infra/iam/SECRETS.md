@@ -1,22 +1,22 @@
-# SRV-03 — Secrets applicatifs
+# Secrets applicatifs
 
 Terraform déclare les conteneurs Secret Manager, **jamais leurs valeurs ni leurs
 versions**. Aucune ressource `google_secret_manager_secret_version` n'est utilisée :
 les valeurs ne transitent pas dans le plan ni dans le state via ce code.
 
-## Catalogue initial
+## Catalogue et consommateurs
 
-| ID du secret | Contenu prévu | Consommateur prévu |
+| ID du secret | Contenu | Usage |
 | --- | --- | --- |
-| `discord-public-key` | Clé publique Ed25519 de l'application Discord | `discord-proxy` |
+| `discord-public-key` | Clé publique Ed25519 de l'application Discord | Vérification de signature du callback (`discord-hello` ou proxy configuré) |
 | `discord-bot-token` | Token du bot, uniquement si l'appel Discord utilisé le nécessite | À attribuer aux seules fonctions qui en ont réellement besoin |
 | `discord-application-id` | ID de l'application Discord | Script d'enregistrement des commandes, fonctions qui utilisent cet ID |
 | `discord-oauth-client-secret` | Client secret OAuth2 Discord | `auth-proxy` |
 | `admin-allowlist` | Tableau JSON d'IDs Discord autorisés, par exemple `["123456789"]` | `command-worker` pour les commandes admin |
 
 La clé publique et l'application ID ne sont pas confidentiels ; ils sont placés
-ici pour suivre BOT-01. Les IDs doivent rester des chaînes, pas des nombres JS.
-Le format de l'allow-list devra être utilisé et validé par BOT-08 ; `[]` refuse
+ici pour centraliser la configuration Discord. Les IDs doivent être des chaînes,
+pas des nombres JS. Le consommateur valide le format de l'allow-list ; `[]` refuse
 tous les utilisateurs si cette liste est la seule méthode d'autorisation.
 
 Les callbacks Discord à token d'interaction n'exigent pas nécessairement le token
@@ -33,9 +33,11 @@ du bot : ne pas attribuer cet accès par défaut à tous les notifiers.
 - Le deployer de la CI n'a que `getIamPolicy`/`setIamPolicy` sur chacun de ces
   secrets (`deployer-iam.tf`) : il peut donner `secretAccessor` à une fonction
   depuis `infra/serverless`, pas lire ni écrire une valeur.
-- Les secrets dev, créés auparavant par `infra/serverless`, sont adoptés par un
-  bloc `import` (`import_application_secrets = true` dans `dev.tfvars`) ; le
-  stack serverless les oublie sans les détruire (`infra/serverless/removed.tf`).
+- Pour une adoption de conteneurs existants, activer `import_application_secrets`
+  et examiner les imports du plan. Pour une installation vide, désactiver cette
+  option : voir le [guide de déploiement](../../docs/deployment.md).
+  `infra/serverless/removed.tf` conserve la transition sans destruction des secrets
+  retirés de ce state ; vérifier les states avant toute autre migration.
 - Créer un conteneur ne suffit pas à démarrer les fonctions : une version
   référencée doit exister et l'identité d'exécution doit avoir les permissions.
 - Coût : quelques centimes par mois de versions actives, conservés après un
@@ -62,8 +64,8 @@ après l'opération selon les règles de stockage sécurisé de votre poste.
 La console Secret Manager est aussi utilisable sans fichier temporaire.
 
 Utiliser les informations de l'application Discord **dev pour dev**, et celles
-de l'application **prd pour prd**. La création de ces applications relève de BOT-01.
-Ne pas inventer de vraies valeurs pour terminer ce ticket.
+de l'application **prd pour prd**. Créer/configurer les applications externes
+avant d'alimenter leurs valeurs ; ne pas substituer de fausses données.
 
 Vérifier l'existence et l'état des versions sans afficher leur contenu :
 
@@ -73,9 +75,9 @@ gcloud secrets versions list discord-bot-token --project=cloud-pixelwar-dev
 
 ## Accès IAM limités par consommateur
 
-Aucun `roles/secretmanager.secretAccessor` global n'est ajouté par ce ticket.
-Le module `function` de SRV-01 accorde ce rôle **sur chaque secret référencé**,
-au seul service account d'exécution de cette fonction. Exemple futur :
+Le module `function` accorde `roles/secretmanager.secretAccessor` **sur chaque
+secret référencé**, au compte d'exécution de cette fonction, pas au niveau projet.
+Exemple de référence dans un appel au module :
 
 ```hcl
 secrets = {
@@ -89,11 +91,12 @@ secrets = {
 Ce bloc s'ajoute à l'appel du module du proxy, pas seul à la racine du stack.
 Remplacer `1` par le numéro réel de la version ajoutée. Le secret existe déjà
 (stack `iam`), seul son ID est passé ; ne pas donner au proxy accès à tous les
-secrets. Le script d'enregistrement aura des accès ciblés définis avec BOT-02/SRV-02.
+secrets. L'identité de l'outil d'enregistrement a des accès ciblés aux deux
+secrets décrits dans [son guide](../../docs/discord-commands.md).
 
-Les attributions effectives et les tests d'accès positif/négatif seront vérifiés
-quand les fonctions existeront. Ce ticket prépare les conteneurs ; il ne prouve pas
-encore leurs accès en conditions réelles.
+Après déploiement, contrôler la policy du secret et l'identité runtime, puis
+vérifier un accès autorisé et un refus avec une identité non autorisée. Une
+version activée et un plan valide ne prouvent pas à eux seuls la lecture runtime.
 
 ## Rotation et destruction
 

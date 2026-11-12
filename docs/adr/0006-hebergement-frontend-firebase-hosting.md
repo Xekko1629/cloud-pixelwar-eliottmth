@@ -50,9 +50,3 @@ Le frontend est servi par **Firebase Hosting** : fichiers statiques derrière le
 - Firebase ne peut pas être retiré d'un projet une fois ajouté (ADR-0005) : `google_firebase_project` va dans le stack `bootstrap`. Le site Hosting, lui, reste dans le stack applicatif et se détruit avec lui.
 - Firebase Hosting conserve les versions précédentes déployées : en limiter le nombre pour ne pas accumuler de stockage.
 - La redirect URI Discord de chaque environnement est l'URL du site (`https://<site>.web.app/auth/callback`). Elle est enregistrée dans l'application Discord de cet environnement (BOT-01).
-
-## En soutenance
-
-- « Firebase Hosting, c'est de l'hébergement statique avec un CDN, comme le sujet le propose, avec HTTPS automatique. »
-- « Les deux autres options demandaient de rendre un bucket ou un service Cloud Run public, ce qu'on s'interdit. »
-- « App Engine a été écarté parce qu'on ne peut pas le supprimer d'un projet : l'infrastructure ne serait plus jetable. »

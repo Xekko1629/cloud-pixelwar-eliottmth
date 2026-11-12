@@ -46,6 +46,7 @@ jobs:
               # The plan zips the built functions: a code change is a redeployment.
               - 'app/functions/**'
               - 'app/shared/src/**'
+              - 'app/shared/package.json'
               - 'app/package-lock.json'
             'serverless/modules/function':
               - 'infra/serverless/modules/function/**'

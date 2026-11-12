@@ -58,7 +58,13 @@ locals {
   #   hello = { function_name = module.hello.name, uri = module.hello.uri, service_type = module.hello.service_type }
   # Same shape for discord (module.discord_proxy, BOT-03), auth (module.auth_proxy, WEB-02a)
   # and api (module.web_proxy, DRAW-01).
-  gateway_backends = {}
+  gateway_backends = local.discord_hello_enabled ? {
+    discord = {
+      function_name = module.discord_hello[0].name
+      uri           = module.discord_hello[0].uri
+      service_type  = module.discord_hello[0].service_type
+    }
+  } : {}
 }
 
 # Not created until a proxy exists: API Gateway rejects a spec without any backend.

@@ -73,6 +73,22 @@ jobs:
           client-id: ${{ steps.github_app.outputs.client_id }}
           private-key: ${{ steps.github_app.outputs.private_key }}
 
+      # archive_file is refreshed even during destroy. A fresh checkout has no dist/:
+      # build the source folders first, otherwise the first deployed function blocks teardown.
+      - uses: actions/setup-node@v4
+        if: inputs.stack == 'serverless'
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Build the functions for archive refresh
+        if: inputs.stack == 'serverless'
+        working-directory: app
+        run: |
+          npm ci
+          npm run build:functions
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}

@@ -1,235 +1,190 @@
-# CI/CD
+# Intégration et déploiement continus
 
-## Application tests (TEST-01)
+## Périmètre
 
-Every PR to `prod` also runs `_app-test.yml`: Node.js 24 strict type checks,
-Vitest unit tests with a 70% per-file coverage threshold, then integration tests
-against local Firestore and Pub/Sub emulators (Java 21). No cloud credentials
-are used. Coverage is published in the run summary and reports are uploaded as
-artifacts. `CI result` depends on this job, so failures block the required check.
-See [testing.md](testing.md) for local commands, limitations and dependency alerts.
+Les workflows de `.github/workflows/` contrôlent les contributions et appliquent
+les stacks déclarés. Pour installer un environnement vide, suivre le
+[guide de déploiement](deployment.md) ; pour les règles de contribution et de
+signature, consulter le [GitFlow](gitflow.md).
 
-BOT-02 provides the Discord command registration tool and its
-[post-deployment integration contract](discord-commands.md). It is not yet wired
-to this infrastructure workflow; SRV-02 must call it after a successful
-application deployment, with environment-scoped credentials. PR tests never
-register real Discord commands.
+Une fusion dans `prod` ne déclenche pas d'apply. Le code du workflow de la
+référence choisie détermine les ressources traitées ; un répertoire Terraform
+supplémentaire n'est pas déployé automatiquement.
 
-## GitFlow
+## Événements et effets
 
-- `prod`: default branch, always deployable, protected (PR + review + green checks + signed commits).
-- `feature/*`: short-lived branches created from `prod`, one change each.
-- Releases are tags `vX.Y.Z` (semantic versioning) created on `prod`.
+| Événement | Contrôles | Plans distants | Effets |
+| --- | --- | --- | --- |
+| PR vers `prod` | Application et stacks sélectionnés | `foundation`, `bootstrap`, `serverless`, dev/prd selon les chemins | Aucun apply |
+| Lancement manuel de `Deploy` | Contrôles Terraform | Plan dans chaque job d'apply | `foundation` et `bootstrap` dev, puis `serverless` dev |
+| Push d'un tag `v*` | Contrôles Terraform | Plan dans chaque job d'apply | Dev, puis prd : `foundation` et `bootstrap`, puis `serverless` et `runners` prd selon leurs dépendances |
+| Lancement manuel de `Destroy` | Confirmation de l'environnement | Préparation du destroy | `serverless` et `runners` prd en parallèle, puis `foundation` |
 
-| Event | Checks | Plan dev + prd | Apply dev | Apply prd |
-|---|---|---|---|---|
-| PR `feature/*` → `prod` (`ci.yml`) | ✅ | ✅ | — | — |
-| Manual run of `deploy.yml` from any branch | ✅ | — | foundation + bootstrap → serverless | — |
-| Tag `v*` pushed (`deploy.yml`) | ✅ | — | foundation + bootstrap → serverless | foundation + bootstrap, then serverless and runners in parallel, after dev |
-| Manual run of `destroy.yml` | — | — | destroy dev or prd: serverless and runners (prd only), then foundation; bootstrap is kept | |
+`iam` et `access` s'appliquent manuellement. `bootstrap` s'applique par CI mais
+n'est pas ciblé par `Destroy`. Les plans d'apply ne sont pas les fichiers de
+plan des PR : chaque job recalcule son plan et l'applique sans pause de review
+entre ces deux étapes. Lire les plans de PR et approuver la release en amont.
 
-Checks: `terraform fmt -check`, `tflint` (rules in `.tflint.hcl`), `terraform validate` and `terraform test` (`*.tftest.hcl`) on each stack.
-Any failure stops the pipeline before plan or apply.
+Le contrôle d'appartenance du commit à `origin/prod` s'exécute dans `_apply.yml`
+pour prd, pas pour les applies dev. Le workflow ne vérifie pas la signature du
+tag ; la convention de signature et les protections GitHub sont distinctes.
 
-PR checks select changed directories: `foundation`, `iam`, `access`, `runners`,
-`bootstrap`, `serverless`, `serverless/modules/function`, `serverless/modules/api-gateway` and
-`serverless/modules/function-source`. The module entries run their mock-provider tests independently,
-since the root stack does not discover them. A change in `app/functions`, `app/shared/src` or
-`app/package-lock.json` also re-plans `serverless`.
-Remote PR plans cover `foundation` and `serverless` (dev and prd), when that stack changes. Release
-validation/tests also cover `bootstrap`, `serverless` and its modules by
-default. Deploy now applies `foundation` then `serverless` in each environment;
-destroy removes `serverless` before runners (prd) and `foundation`. Application
-secrets, the state bucket and every API live in `iam`, which is preserved, as is
-the bootstrap (registry, source bucket and build identity): their contents survive
-a destroy. Before any plan or apply of `serverless`, the CI builds the functions (`npm run build:functions`); Terraform zips and uploads them: see [functions.md](functions.md).
-See [the secrets runbook](../infra/iam/SECRETS.md) before
-triggering a workflow. Each apply job computes then applies its own plan without
-an intervening review pause; review the PR plans before tagging.
+## Workflows et contrôles
 
-## Workflows
+| Fichier | Rôle |
+| --- | --- |
+| `ci.yml` | Sélection des chemins, contrôles, plans dev/prd et agrégation `CI result` |
+| `_app-test.yml` | Node.js 24, Java 21, installation npm, types stricts, couverture, émulateurs et build des fonctions |
+| `_fmt.yml`, `_lint.yml` | Format Terraform et règles tflint |
+| `_validate.yml`, `_test.yml` | Validation et tests Terraform par stack/module |
+| `_plan.yml` | Plan PR avec l'identité de lecture de `<env>-plan` |
+| `_apply.yml` | Authentification, build serverless, plan et apply du stack |
+| `_destroy.yml` | Authentification, build serverless pour rafraîchir les archives, puis destroy |
+| `deploy.yml`, `destroy.yml` | Orchestration et choix des environnements/stacks |
 
-### Accès humains (appliqués à la main)
+Sur chaque PR vers `prod`, le job `application` exécute les vérifications strictes
+TypeScript, les tests Vitest avec un seuil de couverture de 70 % par fichier,
+puis les tests d'intégration Firestore/Pub/Sub et le build. Les émulateurs
+utilisent un projet fictif sans accès GCP. Les rapports JUnit et de couverture
+sont attachés au run. Voir [les commandes de test](testing.md).
 
-`infra/access` n'est appliqué par aucun workflow, ni en dev ni en prd : Xekko
-l'applique en local avec ses identifiants, comme `infra/iam`. Il gère les rôles
-`editor` de l'équipe et de l'instructeur, le `billing.viewer` de l'instructeur
-(prd) et la lecture des deux secrets Discord dev. Aucune identité de CI n'a le
-droit de modifier l'IAM d'un projet. Voir le [runbook access](../infra/access/README.md).
-Les states IAM/access sont persistants et ne sont ciblés ni par Deploy ni par
-Destroy, pas plus que les secrets applicatifs (gérés par `infra/iam`) : les
-attributions de lecture survivent donc à un destroy.
+Le job `CI result` est toujours publié, même lorsque des stacks sont ignorés, et
+échoue si un job requis échoue ou est annulé. Le sélectionner comme contrôle
+requis dans la protection de `prod`. Les rapports de test sont des preuves
+d'exécution du run, pas une affirmation de couverture métier globale.
 
-Le filtre de PR et les contrôles locaux de release incluent maintenant `access`.
-Ils n'appliquent pas de droits ; aucune authentification GCP dans ces tests simulés.
+## Filtrage des chemins pour les pull requests
 
-```
-.github/workflows/
-├── ci.yml          # PR → prod: fmt + validate + test → plan dev + prd (foundation, serverless)
-├── deploy.yml      # foundation + serverless dev, then foundation prd → serverless + runners (tag only)
-├── destroy.yml     # typed confirmation; serverless + runners (prd only), then foundation
-├── _fmt.yml        # reusable steps, never run directly
-├── _lint.yml
-├── _validate.yml
-├── _test.yml
-├── _plan.yml
-├── _apply.yml
-└── _destroy.yml
-```
+`dorny/paths-filter` sélectionne les contrôles Terraform. Consulter les filtres
+de `ci.yml` pour les motifs exacts et les jobs réutilisables pour leurs valeurs
+par défaut.
 
-- Environment-specific values come from `backends/<env>.hcl`, `<env>.tfvars` and the GitHub environment variables. `<env>` is `dev` or `prd`.
-- `_apply.yml` refuses to apply `prd` from a commit that is not on `prod`.
-- Apply and destroy never run concurrently on the same environment and stack.
-- Plans are written to the run summary.
-- **Runner**: every job runs on the `runner` input if set, then on the `RUNNER_LABEL` repository variable, then on `ubuntu-latest`.
-  See [Self-hosted runners](#self-hosted-runners) for the exceptions.
+| Chemin | Validation/tests Terraform | Plan dev/prd |
+| --- | --- | --- |
+| `infra/foundation/**` | `foundation` | Oui |
+| `infra/bootstrap/**` | `bootstrap` | Oui |
+| `infra/serverless/**` | `serverless`, modules concernés | Oui |
+| `app/functions/**`, `app/shared/src/**`, manifeste partagé, lockfile npm | `serverless` | Oui |
+| `infra/iam/**`, `infra/access/**` | Stack concerné | Non, application manuelle |
+| `infra/runners/**` | `runners` | Non |
+| `.github/workflows/**` | Ensemble des stacks sélectionnés par les filtres | Selon les jobs de plan |
+| Documentation seule | Pas de contrôle Terraform sélectionné par ces chemins | Non |
 
-## Path filtering (pull requests only)
+Le job applicatif n'est pas soumis à ce filtrage Terraform. Les tests des modules
+`function`, `api-gateway` et `function-source` sont lancés séparément : Terraform
+ne découvre pas leurs tests depuis la racine du stack. `.tflint.hcl` déclenche les
+filtres qui le référencent ; ne pas supposer que tout fichier de configuration
+relance tous les jobs.
 
-On a PR, `ci.yml` only checks the stacks whose directory changed (job `changes`, `dorny/paths-filter`).
-A change under `.github/workflows/` or to `.tflint.hcl` re-checks every stack.
+Les plans de `runners` ne sont pas exécutés en PR : le rafraîchissement des
+releases Helm lit des secrets Kubernetes, ce que le planner ne doit pas faire.
+Le plan correspondant est visible dans le job d'apply.
 
-| PR changes… | fmt / lint | validate / test | plan dev + prd |
-|---|---|---|---|
-| nothing under `infra/` or `.github/workflows/` (e.g. `docs/`) | skipped | skipped | skipped |
-| `infra/iam/**` | ✅ | iam | skipped (never applied by the CI) |
-| `infra/foundation/**` | ✅ | foundation | ✅ |
-| `infra/bootstrap/**` | ✅ | bootstrap | ✅ |
-| `infra/serverless/**` | ✅ | serverless (+ module) | ✅ |
-| `infra/access/**` | ✅ | access | skipped (applied by hand) |
-| `infra/runners/**` | ✅ | runners | skipped (see below) |
-| `.github/workflows/**` or `.tflint.hcl` | ✅ | all stacks | ✅ |
+## Authentification : fédération d'identité Workload Identity
 
-The **`CI result`** job always runs and fails if any other job failed. It is the check to mark as required on `prod`.
+Chaque job obtient un token OIDC GitHub échangé contre des credentials GCP
+temporaires, sous les conditions du dépôt et de l'environnement déclarées dans
+`infra/iam`. Aucune clé JSON de compte de service n'est stockée dans GitHub.
 
-To add a stack, add an entry to the `filters` of the `changes` job.
-`deploy.yml` and `destroy.yml` are not path-filtered: they process their explicitly
-listed stacks, not every directory under `infra/`. A new directory is not
-automatically deployed. A merge/push to `prod` alone does not trigger Deploy.
+| Identité | Environnement GitHub | Usage |
+| --- | --- | --- |
+| `github-planner` | `<env>-plan` | Plans PR, lecture seule, sans verrou d'écriture du state |
+| `github-terraform` | `<env>` | Apply et destroy, avec verrou du state |
 
-## Authentication: Workload Identity Federation
+Les rôles projet sont configurables par `planner_roles`/`deployer_roles`. Le code
+IAM ajoute des rôles personnalisés pour les policies des ressources et des
+attributions ciblées sur les secrets/comptes de service persistants. Le bootstrap
+donne au planner la lecture des objets du bucket de sources. Consulter
+`infra/iam/deployer-iam.tf`, `iam.tf`, `secrets.tf`, `runners.tf` et
+`infra/bootstrap/functions.tf` pour le périmètre exact ; ne pas confondre accès
+aux métadonnées/policies d'un secret et lecture de sa valeur.
 
-No cloud key is stored in GitHub. Each job gets a short-lived OIDC token, and GCP exchanges it for temporary credentials only if it comes from this repository **and** the right GitHub environment.
+Les environnements GitHub, variables `WIF_PROVIDER` et `DEPLOYER_SA`, reviewers et
+restrictions de références sont déclarés dans `infra/iam`. Les règles réellement
+appliquées dépendent de la configuration et des fonctionnalités GitHub du dépôt.
+Les protections de branche se vérifient séparément dans les paramètres GitHub.
 
-Each GCP project has two service accounts:
+## Construction et déploiement des fonctions
 
-| Service account | Roles | Usable from GitHub environment | Used by |
-|---|---|---|---|
-| `github-terraform` (deployer) | `roles/editor`, `roles/resourcemanager.projectIamAdmin`, `roles/container.admin` | `<env>` | apply, destroy |
-| `github-planner` (read-only) | `roles/viewer` | `<env>-plan` | PR plans |
+Avant un plan/apply serverless, la CI installe les dépendances depuis le lockfile
+du dépôt et lance `npm run build:functions`. Le module `function-source` crée le
+ZIP et l'objet GCS ; `function` déploie depuis sa génération exacte.
 
-Both are created by the `infra/iam` stack. Their project roles also give them access to the state bucket
-(GCP grants `projectEditor` write and `projectViewer` read on objects by default).
+Avant le destroy serverless, le même build fournit les fichiers nécessaires au
+rafraîchissement de `archive_file` sur un runner neuf. Sans eux, la préparation
+du destroy peut échouer avant toute suppression.
 
-The deployer also gets two custom roles bound **per resource**, never on the project (`deployer-iam.tf`):
-`getIamPolicy`/`setIamPolicy` on each application secret, so that `infra/serverless` can grant
-`secretAccessor` to a function, and on the `external-secrets` service account, so that `infra/runners`
-can add its Workload Identity binding. It cannot create, update or delete these resources.
+Le build CI utilise le lockfile du dépôt ; le manifeste livré à Cloud Build ne
+contient pas de lockfile de déploiement. Dev et prd construisent chacun depuis
+le commit sélectionné : ne pas assimiler cela à une promotion d'archives
+identiques. Voir [les sources des fonctions](functions.md) et ADR-0009.
 
-PR plans run with the read-only identity and `-lock=false`. A PR can therefore never modify an environment, and `prd` approvals are only requested for real deploys.
+L'enregistrement des commandes Discord est une opération distincte, décrite
+dans [son guide](discord-commands.md). `Deploy` n'exécute pas ce script. Les PR et
+tests n'enregistrent aucune commande réelle.
 
-## One-time setup
+## Runners auto-hébergés
 
-### 1. Apply `infra/iam` by hand (once per environment)
+`infra/runners` installe External Secrets et ARC sur le cluster de foundation
+prd. External Secrets lit `arc-github-app` via Workload Identity for GKE et crée
+le secret Kubernetes utilisé par ARC. Chaque job obtient un pod runner éphémère
+sur le pool dédié ; les pods en attente contribuent au déclenchement de
+l'autoscaling du pool.
 
-The `infra/iam` stack creates, for one environment:
+### Affectation des jobs aux runners
 
-- **in GCP**: every API of the project, the state bucket (imported, `prevent_destroy`), the Workload Identity
-  pool and provider, the `github-terraform` and `github-planner` service accounts, the budget, and the
-  Secret Manager containers (application secrets and, in prd, `arc-github-app`), without values;
-- **in GitHub**: the `<env>` and `<env>-plan` environments, with their `WIF_PROVIDER` and `DEPLOYER_SA` variables.
-  For `prd`, it also requires a reviewer and only allows deploys from the `prod` branch and `v*` tags (see `prd.tfvars`).
+- Pour les contrôles/PR : input `runner`, puis `vars.RUNNER_LABEL`, puis
+  `ubuntu-latest` selon le job réutilisable.
+- Les jobs d'apply/destroy orchestrés déclarent `ubuntu-latest` explicitement,
+  pour rester indépendants de l'infrastructure modifiée.
+- `changes` et `CI result`, ainsi que les tests applicatifs, utilisent un runner
+  GitHub hébergé conformément à leurs fichiers de workflow.
 
-It lives in its own stack so that destroying `foundation` never removes the CI identities.
-The CI only checks this stack (fmt, validate, test) and never applies it: the CI cannot create the identity it uses to log in.
-Apply it by hand, with your own accounts, once per environment and whenever `infra/iam` changes.
-`just manual` (or `scripts/apply-manual.sh [dev|prd|all] [iam|access|all]`) runs `iam` then `access`
-for each environment: it checks that HEAD is `origin/prod`, sets `GITHUB_TOKEN` from `gh`, shows each
-plan and applies it only after confirmation, and requires typing `destroy` when a plan deletes or replaces.
-The GitHub token must belong to a repository admin.
+`infra/runners` gère la variable de dépôt `RUNNER_LABEL`. Si elle pointe vers un
+scale set indisponible, un contrôle peut rester en file. Pour un workflow qui
+expose l'input, renseigner `runner=ubuntu-latest`. Le retrait de la variable est
+une modification GitHub distincte à valider, pas un diagnostic sans effet.
 
-```sh
-cd infra/iam
-export GITHUB_TOKEN=$(gh auth token)
+### Application GitHub pour les runners
 
-terraform init -reconfigure -backend-config=backends/dev.hcl
-terraform apply -var-file=dev.tfvars
+1. Créer une GitHub App et l'installer sur le seul dépôt concerné. Permissions
+   de dépôt : administration lecture/écriture pour les runners, variables
+   lecture/écriture, métadonnées lecture. Pas de webhook requis par ce parcours.
+2. Après création du conteneur par `infra/iam` prd, préparer hors du dépôt un
+   fichier accessible au seul propriétaire avec le schéma :
 
-terraform init -reconfigure -backend-config=backends/prd.hcl
-terraform apply -var-file=prd.tfvars
-```
-
-Apply `infra/iam` before any CI deploy: it enables every API and gives the deployer the
-`deployerResourceIamPolicy` role (IAM policies of buckets, registries, functions, Cloud Run
-services and Pub/Sub, which `roles/editor` lacks) and the planner `plannerResourceIamRead`.
-Every other stack except `access` (also applied by hand) is then deployed by the CI;
-`bootstrap` is applied by Deploy but never destroyed.
-
-### 2. Self-hosted runners (prd)
-
-See [Self-hosted runners](#self-hosted-runners): create the GitHub App and add the secret version once `infra/iam` (prd) is applied.
-
-### 3. Branch protection on `prod`
-
-Require a pull request with 1 approval, the `CI result` check passing, and signed commits.
-
-The **Run workflow** button of `deploy.yml` and `destroy.yml` only appears once they are on `prod`, the default branch.
-
-## Self-hosted runners
-
-Stack `infra/runners`, deployed in **prd only**, on the GKE cluster of `infra/foundation` (`enable_cluster = true` in prd).
-
-```
-Secret Manager "arc-github-app"  (GitHub App credentials, added by hand)
-      │  Workload Identity (KSA external-secrets/external-secrets → GSA external-secrets)
-      ▼
-External Secrets Operator (Helm, ns external-secrets) ──► Kubernetes secret "arc-github-app" (ns arc-runners)
-                                                                │
-Actions Runner Controller (Helm, ns arc-systems)                ▼
-Runner scale set "pixelwar-runners" (Helm, ns arc-runners) ──► registers on the repository
-      │  one ephemeral pod per job: nodeSelector pool=runners + toleration dedicated=runners
-      ▼
-Node pool "runners": 0 → 3 nodes (GKE cluster autoscaler)
-```
-
-- **Helm through Terraform**: `helm_release` with pinned chart versions and values in `infra/runners/values/<chart>-<env>.yaml[.tftpl]`.
-- **Dynamic registration**: runners are ephemeral. ARC creates a runner per job and removes it afterwards; destroying the release removes the scale set from GitHub (no stale registration).
-- **Node autoscaling**: a pending runner pod makes the `runners` pool grow (0 → 3); idle nodes are removed (`OPTIMIZE_UTILIZATION` profile).
-
-### Job routing
-
-| Job | Runner |
-|---|---|
-| fmt, validate, test, plan (every stack) | `RUNNER_LABEL` if set, otherwise `ubuntu-latest` |
-| apply / destroy of `foundation` and `runners` | always `ubuntu-latest`: they create, change or delete the runners themselves |
-
-`RUNNER_LABEL` (repository variable) is created by `infra/runners` once the scale set is installed, and deleted on destroy:
-the first deploy and any run after a destroy use `ubuntu-latest`, then jobs move to the self-hosted runners automatically.
-If the runners are broken while the variable exists, jobs stay queued: run a workflow with `runner = ubuntu-latest`,
-or `gh variable delete RUNNER_LABEL` until the next apply of `infra/runners`.
-
-PRs do not plan `infra/runners` (fmt, validate and test only): refreshing Helm releases reads Kubernetes secrets,
-which the read-only planner must not access. Its plan is shown in the apply job of each release.
-
-### GitHub App (one-time, manual)
-
-1. Create a GitHub App owned by the repository owner. Repository permissions: *Administration: read & write* (self-hosted runners),
-   *Variables: read & write* (`RUNNER_LABEL`), *Metadata: read*. No webhook. Install it on this repository only.
-2. Apply `infra/iam` in prd (creates the empty `arc-github-app` secret), then add its value:
-
-   ```sh
-   # arc-github-app.json:
-   # {"github_app_id": "<Client ID>", "github_app_installation_id": "<installation ID>", "github_app_private_key": "<content of the .pem>"}
-   gcloud secrets versions add arc-github-app --project=cloud-pixelwar-prod --data-file=arc-github-app.json
-   rm arc-github-app.json <app>.private-key.pem
+   ```json
+   {"github_app_id":"<Client ID>","github_app_installation_id":"<installation ID>","github_app_private_key":"<contenu PEM>"}
    ```
 
-The key is never in the repository, a Terraform state or GitHub secrets: External Secrets Operator reads it in the cluster,
-and the deploy jobs of `infra/runners` read it in memory to mint a one-hour GitHub App token (`actions/create-github-app-token`).
+3. Ajouter la version à Secret Manager sans afficher sa valeur :
 
-### Cost safety
+   ```sh
+   gcloud secrets versions add arc-github-app --project=cloud-pixelwar-prod \
+     --data-file=/chemin/hors-du-depot/arc-github-app.json
+   ```
 
-- `runners` node pool: `e2-standard-2`, 0 to 6 nodes; runner pods request 1 vCPU / 2 GiB (about one runner per node), `maxRunners: 6`. The cap keeps the cluster within the 16 vCPU quota (see [GCP projects and costs](gcp.md)).
-- `system` node pool: one spot `e2-medium` for the controller and system pods.
-- Budget alerts per project (`infra/iam/budget.tf`): 20 EUR, emails at 50 %, 90 % and 100 % (see [GCP projects and costs](gcp.md)).
-- Runner activity: Cloud Logging, `resource.type="k8s_container" AND resource.labels.namespace_name=("arc-runners" OR "arc-systems")`.
+4. Retirer les fichiers sensibles selon les règles de stockage sécurisé du poste.
+   Ne pas les placer dans Git, les plans ou un ticket.
+
+External Secrets lit la valeur dans le cluster. Les jobs runners la lisent en
+mémoire pour obtenir un token d'installation GitHub de courte durée avec
+`actions/create-github-app-token`. Cela ne donne pas aux fonctions applicatives
+accès au secret.
+
+## Vérification, concurrence et diagnostic
+
+- Chaque apply/destroy est sérialisé par environnement **et stack**, sans
+  annulation de l'opération en cours. Ce n'est pas un verrou global de release.
+- Les plans PR utilisent `-lock=false` avec une identité de lecture. Si le state
+  n'existe pas, `_plan.yml` peut produire un plan contre un state local vide ;
+  le résumé le signale. Ce plan n'est pas une preuve de création de l'environnement.
+- Les plans sont publiés dans le résumé du run. Ne pas publier un plan ou state
+  brut contenant des informations sensibles ailleurs.
+- Vérifier les approbations, références et runners du run avant de diagnostiquer
+  un job en attente ; consulter Cloud Build pour les erreurs de build de fonction.
+- Vérifier les plafonds de pools, `maxRunners`, quotas et budgets avant une montée
+  en charge, selon [le guide GCP](gcp.md).
+
+Pour les commandes de lancement, les prérequis, le retour arrière et les limites
+du nettoyage, utiliser le [guide de déploiement](deployment.md).

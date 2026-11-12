@@ -4,7 +4,11 @@
 
 ### 1. Installer les outils
 
-Il faut `just`, `terraform`, `tflint`, `gitleaks` et `lefthook`. Chacun les installe comme il veut, en dernière version, sauf **Terraform**, qui doit être à la même version que `TF_VERSION` dans `.github/workflows/_*.yml` (aujourd'hui `1.17.0`).
+Les contrôles d'infrastructure utilisent `just`, `terraform`, `tflint`, `gitleaks`
+et `lefthook`. Installer **Terraform à la version déclarée par `TF_VERSION` dans
+les workflows et `tf_version` dans le `justfile`**. Pour les autres outils,
+utiliser une version compatible avec les configurations du dépôt et contrôler
+les changements de comportement lors d'une mise à jour.
 
 Windows (winget) :
 
@@ -22,7 +26,20 @@ brew install just tflint gitleaks lefthook hashicorp/tap/terraform
 
 Le Terraform de Homebrew core est bloqué en 1.5 : passer par `hashicorp/tap`. Sans Homebrew, chaque outil publie des binaires dans ses releases GitHub.
 
-Plus tard, l'application demandera aussi Node.js 24 (LTS, voir l'[ADR-0008](adr/0008-compute-cloud-run-functions.md)), et les déploiements Helm, kubectl et gcloud.
+Selon l'opération, installer également :
+
+| Usage | Outils |
+| --- | --- |
+| Application, build des fonctions et commandes Discord | Node.js 24 et npm, selon `app/package.json` |
+| Émulateurs Firestore/Pub/Sub | Java 21 et outils npm du projet |
+| Authentification et opérations GCP | Google Cloud CLI (`gcloud`) |
+| GitHub et script d'application manuelle | Git, GitHub CLI (`gh`), `jq` et Bash |
+| Diagnostic du cluster et des releases | `kubectl` et Helm ; le déploiement CI utilise les providers Terraform |
+| Vérification des workflows | `actionlint`, en complément des tests CI |
+
+Installer les outils depuis leurs distributions officielles. Les exemples
+d'installation ci-dessus ne garantissent pas une version précise : vérifier les
+versions avant `just setup` et suivre les [prérequis de test](testing.md).
 
 ### 2. Lancer `just setup`
 

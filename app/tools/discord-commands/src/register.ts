@@ -40,6 +40,29 @@ interface Dependencies {
   sleep: (milliseconds: number) => Promise<void>;
 }
 
+/** Add/update only this guild command; never bulk-overwrite the existing catalogue. */
+export function helloRegistrationPlan(target: Target) {
+  const plan = registrationPlan(target);
+  if (target.environment !== 'dev') throw new Error('The temporary hello command is dev-only.');
+  return {
+    url: plan.url,
+    method: 'POST' as const,
+    commands: [{
+      type: 1, name: 'hello', description: 'Tester le callback Discord de développement.',
+      default_member_permissions: null,
+      options: [{ type: 3, name: 'nom', description: 'Nom à saluer.', required: true, min_length: 1, max_length: 80 }],
+    }],
+  };
+}
+
+export async function registerHelloCommand(
+  target: Target, token: string, confirmation: string,
+  dependencies: Dependencies = { fetch: globalThis.fetch, sleep: async (ms) => { await setTimeout(ms); } },
+): Promise<void> {
+  const plan = helloRegistrationPlan(target);
+  await sendRegistration(target, token, confirmation, dependencies, plan.url, plan.method, plan.commands[0]);
+}
+
 /** Deterministic PUT: replaces every command in this scope, including unlisted commands. */
 export async function registerCommands(
   target: Target,
@@ -48,15 +71,22 @@ export async function registerCommands(
   dependencies: Dependencies = { fetch: globalThis.fetch, sleep: async (ms) => { await setTimeout(ms); } },
 ): Promise<void> {
   const plan = registrationPlan(target);
+  await sendRegistration(target, token, confirmation, dependencies, plan.url, 'PUT', plan.commands);
+}
+
+async function sendRegistration(
+  target: Target, token: string, confirmation: string, dependencies: Dependencies,
+  url: string, method: 'PUT' | 'POST', payload: unknown,
+): Promise<void> {
   if (confirmation !== target.applicationId) throw new Error('Confirm the target application ID before applying.');
   if (!token || /\s/.test(token)) throw new Error('A nonempty DISCORD_BOT_TOKEN without whitespace is required.');
-  const body = JSON.stringify(plan.commands);
+  const body = JSON.stringify(payload);
   // Four attempts maximum. Never print the token, raw errors or Discord response bodies.
   for (let attempt = 0; attempt < 4; attempt++) {
     let response: Response;
     try {
-      response = await dependencies.fetch(plan.url, {
-        method: 'PUT', headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' },
+      response = await dependencies.fetch(url, {
+        method, headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' },
         body, redirect: 'error', signal: AbortSignal.timeout(15_000),
       });
     } catch {

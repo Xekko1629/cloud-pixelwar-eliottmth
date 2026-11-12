@@ -125,7 +125,7 @@ Voir [le contrat et les limites d'intégration DATA-03](../rate-limits.md).
 
 ### Écriture
 
-- Un lot accepté est plafonné à **500 pixels** par défaut, valeur configurable. Un trait plus long est redécoupé côté client ; un lot qui dépasse les budgets de tuiles, de documents ou d'octets est refusé explicitement, pas appliqué partiellement. Le budget transactionnel exact reste à mesurer avec DATA-02.
+- Un lot accepté est plafonné à **500 pixels** par défaut, valeur configurable. Un trait plus long est redécoupé côté client ; un lot qui dépasse les budgets de tuiles, de documents ou d'octets est refusé explicitement, pas appliqué partiellement. Le dimensionnement du budget transactionnel exige une mesure sur la représentation réellement écrite.
 - Le `draw-worker` groupe les pixels d'un lot **par tuile** : une écriture pour le document de couleurs et une pour celui des métadonnées de chaque tuile touchée, dans une transaction qui écrit aussi **un delta par région** (ADR-0003). Un lot touchant `T` tuiles et `R` régions écrit donc `2T + R` documents, avant les documents annexes (déduplication, quota, `bounds`) ; le code partagé expose ce calcul et un budget configurable.
 - La concurrence maximale du worker est plafonnée (DRAW-02), pour rester sous le débit qu'un document de tuile supporte.
 - `bounds` n'est réécrit que si le lot sort du rectangle actuel, ce qui devient vite rare. Ce document ne devient donc pas un point chaud en écriture.
@@ -161,10 +161,3 @@ Voir [le contrat et les limites d'intégration DATA-03](../rate-limits.md).
 - Une tuile très sollicitée (beaucoup de pixels au même endroit pendant le test de charge) peut provoquer des conflits de transaction. À mesurer pendant OBS-05a, et à atténuer en plafonnant la concurrence du worker.
 - `/admin size` ne fait pas partie des commandes imposées par le sujet (§3.2), qui demande d'implémenter « exactly these ». On la présente comme une commande en plus, qui ne modifie aucune des commandes obligatoires. À signaler à l'encadrant, en même temps que la question de l'ADR-0004.
 - Changer la taille des tuiles ou des régions après coup impose de migrer toutes les données. Ces valeurs sont donc fixées ici, et ne changeront que par un nouvel ADR.
-
-## En soutenance
-
-- « La grille est infinie : on ne stocke que les tuiles de 64×64 où quelque chose a été peint, donc le coût suit le dessin, pas la taille. »
-- « Un admin peut la borner avec `/admin size`, sans redéployer. Le `draw-worker` applique la taille, comme la pause, et le frontend affiche le bord en temps réel. »
-- « On sépare les couleurs, 4 Kio par tuile et chargées par le canvas, des métadonnées, chargées seulement à l'inspection. 64, parce que les métadonnées doivent tenir sous la limite de 1 Mio d'un document Firestore. »
-- « Pour dézoomer, on affiche une pyramide d'images basse résolution, comme une carte. `/get` et `/snapshot` rendent la zone peinte, pas l'infini. »

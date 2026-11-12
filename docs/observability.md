@@ -1,4 +1,4 @@
-# SRV-08 — Observabilité commune des services
+# Observabilité des fonctions
 
 ## Périmètre et décisions
 
@@ -7,10 +7,10 @@ logs JSON vers stdout, spans manuels par requête/message, contexte W3C et métr
 métier. Aucun démarrage réseau ou SDK lors d'un simple import.
 Elle ne doit pas entrer dans le bundle du frontend.
 
-OpenTelemetry est demandé par #38. L'export retenu est **OTLP HTTP/protobuf** vers
-la Telemetry API GCP, avec ADC et rafraîchissement des tokens. Les anciens paquets
-`@google-cloud/opentelemetry-cloud-*-exporter` annoncent leur dépréciation et leur
-archivage après le 30 octobre 2026 : ils ne sont pas introduits ici.
+L'export retenu est **OTLP HTTP/protobuf** vers la Telemetry API GCP, avec ADC et
+rafraîchissement des tokens. Les exporteurs directs historiques
+`@google-cloud/opentelemetry-cloud-*-exporter` ne sont pas utilisés ; consulter
+la référence de migration OpenTelemetry Google pour les contraintes d'export.
 La bibliothèque utilise la famille SDK OpenTelemetry 3 / exporteurs 0.300 et API
 1.10 ; les versions sont fixées dans le lockfile, sans forcer les peer dependencies.
 
@@ -21,10 +21,10 @@ Ce choix ne revendique pas de gain de performance mesuré.
 
 Un Collector Cloud Run est une autre option recommandée par Google lorsque
 l'environnement s'y prête ; il ajouterait un composant à déployer/configurer.
-L'export direct est retenu pour ce premier socle. Aucun Collector applicatif ne
+L'export direct est utilisé par la bibliothèque. Aucun Collector applicatif ne
 doit être installé sur le GKE réservé aux runners.
 
-## Contrat de propagation (à brancher dans les futurs services)
+## Contrat de propagation
 
 ```mermaid
 flowchart LR
@@ -37,7 +37,8 @@ flowchart LR
     W -.-> L
 ```
 
-Ce schéma décrit l'API de la bibliothèque, pas un flux métier déjà déployé.
+Ce schéma représente le contrat des wrappers ; leur utilisation par un handler
+détermine les traces et attributs effectivement émis.
 
 ## Initialisation : une instance par processus de service
 
@@ -64,9 +65,9 @@ En local, utiliser `createObservability` avec des exporteurs en mémoire ou sans
 exporteur (logs uniquement). Sans exporteur, aucune donnée de trace/métrique n'est
 envoyée ; ce n'est pas un mode de production instrumenté complet.
 
-Le paquet expose des **sources TypeScript**, comme le workspace initial.
-SRV-02 devra les compiler ou les bundler dans l'archive de sources ; ces exemples ne sont
-pas une promesse d'exécution directe par Node des imports TypeScript actuels.
+Le paquet expose des **sources TypeScript**. Le [build des fonctions](functions.md)
+les regroupe dans le JavaScript livré à Cloud Build ; ces exemples ne supposent
+pas une exécution directe des imports TypeScript par le runtime.
 
 ## Proxy : générer, publier puis répondre
 
@@ -98,7 +99,7 @@ message concurrent. Le baggage n'est ni extrait ni propagé.
 
 ```ts
 await obs.message('pixel-draw', pushBody.message.attributes ?? {}, async () => {
-  await commitPixels(event); // traitement métier à implémenter dans DRAW-02
+  await commitPixels(event); // opération métier de l'appelant
   obs.pixels.processed(event.pixels.length, event.source);
   obs.pixels.latency(event.occurred_at); // appeler après le commit réel
   await nextTopic.publishMessage({
@@ -119,7 +120,7 @@ des paramètres sensibles ou un nom de span par utilisateur.
 Les providers/context managers sont propres à cette instance ; ils ne remplacent
 pas les providers globaux OpenTelemetry du processus. Cela évite les effets de
 bord, mais signifie que les spans des SDK tiers ne sont pas automatiquement reliés.
-Une auto-instrumentation future nécessite une décision de bootstrap cohérente :
+L'ajout d'une auto-instrumentation exige un bootstrap cohérent :
 ne pas installer un second SDK global au hasard.
 
 ## Logs et données sensibles
@@ -165,8 +166,9 @@ avant d'écrire les dashboards/alertes DRAW-05 et OBS-02.
 
 ## Cloud Run : exporter avant de répondre
 
-Le module Cloud Run utilise `cpu_idle = true`. Ne pas compter uniquement sur les
-timers d'export en arrière-plan lorsque la requête est terminée.
+Le contrat des Cloud Run functions impose de terminer le travail avant la réponse.
+Ne pas compter uniquement sur les timers d'export en arrière-plan lorsque la
+requête est terminée.
 Après `obs.request`/`obs.message`, appeler et attendre `obs.flush()` **avant** la
 réponse HTTP/ack Pub/Sub. Le span est alors terminé et peut être exporté.
 Les erreurs d'export ne doivent pas transformer un traitement métier réussi en
@@ -193,19 +195,20 @@ La bibliothèque n'installe pas de handler global ni de `process.exit` à l'impo
 
 ## Infrastructure et coûts
 
-Le bootstrap active Logging, Monitoring, Trace et Telemetry (sans les désactiver
-au destroy). Le module function conserve les trois rôles demandés par #38 et ajoute
-`roles/telemetry.tracesWriter` pour l'ingestion OTLP. Si un quota project ADC
+Le stack `iam` active Logging, Monitoring, Trace et Telemetry sans désactiver les
+APIs lors d'un destroy. Le module `function` attribue au runtime
+`logging.logWriter`, `cloudtrace.agent`, `monitoring.metricWriter` et
+`telemetry.tracesWriter`. Si un projet de quota ADC
 distinct est configuré, vérifier également `serviceusage.services.use` sur ce
 projet ; ne pas distribuer des droits supplémentaires sans besoin démontré.
 
-Ces attributions sont à l'identité runtime, pas aux utilisateurs finaux. Aucun
-service n'est exposé publiquement par ce changement et aucune clé n'est ajoutée.
+Ces attributions concernent l'identité runtime, pas les utilisateurs finaux, et
+ne créent aucun droit d'invocation anonyme. L'export utilise ADC, sans clé JSON.
 Les exports entraînent trafic, latence, consommation CPU et ingestion facturable.
 La fréquence métrique est 60 s ; l'échantillonnage traces est configurable et respecte
-le sampling du parent W3C. Évaluer les coûts et le volume avant charge/démonstration.
+le sampling du parent W3C. Évaluer les coûts et le volume avant une montée en charge.
 
-## Validation et limites actuelles
+## Vérification locale
 
 Depuis `app/` : `npm run typecheck`, `npm run test:coverage`, `npm run test:integration`.
 Les tests vérifient parenté proxy/worker, corrélation des logs, concurrence,
@@ -213,11 +216,24 @@ erreurs, métriques, paramètres OTLP et renouvellement des headers simulé.
 Un test d'intégration envoie de vrais lots OTLP/protobuf à un récepteur HTTP local.
 Les tests Terraform vérifient les ressources et le rôle supplémentaire.
 
-**Pas encore prouvé :** réception réelle des données par GCP, mapping exact des
-métriques, permissions runtime effectives et latence du flush sous Cloud Run.
-SRV-09 doit montrer un log, une trace et des métriques sur dev avec l'identité
-réelle. Aucun proxy ni worker métier n'est instrumenté tant qu'il n'utilise pas
-explicitement ces wrappers.
+Les tests locaux ne prouvent pas la réception par GCP ni les droits runtime.
+
+## Vérification en environnement GCP
+
+1. Déployer une fonction utilisant les wrappers et les exporteurs GCP, avec son
+   identité runtime et les rôles du module `function`.
+2. Produire une requête de test et retrouver le log JSON, son `correlation_id`,
+   puis la trace reliée dans Logs Explorer et Cloud Trace.
+3. Pour un message, vérifier les attributs Pub/Sub et la parenté du span consommateur.
+4. Vérifier les types et labels réellement ingérés dans Metrics Explorer avant
+   de configurer les tableaux de bord et alertes.
+5. Mesurer la latence totale, flush compris, et vérifier les erreurs d'export
+   sans rejouer une opération métier réussie.
+
+En cas d'absence de données, contrôler APIs, identité ADC, projet de quota,
+permissions, échantillonnage et erreurs d'export. Conserver les résultats dans
+les rapports de test ou les tickets. Un handler utilisant uniquement le logger
+n'émet pas automatiquement des traces et métriques.
 
 ## Sources (consultées le 29 octobre 2026)
 

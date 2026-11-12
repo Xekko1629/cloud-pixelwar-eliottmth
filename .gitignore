@@ -29,6 +29,7 @@ node_modules/
 dist/
 build/
 coverage/
+test-results/
 *.tsbuildinfo
 npm-debug.log*
 

@@ -71,9 +71,3 @@ Elles passent aussi par Pub/Sub, pour n'avoir qu'un seul mécanisme de livraison
 - Un service account d'invocation en plus par worker. Le module `function` le crée (SRV-01).
 - En push, le worker doit répondre avant la fin du délai d'acquittement (600 s au maximum). Pour les traitements longs, comme le rendu d'image, il faut régler ce délai et le timeout Cloud Run ensemble.
 - L'ordre n'est pas garanti : l'idempotence des workers est obligatoire, pas optionnelle.
-
-## En soutenance
-
-- « Le proxy publie et répond. Pub/Sub pousse le message vers le worker avec un token OIDC, et c'est Cloud Run qui vérifie ce token. En cas d'échec, il y a des retries avec backoff, puis la DLQ. »
-- « Eventarc a été écarté parce qu'on ne peut pas lui attacher de DLQ en Terraform. »
-- « Les événements du bucket et du scheduler passent aussi par Pub/Sub : un seul mécanisme, une seule façon de surveiller. »

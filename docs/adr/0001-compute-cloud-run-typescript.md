@@ -13,7 +13,7 @@
   - les **Cloud Run functions** (ex-Cloud Functions gen2) : on fournit les sources, et Cloud Build construit l'image au moment du déploiement.
 - SRV-02 exige qu'une release construise chaque image **une seule fois**, puis déploie le même digest en dev et en prd.
 - Le frontend tourne dans le navigateur : il sera de toute façon en TypeScript ou en JavaScript.
-- Chaque membre doit pouvoir expliquer tout le code à la soutenance, pas seulement sa partie (§5, §5.5).
+- Un langage commun limite le coût d'appropriation et de maintenance du code partagé.
 
 ## Décision
 
@@ -50,8 +50,8 @@ Tous les proxies et workers sont des **services Cloud Run**, déployés par Terr
 |---|---|
 | Cloud Run functions (gen2) | L'image est reconstruite à chaque déploiement, dans chaque environnement : dev et prd n'exécutent pas le même artefact, ce qui contredit SRV-02. Le build a lieu pendant `terraform apply` (Cloud Build), ce qui rallonge l'apply et le rend plus fragile. Leur seul avantage, ne pas gérer le build, est traité par FND-06c. |
 | Python 3.13 | Pillow est excellent pour le rendu d'images. Mais le projet aurait deux langages (Python pour le backend, TypeScript pour le frontend), et le code commun (palette, bornes de la grille, découpage en tuiles, format des événements) serait écrit et testé deux fois. Les cold starts sont aussi plus lents. |
-| Go | Meilleurs cold starts, et un rendu d'image très efficace avec la bibliothèque standard (`image/png`, `crypto/ed25519`). Mais là aussi deux langages, sans code partagé, et un langage de plus que les trois membres doivent maîtriser pour la soutenance. |
-| GKE ou VM | Interdit : le cluster n'héberge que les runners de CI (§3.1). |
+| Go | Meilleurs cold starts, et un rendu d'image très efficace avec la bibliothèque standard (`image/png`, `crypto/ed25519`). Mais là aussi deux langages à maintenir et à maîtriser, sans code partagé avec le frontend. |
+  | GKE ou VM | Interdit : le cluster n'héberge que les runners de CI (§3.1). |
 
 ## Conséquences
 
@@ -67,9 +67,3 @@ Tous les proxies et workers sont des **services Cloud Run**, déployés par Terr
 - Il faut construire et publier les images : c'est l'objet de FND-06c et de SRV-02.
 - Node est moins économe en mémoire que Go pour rendre une grande image : 10000×10000 pixels en RGBA font 400 Mo. Le rendu (DATA-05b) passera par une bibliothèque native (par exemple `sharp`, basée sur libvips) ou par un buffer indexé à 1 octet par pixel, et le `render-worker` aura une mémoire dimensionnée à part.
 - Le cold start de Node grossit avec les dépendances (`firebase-admin` surtout) : garder des images minces, et mesurer le temps d'acquittement du `discord-proxy` (BOT-09).
-
-## En soutenance
-
-- « Des services Cloud Run plutôt que des functions : on construit l'image une seule fois et on déploie exactement le même digest en dev puis en prd. »
-- « TypeScript partout : le frontend l'impose, et ça nous permet de partager la palette, les calculs de tuiles et le format des événements entre le navigateur et les workers. »
-- « Les workers sont en ingress interne : même avec un token, on ne peut pas les appeler depuis Internet. Seuls Pub/Sub et Cloud Scheduler les atteignent. »

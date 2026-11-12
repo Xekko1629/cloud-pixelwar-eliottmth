@@ -1,155 +1,136 @@
-# BOT-02 — Enregistrement des commandes Discord
+# Enregistrement des commandes Discord
 
-## Périmètre
+## Objet et périmètre
 
-`app/tools/discord-commands/` est un outil de déploiement, **pas une fonction Cloud
-Run** et pas un bot Gateway permanent. Il enregistre quatre commandes HTTP
-Discord API v10 : `/draw`, `/get`, `/snapshot` et `/admin` avec ses cinq sous-commandes.
-Il ne traite aucune interaction et n'implémente aucune action métier.
-Les brouillons non suivis dans `app/functions/discord-bot/` restent inchangés.
+`app/tools/discord-commands/` est un outil d'administration du catalogue Discord,
+pas une Cloud Run function ni un bot WebSocket permanent. Le mode normal
+enregistre `/draw`, `/get`, `/snapshot` et `/admin` avec ses sous-commandes.
+Il ne reçoit aucune interaction et n'exécute pas leurs actions métier.
 
-- Les définitions TypeScript sont la source de vérité ; `JSON.stringify` produit
-  le payload JSON. Palette et bornes proviennent de `@pixelwar/shared/grid`.
-- Dev : commandes limitées au serveur de test. Prd : commandes globales, mais
-  uniquement utilisables dans les serveurs et pour une installation serveur
-  (`contexts: [0]`, `integration_types: [0]`). Pas de commandes en DM.
-- `/admin` et, provisoirement, `/snapshot` ont `default_member_permissions: "0"` :
-  désactivées par défaut sauf pour les administrateurs Discord. Un responsable
-  du serveur peut autoriser le rôle Pixelwar Admin dans Paramètres du serveur →
-  Intégrations. Cette visibilité n'est **pas** une autorisation métier ; les workers
-  doivent toujours vérifier l'allow-list et/ou le rôle (BOT-08 et handler snapshot).
-  La restriction de snapshot suit l'interprétation prudente du sujet, à confirmer
-  avec l'encadrant.
-- `ratelimit.user` est de type Discord USER (6), pas un nombre JS ; l'ID reçu
-  reste une chaîne. `limit` est un entier de 0 à `Number.MAX_SAFE_INTEGER` :
-  0 signifie quota nul, pas illimité. Le worker doit revalider ces entrées.
-- `size.width` et `size.height` sont optionnels et bornés à 10 000..10⁹.
-  Aucune option = grille infinie ; deux options = grille bornée. Discord ne peut
-  pas imposer « les deux ou aucune » : le worker devra refuser une option seule.
+Pour ajouter uniquement `/hello nom` en dev, utiliser `--hello` selon le
+[guide de la sonde](discord-hello.md). Ce mode fait un POST ciblé, pas un
+remplacement du catalogue.
 
-## Utilisation locale — Node.js 24
+## Contrat des définitions
 
-Depuis `app/`, après `npm ci`, une prévisualisation ne demande **aucun token**
-et ne fait aucun appel réseau :
+- `definitions.ts` est la source de vérité, sérialisée en JSON. Palette et bornes
+  proviennent de `@pixelwar/shared/grid`.
+- Dev : portée guild, avec un serveur de test explicite. Prd : portée globale,
+  installations serveur et interactions serveur (`contexts: [0]`,
+  `integration_types: [0]`), sans commandes en message privé.
+- `/admin` et `/snapshot` ont `default_member_permissions: "0"`, donc une
+  visibilité restreinte par défaut. Les intégrations du serveur peuvent autoriser
+  des rôles. Cette visibilité **ne remplace pas** la vérification métier dans le
+  handler/worker.
+- `ratelimit.user` est une option Discord USER (6) : l'ID est une chaîne, pas un
+  nombre JS. `limit` va de 0 à `Number.MAX_SAFE_INTEGER` ; zéro n'est pas illimité.
+- `size.width` et `size.height` sont optionnels, de 10 000 à 10⁹. Aucune option
+  signifie grille infinie ; les deux signifient grille bornée. L'appelant doit
+  refuser une seule dimension, car le schéma Discord n'impose pas cette dépendance.
+
+## Prérequis et configuration
+
+1. Installer Node.js 24 et les dépendances : `npm ci` depuis `app/`.
+2. Créer une application Discord **distincte par environnement** et, pour dev,
+   un serveur de test où l'application est installée avec les autorisations de
+   commandes nécessaires.
+3. Créer les conteneurs et alimenter les secrets de l'environnement selon le
+   [guide Secret Manager](../infra/iam/SECRETS.md). L'identité exécutant l'outil
+   doit lire uniquement `discord-application-id` et `discord-bot-token`.
+4. Confirmer le projet, l'application et la portée avant tout enregistrement.
+
+| Variable | Rôle |
+| --- | --- |
+| `APP_ENV` | `dev` ou `prd`, jamais le nom de branche `prod` |
+| `DISCORD_APPLICATION_ID` | ID de l'application de cet environnement |
+| `DISCORD_GUILD_ID` | Obligatoire en dev ; absente en prd, même pas vide |
+| `DISCORD_BOT_TOKEN` | Requis seulement pour une modification réelle |
+
+## Prévisualiser puis enregistrer
+
+Exemple Bash depuis `app/`, avec les IDs réels et une version numérique de secret
+sélectionnée par l'opérateur. Pour dev :
 
 ```sh
-APP_ENV=dev \
-DISCORD_APPLICATION_ID=123456789012345678 \
-DISCORD_GUILD_ID=234567890123456789 \
+set +x
+export APP_ENV=dev
+export DISCORD_GUILD_ID='ID_DU_SERVEUR_DE_TEST'
+DISCORD_APPLICATION_ID=$(gcloud secrets versions access NUMERO_VERSION \
+  --secret=discord-application-id --project=cloud-pixelwar-dev) || exit 1
+export DISCORD_APPLICATION_ID
 npm run discord:commands
 ```
 
-Les IDs ci-dessus sont fictifs. Pour prd : `APP_ENV=prd`, ID de l'application prd
-et variable `DISCORD_GUILD_ID` **absente**, même pas une chaîne vide.
-Ne pas confondre `prd` (environnement) et `prod` (branche).
+Sans `--apply`, aucun appel Discord n'est fait et le token de bot n'est pas
+nécessaire. Vérifier la cible et le catalogue affichés. Pour prd, choisir le
+projet/application prd, définir `APP_ENV=prd` et retirer `DISCORD_GUILD_ID`.
 
-Un envoi réel exige explicitement :
+Après validation explicite de la modification, dans le même terminal :
 
 ```sh
+DISCORD_BOT_TOKEN=$(gcloud secrets versions access NUMERO_VERSION \
+  --secret=discord-bot-token --project=cloud-pixelwar-dev) || exit 1
+export DISCORD_BOT_TOKEN
 npm run discord:commands -- --apply --confirm-application-id "$DISCORD_APPLICATION_ID"
+unset DISCORD_BOT_TOKEN DISCORD_APPLICATION_ID DISCORD_GUILD_ID APP_ENV
 ```
 
-Il faut alors injecter `APP_ENV`, `DISCORD_APPLICATION_ID`, `DISCORD_GUILD_ID`
-(dev seulement), et `DISCORD_BOT_TOKEN` dans l'environnement du processus depuis
-une source sûre. Ne pas saisir le token en clair dans une commande, le dépôt,
-un fichier versionné ou un chat. Ne pas activer `set -x`.
+Remplacer séparément `NUMERO_VERSION` par la version sélectionnée pour chaque
+secret ; ne pas supposer qu'elles ont le même numéro. En prd, adapter aussi le
+projet de lecture du token. Aucun token en clair dans la commande, le dépôt,
+les logs ou un chat ; ne pas activer le traçage shell `set -x`.
 
-**Attention : bulk overwrite remplace toutes les commandes de la portée ciblée,
-y compris les types non présents dans ce catalogue.** Des commandes ajoutées à la
-main dans cette même portée seront supprimées. La confirmation protège contre
-une exécution involontaire ; elle ne prouve pas que l'ID appartient au bon
-environnement. BOT-01 doit fournir deux applications distinctes.
+**Le PUT remplace toutes les commandes de la portée ciblée**, y compris celles
+absentes du catalogue et les autres types de commandes. Les ajouts individuels,
+dont `/hello`, peuvent être supprimés. La confirmation de l'ID prévient une
+exécution involontaire, mais ne prouve pas que l'application appartient au bon
+environnement. Le même PUT est répétable sans doublons ; il consomme néanmoins
+des requêtes et quotas. Une autre portée n'est pas nettoyée automatiquement.
 
-Le PUT est répétable : même payload → même catalogue, sans doublons de commandes.
-Cela ne signifie pas absence de requêtes, de quotas ou de changements de versions
-côté Discord. Les anciennes commandes d'une **autre portée** ne sont pas nettoyées.
-Un changement guild/global nécessite une migration explicite.
+## Vérification et diagnostic
 
-## Erreurs et sécurité
+- Succès du CLI : Discord a accepté l'enregistrement, pas validé le comportement
+  des commandes.
+- Dans le serveur : contrôler le catalogue, les options, leur type et les
+  permissions avec un compte normal et un compte autorisé.
+- Pour les actions : configurer le callback et tester le backend séparément.
+  Le catalogue peut être enregistré indépendamment de la disponibilité du handler.
+- 429 : respecter `Retry-After` ou `retry_after` ; jusqu'à quatre tentatives,
+  fractions de seconde acceptées, arrêt si le délai est invalide ou supérieur à 60 s.
+- 5xx : jusqu'à quatre tentatives, attentes de 1, 2 et 4 s. Autres 4xx : arrêt.
+- Timeout de 15 s ou erreur réseau : arrêter et vérifier l'état effectif avant
+  relance ; une modification peut avoir réussi sans réponse reçue. Aucun rollback
+  implicite. Les redirections sont refusées pour ne pas déplacer les credentials.
 
-- 429 : attendre `Retry-After` en secondes, sinon `retry_after` du JSON ; délai
-  fractionnaire accepté. Arrêt si absent/invalide ou supérieur à 60 s, sans
-  réessayer trop tôt. Au maximum quatre tentatives.
-- 5xx : jusqu'à quatre tentatives avec attentes de 1, 2 et 4 s.
-- 4xx hors 429 : arrêt immédiat (401 : token ; 403 : accès ; 404 : cible).
-- Réseau/timeout : arrêt, vérifier l'état avant de relancer le PUT. Timeout de
-  15 s par requête ; redirections interdites pour ne pas déplacer le token.
-- Ni token, ni corps de réponse Discord, ni exception HTTP brute ne sont loggés.
-  Le CLI émet un message générique et un code de sortie 1 en cas d'échec.
-  Un échec d'acquittement peut suivre une mise à jour déjà appliquée : vérifier
-  Discord ou rejouer le PUT, pas supposer un rollback.
+Le CLI renvoie un code non nul et un message générique sans token, réponse HTTP
+brute ou exception sensible. Vérifier configuration et droits sans afficher
+les valeurs pour diagnostiquer l'erreur.
 
-## Contrat d'intégration SRV-02 — pas encore branché
+## Intégration dans un processus de déploiement
 
-Le workflow actuel déploie l'infrastructure, pas les fonctions applicatives.
-Ne pas y ajouter un appel sans déploiement applicatif préalable.
-SRV-02 devra appeler le script **après chaque déploiement applicatif réussi** :
+Le workflow `Deploy` n'exécute pas cet outil. Pour l'appeler dans une procédure
+ou une automatisation autorisée : utiliser le même commit que le backend,
+installer avec `npm ci`, fournir les variables fiables de l'environnement,
+prévisualiser puis confirmer la cible, sérialiser les modifications par portée
+et traiter tout échec explicitement. En CI, lire les secrets avec WIF et des
+droits ciblés, jamais une clé GCP persistante. Ne pas enregistrer de commandes
+réelles dans les tests ou sur une PR.
 
-1. Checkout du même commit que celui déployé, Node 24, `npm ci` depuis `app/`.
-2. Sélection du projet (`cloud-pixelwar-dev` ou `cloud-pixelwar-prod`) via une
-   configuration d'environnement fiable. Utiliser WIF, jamais une clé GCP.
-3. Lire les versions sélectionnées de `discord-application-id` et
-   `discord-bot-token` dans Secret Manager ; masquer le token avant tout affichage.
-   Accorder `secretAccessor` uniquement sur ces secrets à l'identité chargée de
-   l'enregistrement. Pas de rôle global ou d'accès aux secrets OAuth inutiles.
-4. Fournir l'ID de serveur de test via la configuration dev ; ne pas fournir
-   `DISCORD_GUILD_ID` à prd. Exécuter d'abord le dry-run, puis l'appel `--apply`
-   explicitement confirmé par l'ID de l'application de cet environnement.
-5. Sérialiser déploiement et enregistrement par environnement, garder les
-   approbations prd et faire échouer la release si le script échoue.
+## Mise à jour et retrait
 
-Pas d'enregistrement sur une PR ni dans les tests. L'enregistrement n'a pas
-besoin de la clé publique ou de l'URL d'interactions, mais une commande ne
-fonctionnera réellement que lorsque BOT-03 et les workers seront prêts.
+Modifier les définitions versionnées, faire relire leur diff et leur
+prévisualisation, puis appliquer dans la bonne portée. Le retrait d'une commande
+du catalogue normal prend effet au prochain PUT dans cette portée. Pour une
+commande ajoutée individuellement, utiliser son ID et l'opération de suppression
+ciblée après validation, sans vider les autres commandes. Coordonner le retrait
+avec celui du handler et du callback de l'application.
 
-## Validation
+## Tests et références
 
-```sh
-npm run typecheck
-npm test
-npm run test:coverage
-```
+Depuis `app/` : `npm run typecheck`, `npm test`, `npm run test:coverage`.
+Les tests simulent l'API Discord : catalogue, cibles, confirmation, méthodes
+HTTP, erreurs et délais. Ils ne prouvent pas l'autorisation du serveur réel.
 
-Tests du catalogue, cibles dev/prd, confirmation, PUT répétable, erreurs 4xx/5xx,
-429, timeout/réseau simulés et CLI en sous-processus. Aucun envoi réel à Discord.
-L'enregistrement réel, l'autorisation serveur et l'exécution après déploiement
-restent à vérifier avec BOT-01/SRV-02 ; le ticket n'est pas validé de bout en bout.
-
-### Première validation dev après merge
-
-1. CI verte sur le commit courant de BOT-02, basé sur le `prod` contenant
-   TEST-01, DATA-01, SRV-03 et SRV-08. Vérifier que les trois exports du shared
-   (`grid`, `observability`, `observability/google`) sont conservés et que
-   `npm ci` accepte le lockfile sans le régénérer.
-2. Valider séparément le plan puis le déploiement Terraform dev, suivant
-   [la checklist SRV-03](../infra/iam/SECRETS.md). Ce workflow applique
-   `foundation` et `serverless` ; il **n'enregistre pas** les commandes Discord.
-   Ne pas pousser de tag `v*` pour ce test, car cela engage aussi prd.
-3. Alimenter les secrets depuis l'application **dev** de BOT-01. Fournir au
-   script son Application ID et l'ID du serveur de test ; garder le token hors
-   des commandes en clair, des logs et du dépôt.
-4. Exécuter la prévisualisation sans `--apply` : contrôler la cible guild dev,
-   les quatre commandes principales, les cinq sous-commandes admin et les
-   seize choix de couleur. À ce stade aucun appel Discord n'est effectué.
-5. Après accord explicite, enregistrer avec `--apply --confirm-application-id`
-   et vérifier le catalogue dans le serveur de test. Répéter le même appel
-   autorisé pour constater l'absence de doublons dans cette portée.
-6. Vérifier la visibilité avec un compte normal et un compte autorisé. Pour
-   le rôle métier Pixelwar Admin sans permission Discord Administrator,
-   configurer explicitement les accès dans les intégrations du serveur.
-
-Ces essais réels ne sont **pas** exécutés par la CI ni lors du développement
-local. Leur résultat devra être consigné après réalisation. Tant que BOT-03 et
-les workers ne sont pas déployés, une commande visible peut échouer lorsqu'on
-l'invoque : aucun test de dessin, signature/PING, quota ou autorisation métier
-n'est validé par le seul enregistrement des commandes. DATA-03 n'est pas un
-prérequis pour créer les secrets ou enregistrer ce catalogue ; il est requis
-pour valider les quotas avant l'ouverture du dessin aux utilisateurs.
-
-## Sources
-
-Consultées le 5 novembre 2026 :
-- [Discord — commandes, options, permissions et bulk overwrite](https://docs.discord.com/developers/interactions/application-commands)
-- [Discord — limites de débit et Retry-After](https://docs.discord.com/developers/topics/rate-limits)
-- [tsx — exécution TypeScript](https://tsx.hirok.io/)
-- [Node 24 — contraintes du TypeScript natif](https://nodejs.org/docs/latest-v24.x/api/typescript.html)
+- [Commandes, options, permissions et enregistrement](https://docs.discord.com/developers/interactions/application-commands)
+- [Limites de débit Discord](https://docs.discord.com/developers/topics/rate-limits)
+- [Exécution TypeScript avec tsx](https://tsx.hirok.io/)

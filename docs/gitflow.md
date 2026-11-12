@@ -1,46 +1,61 @@
-# GitFlow et releases
-
-Ce document décrit le flux de contribution et de déploiement du projet. La branche `prod` est la branche principale ; elle contient l'historique intégré et validé. Une fusion dans `prod` ne déploie pas l'application.
+# Contribution et releases
 
 ## Branches et pull requests
 
-- Chaque contribution part du dernier commit de `prod` dans une branche courte nommée `feature/<sujet>` (par exemple `feature/discord-draw`). Pour une correction, utiliser `fix/<sujet>`.
-- Ouvrir une pull request vers `prod`. Le contrôle `CI result` doit réussir avant sa fusion. Une review est recommandée, mais le ruleset actuel ne requiert aucune approbation (`required_approving_review_count: 0`).
-- Supprimer la branche de travail après la fusion.
-- Ne pas pousser directement sur `prod` ni réécrire son historique. Le ruleset GitHub impose une PR, le contrôle `CI result` et des commits signés. Une review est recommandée, mais aucune approbation n'est actuellement configurée comme obligatoire.
+`prod` est la branche principale. Créer une branche courte `feature/<sujet>` ou
+`fix/<sujet>` depuis sa version intégrée, puis ouvrir une PR vers `prod`.
+Une fusion ne déploie pas l'application.
 
-## Releases et déploiements
+- Utiliser des commits signés et les Conventional Commits : `feat: …`, `fix: …`,
+  `docs: …`. Le type de commit `feat` ne change pas le préfixe `feature/` des branches.
+- Faire réussir `CI result`, lire les plans et obtenir une review avant fusion.
+- Ne pas pousser directement sur `prod`, ne pas réécrire son historique et ne
+  pas déplacer un tag publié. Supprimer la branche après intégration.
 
-Les changements peuvent être fusionnés séparément dans `prod`, puis regroupés dans une release lorsque l'équipe décide de déployer. Le tag de release désigne le commit exact qui sera déployé.
+Ces règles de contribution ne décrivent pas à elles seules les protections
+automatisées du dépôt. Vérifier les rulesets, contrôles requis, approbations et
+exceptions administrateur dans les paramètres GitHub. Un besoin de modification
+de ces règles se suit dans une issue, pas comme un workflow hypothétique ici.
 
-### Comportement actuellement déployé
+## Déploiement dev manuel
 
-1. Vérifier que le commit de release est sur `prod` et que la CI est verte.
-2. Créer **manuellement** un tag au format SemVer, par exemple `v1.2.0`, puis le pousser.
-3. Le push du tag `v*` déclenche automatiquement `deploy.yml` : contrôles, déploiement sur `dev`, puis déploiement sur `prd` après approbation de l'environnement GitHub `prd`.
-4. Le lancement manuel de `deploy.yml` (`workflow_dispatch`) exécute les contrôles et applique sur `dev` seulement. Il ne sélectionne pas un tag particulier.
+Le lancement `workflow_dispatch` de `deploy.yml` applique dev seulement. Choisir
+la référence approuvée dans **Actions → Deploy → Run workflow** ; utiliser
+`runner=ubuntu-latest` pour les contrôles si les runners auto-hébergés ne doivent
+pas être sollicités. Ce lancement n'applique ni IAM ni les accès humains.
 
-Le job de production vérifie que le commit déployé est présent dans `prod`. Le workflow actuel ne vérifie pas que le tag est signé.
+Les prérequis, ressources touchées et vérifications sont décrits dans le
+[guide de déploiement](deployment.md). Ne pas utiliser un tag de release pour
+un essai limité à dev.
 
-### Décision cible de l'équipe
+## Release dev puis prd
 
-L'équipe souhaite garder le contrôle du moment du déploiement et pouvoir regrouper plusieurs fonctionnalités : le push d'un tag ne devrait donc pas déployer automatiquement. Le déploiement devrait être lancé manuellement pour le tag choisi, d'abord sur `dev`, puis séparément sur `prd` après vérification. **Ce comportement cible n'est pas encore implémenté** : il faudra adapter `deploy.yml` et maintenir `docs/ci.md` en cohérence (CI-03).
+1. Choisir un commit intégré à `prod`, vérifier sa CI et les plans, puis faire
+   valider la release et ses effets GCP.
+2. Choisir un nouveau numéro [SemVer](https://semver.org/), `vMAJOR.MINOR.PATCH`.
+3. Créer un tag annoté et signé sur le commit choisi, puis le pousser :
 
-La convention cible est d'utiliser des tags annotés et signés, par exemple `git tag -s -a v1.2.0 -m "Release v1.2.0" <commit>`. Le tag `v1.0.0` actuellement présent est léger et non signé. Une fois une release publiée, ne pas déplacer ni réutiliser son tag ; pour corriger une release, créer un nouveau commit et un nouveau numéro de version.
+   ```sh
+   VERSION='vX.Y.Z'
+   COMMIT='SHA_DU_COMMIT_APPROUVE'
+   git tag -s -a "$VERSION" -m "Release $VERSION" "$COMMIT"
+   git push origin "$VERSION"
+   ```
 
-## Conventions
+4. **Le push déclenche automatiquement `Deploy`** : contrôles, dev, puis prd
+   après les dépendances dev et les approbations GitHub configurées.
+5. Vérifier les ressources et intégrations après chaque déploiement. Pour corriger
+   une release, produire un nouveau commit et un nouveau numéro ; ne pas réutiliser
+   le tag.
 
-- Branches : `feature/<sujet>` pour une fonctionnalité, `fix/<sujet>` pour une correction. Utiliser des noms courts, en minuscules, séparés par des tirets.
-- Commits : suivre [Conventional Commits](https://www.conventionalcommits.org/), par exemple `feat: add pixel drawing command` ou `fix: reject invalid colors` (`feat` est le type de commit, tandis que `feature/` est le préfixe des branches).
-- Versions : suivre [SemVer](https://semver.org/) sous la forme `vMAJOR.MINOR.PATCH`. Le choix du numéro de version est fait au moment de préparer la release.
-- Signer les commits et les tags ; la clé publique de signature doit être enregistrée sur GitHub.
+Les commandes contiennent des paramètres à remplacer, pas un numéro de version
+à copier tel quel. La signature nécessite une clé publique enregistrée sur GitHub.
+Le job d'apply prd contrôle l'appartenance du commit à `origin/prod`, mais le
+workflow ne vérifie pas cryptographiquement le tag. Convention de signature,
+protection de branche et conditions du workflow sont trois contrôles distincts.
 
-## Événements et contrôles CI/CD
+## Références
 
-| Job / contrôle | Événement | Référence | Résultat attendu |
-| --- | --- | --- | --- |
-| CI de pull request | Ouverture, mise à jour ou réouverture d'une PR | Branche source vers `prod` | Formatage, validation, tests et plans Terraform dev/prd ; le ruleset exige le contrôle `CI result` |
-| Déploiement dev (actuel) | Push d'un tag `v*` | Le commit du tag | Contrôles puis apply sur `dev` |
-| Déploiement prd (actuel) | Après l'apply dev et approbation de l'environnement `prd` | Le même workflow de tag | Apply sur `prd`, seulement si le commit du tag appartient à `prod` |
-| Déploiement manuel (actuel) | `workflow_dispatch` de `deploy.yml` | Référence choisie pour le lancement, pas un tag sélectionné | Contrôles puis apply sur `dev` uniquement |
-| Déploiement cible | Lancement manuel pour un tag, puis confirmation séparée | Tag choisi, identique pour dev et prd | À implémenter dans CI-03 ; ne pas confondre avec le comportement actuel |
+- [Fonctionnement de la CI/CD](ci.md) : jobs, authentification et runners.
+- [Installation, mise à jour et retrait](deployment.md) : procédure opérationnelle.
+- [Conventional Commits](https://www.conventionalcommits.org/).
