@@ -6,14 +6,15 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 7.0"
     }
-    # Zips the built functions (modules/function-source).
-    archive = {
-      source  = "hashicorp/archive"
-      version = "~> 2.7"
     # API Gateway resources only exist in the beta provider.
     google-beta = {
       source  = "hashicorp/google-beta"
       version = "~> 7.0"
+    }
+    # Zips the built functions (modules/function-source).
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.7"
     }
   }
 
