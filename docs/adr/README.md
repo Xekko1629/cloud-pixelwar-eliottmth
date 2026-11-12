@@ -20,9 +20,10 @@ Un ADR (*Architecture Decision Record*) consigne une décision d'architecture : 
 | [0005](0005-identite-web-firebase-auth.md) | Identité web : OAuth2 Discord côté serveur, puis custom token Firebase | Accepté |
 | [0006](0006-hebergement-frontend-firebase-hosting.md) | Hébergement du frontend : Firebase Hosting | Accepté |
 | [0007](0007-modele-donnees-grille.md) | Données : grille infinie ou bornée par un admin, tuiles 64×64, régions 1024×1024, palette de 16 couleurs | Accepté |
-| [0008](0008-compute-cloud-run-functions.md) | Compute : Cloud Run functions déployées depuis une archive de sources identifiée par SHA-256 | Accepté |
+| [0008](0008-compute-cloud-run-functions.md) | Compute : Cloud Run functions déployées depuis une archive de sources identifiée par SHA-256 | Accepté, artefact de release remplacé par ADR-0009 |
+| [0009](0009-sources-fonctions-terraform.md) | Sources des fonctions : construites par la CI, zippées et téléversées par Terraform | Accepté |
 
-Le build des sources est décrit par l'ADR-0008. Le rendu d'image reste un choix d'implémentation (DATA-05b).
+Le build des sources est décrit par l'ADR-0009. Le rendu d'image reste un choix d'implémentation (DATA-05b).
 
 ## Modèle
 

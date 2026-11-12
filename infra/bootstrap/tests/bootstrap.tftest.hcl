@@ -60,3 +60,15 @@ run "persistent_serverless_prerequisites" {
     error_message = "Scope build permissions to the dedicated bucket and repository, not the whole project."
   }
 }
+
+run "planner_reads_function_sources" {
+  command = plan
+
+  assert {
+    condition = (
+      google_storage_bucket_iam_member.planner_source_reader.role == "roles/storage.objectViewer" &&
+      google_storage_bucket_iam_member.planner_source_reader.member == "serviceAccount:github-planner@pixelwar-test.iam.gserviceaccount.com"
+    )
+    error_message = "The planner only reads the function sources bucket, to refresh the uploaded objects."
+  }
+}

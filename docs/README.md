@@ -4,6 +4,7 @@
 - [CI/CD](ci.md)
 - [Accès humains : équipe, instructeur et secrets Discord dev](../infra/access/README.md)
 - [Tests applicatifs et émulateurs](testing.md)
+- [Fonctions : structure, build et déploiement — SRV-02](functions.md)
 - [Calcul des quotas utilisateur — DATA-03](rate-limits.md)
 - [Observabilité commune des services](observability.md)
 - [Projets GCP et coûts](gcp.md)

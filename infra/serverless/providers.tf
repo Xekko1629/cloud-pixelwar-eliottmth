@@ -11,6 +11,11 @@ terraform {
       source  = "hashicorp/google-beta"
       version = "~> 7.0"
     }
+    # Zips the built functions (modules/function-source).
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.7"
+    }
   }
 
   backend "gcs" {}

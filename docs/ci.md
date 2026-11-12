@@ -32,15 +32,17 @@ Checks: `terraform fmt -check`, `tflint` (rules in `.tflint.hcl`), `terraform va
 Any failure stops the pipeline before plan or apply.
 
 PR checks select changed directories: `foundation`, `iam`, `access`, `runners`,
-`bootstrap`, `serverless`, `serverless/modules/function` and `serverless/modules/api-gateway`.
-The module entries run their mock-provider tests independently, since the root stack does not discover them.
+`bootstrap`, `serverless`, `serverless/modules/function`, `serverless/modules/api-gateway` and
+`serverless/modules/function-source`. The module entries run their mock-provider tests independently,
+since the root stack does not discover them. A change in `app/functions`, `app/shared/src` or
+`app/package-lock.json` also re-plans `serverless`.
 Remote PR plans cover `foundation` and `serverless` (dev and prd), when that stack changes. Release
 validation/tests also cover `bootstrap`, `serverless` and its modules by
 default. Deploy now applies `foundation` then `serverless` in each environment;
 destroy removes `serverless` before runners (prd) and `foundation`. Application
 secrets, the state bucket and every API live in `iam`, which is preserved, as is
 the bootstrap (registry, source bucket and build identity): their contents survive
-a destroy. Source archiving and application promotion remain in SRV-02.
+a destroy. Before any plan or apply of `serverless`, the CI builds the functions (`npm run build:functions`); Terraform zips and uploads them: see [functions.md](functions.md).
 See [the secrets runbook](../infra/iam/SECRETS.md) before
 triggering a workflow. Each apply job computes then applies its own plan without
 an intervening review pause; review the PR plans before tagging.

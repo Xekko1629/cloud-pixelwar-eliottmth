@@ -43,11 +43,18 @@ jobs:
             serverless:
               - 'infra/serverless/**'
               - '.github/workflows/**'
+              # The plan zips the built functions: a code change is a redeployment.
+              - 'app/functions/**'
+              - 'app/shared/src/**'
+              - 'app/package-lock.json'
             'serverless/modules/function':
               - 'infra/serverless/modules/function/**'
               - '.github/workflows/**'
             'serverless/modules/api-gateway':
               - 'infra/serverless/modules/api-gateway/**'
+              - '.github/workflows/**'
+            'serverless/modules/function-source':
+              - 'infra/serverless/modules/function-source/**'
               - '.github/workflows/**'
             runners:
               - 'infra/runners/**'
@@ -95,7 +102,7 @@ jobs:
 
   plan-serverless:
     needs: [changes, fmt, lint, validate, test]
-    if: contains(fromJSON(needs.changes.outputs.stacks), 'serverless') || contains(fromJSON(needs.changes.outputs.stacks), 'serverless/modules/function') || contains(fromJSON(needs.changes.outputs.stacks), 'serverless/modules/api-gateway')
+    if: contains(fromJSON(needs.changes.outputs.stacks), 'serverless') || contains(fromJSON(needs.changes.outputs.stacks), 'serverless/modules/function') || contains(fromJSON(needs.changes.outputs.stacks), 'serverless/modules/api-gateway') || contains(fromJSON(needs.changes.outputs.stacks), 'serverless/modules/function-source')
     strategy:
       fail-fast: false
       matrix:

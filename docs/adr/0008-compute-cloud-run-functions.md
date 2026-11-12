@@ -1,6 +1,6 @@
 # ADR-0008 · Compute : Cloud Run functions déployées depuis une archive de sources
 
-- **Statut** : Accepté
+- **Statut** : Accepté ; section « Artefact de release » remplacée par [ADR-0009](0009-sources-fonctions-terraform.md)
 - **Date** : 2026-11-06
 - **Tickets** : ARCH-01 (#26), SRV-01, SRV-02, SRV-04b, SRV-05. Remplace [ADR-0001](0001-compute-cloud-run-typescript.md).
 - **Références** : Sujet §3.1, §5.5 · C05 §1-2 · C06 §1-2 · [Build des fonctions](https://cloud.google.com/functions/docs/building) · [Identité de build](https://cloud.google.com/functions/docs/securing/build-custom-sa) · [Ingress Cloud Run](https://cloud.google.com/run/docs/securing/ingress)
