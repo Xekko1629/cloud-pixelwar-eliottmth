@@ -55,11 +55,21 @@ variable "routes" {
     operation_id     = string
     summary          = string
     deadline_seconds = optional(number, 15)
+    # firebase: the gateway validates a Firebase ID token before calling the backend.
+    # none: public at the gateway (Discord signature or OAuth login checked by the proxy).
+    auth = optional(string, "firebase")
+    # true: called from the browser, the gateway also publishes an OPTIONS preflight route.
+    cors = optional(bool, false)
   }))
 
   validation {
-    condition     = alltrue([for route in var.routes : contains(["get", "post", "put", "patch", "delete", "options"], route.method)])
-    error_message = "Route methods must be lowercase HTTP verbs supported by OpenAPI 2.0."
+    condition     = alltrue([for route in var.routes : contains(["get", "post", "put", "patch", "delete"], route.method)])
+    error_message = "Route methods must be lowercase HTTP verbs; OPTIONS preflight routes are generated from cors = true."
+  }
+
+  validation {
+    condition     = alltrue([for route in var.routes : contains(["firebase", "none"], route.auth)])
+    error_message = "Route auth must be firebase or none."
   }
 
   validation {
@@ -76,4 +86,26 @@ variable "routes" {
     condition     = length(distinct([for route in var.routes : "${route.method} ${route.path}"])) == length(var.routes)
     error_message = "A path and method pair can only be declared once."
   }
+
+  validation {
+    condition = alltrue([
+      for route in var.routes : route.auth == "firebase"
+      if anytrue([for prefix in var.protected_path_prefixes : startswith(route.path, prefix)])
+    ])
+    error_message = "Routes under a protected prefix (/api/ by default) must require a Firebase ID token."
+  }
+
+  validation {
+    condition = alltrue([
+      for path in distinct([for route in var.routes : route.path if route.cors]) :
+      length(distinct([for route in var.routes : route.backend if route.path == path])) == 1
+    ])
+    error_message = "A CORS path must be served by a single backend, which answers its OPTIONS preflight."
+  }
+}
+
+variable "protected_path_prefixes" {
+  description = "Path prefixes whose routes must validate a Firebase ID token at the gateway (subject section 3.4)"
+  type        = list(string)
+  default     = ["/api/"]
 }

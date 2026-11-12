@@ -5,21 +5,43 @@ locals {
   # Backends actually referenced by a route: the gateway gets run.invoker on these only.
   routed_backends = { for key, backend in var.backends : key => backend if contains([for route in local.published_routes : route.backend], key) }
 
+  # OPTIONS preflight of the browser routes: sent without credentials, so never behind
+  # security, and answered by the backend that serves the path (it sets the CORS headers).
+  preflight_routes = [
+    for path in distinct([for route in local.published_routes : route.path if route.cors]) : {
+      path             = path
+      method           = "options"
+      operation_id     = "${[for route in local.published_routes : route.operation_id if route.path == path][0]}Preflight"
+      summary          = "CORS preflight, answered by the backend"
+      deadline_seconds = 15
+      auth             = "none"
+      address          = var.backends[[for route in local.published_routes : route.backend if route.path == path][0]].uri
+    }
+  ]
+
+  operations = concat(
+    [for route in local.published_routes : {
+      path             = route.path
+      method           = route.method
+      operation_id     = route.operation_id
+      summary          = route.summary
+      deadline_seconds = route.deadline_seconds
+      auth             = route.auth
+      address          = var.backends[route.backend].uri
+    }],
+    local.preflight_routes,
+  )
+
   paths = {
-    for path in distinct([for route in local.published_routes : route.path]) : path => [
-      for route in local.published_routes : {
-        method           = route.method
-        operation_id     = route.operation_id
-        summary          = route.summary
-        deadline_seconds = route.deadline_seconds
-        address          = var.backends[route.backend].uri
-      } if route.path == path
-    ]
+    for path in distinct([for operation in local.operations : operation.path]) :
+    path => [for operation in local.operations : operation if operation.path == path]
   }
 
   openapi = templatefile("${path.module}/openapi.yaml.tftpl", {
     title = var.api_id
     paths = local.paths
+    # Firebase ID tokens of this project (ADR-0005): the Firebase project ID is the GCP project ID.
+    firebase_project_id = var.project_id
   })
 }
 

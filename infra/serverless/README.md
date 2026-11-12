@@ -19,6 +19,12 @@ refuse une spécification sans backend) et l'output `gateway_url` vaut `null`.
 Les APIs nécessaires (`apigateway`, `servicemanagement`, `servicecontrol`) sont
 activées par `infra/iam`.
 
+Les routes exigent par défaut un ID token Firebase validé par la gateway (SRV-04c) ;
+`/discord/interactions` et `/auth/*` sont publiques à la gateway et vérifiées par
+leur proxy. Les routes appelées par le navigateur (`cors = true`) reçoivent une
+route `OPTIONS` publique pour le preflight CORS. Détails et étude de la limitation
+de débit : [module api-gateway](modules/api-gateway/README.md#authentification-des-routes--srv-04c).
+
 ## Secrets applicatifs — SRV-03
 
 Les conteneurs Secret Manager sont déclarés par le stack persistant `infra/iam`

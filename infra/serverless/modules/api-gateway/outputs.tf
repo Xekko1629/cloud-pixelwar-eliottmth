@@ -19,6 +19,6 @@ output "openapi" {
 }
 
 output "published_routes" {
-  description = "METHOD /path of the routes currently served by the gateway"
-  value       = [for route in local.published_routes : "${upper(route.method)} ${route.path}"]
+  description = "METHOD /path of the routes currently served by the gateway, with their gateway auth"
+  value       = [for operation in local.operations : "${upper(operation.method)} ${operation.path} (${operation.auth})"]
 }
