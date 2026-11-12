@@ -32,10 +32,10 @@ Checks: `terraform fmt -check`, `tflint` (rules in `.tflint.hcl`), `terraform va
 Any failure stops the pipeline before plan or apply.
 
 PR checks select changed directories: `foundation`, `iam`, `access`, `runners`,
-`bootstrap`, `serverless`, and `serverless/modules/function`. The last entry runs the module's
-mock-provider tests independently, since the root stack does not discover them.
+`bootstrap`, `serverless`, `serverless/modules/function` and `serverless/modules/api-gateway`.
+The module entries run their mock-provider tests independently, since the root stack does not discover them.
 Remote PR plans cover `foundation` and `serverless` (dev and prd), when that stack changes. Release
-validation/tests also cover `bootstrap`, `serverless` and its function module by
+validation/tests also cover `bootstrap`, `serverless` and its modules by
 default. Deploy now applies `foundation` then `serverless` in each environment;
 destroy removes `serverless` before runners (prd) and `foundation`. Application
 secrets, the state bucket and every API live in `iam`, which is preserved, as is

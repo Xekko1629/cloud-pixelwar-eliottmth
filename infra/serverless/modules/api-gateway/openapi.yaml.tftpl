@@ -1,0 +1,46 @@
+# OpenAPI 2.0 (Swagger): the only version API Gateway accepts.
+# Rendered by Terraform (main.tf): one operation per route whose backend is deployed.
+swagger: "2.0"
+info:
+  title: ${jsonencode(title)}
+  description: Single public entry point of the pixel canvas (subject section 3.1)
+  version: "1.0.0"
+schemes:
+  - https
+produces:
+  - application/json
+# Firebase ID token (ADR-0005), checked by the gateway: signature against Google's keys,
+# issuer, audience and expiry. A route opts in with "security: - firebase: []".
+securityDefinitions:
+  firebase:
+    authorizationUrl: ""
+    flow: "implicit"
+    type: "oauth2"
+    x-google-issuer: ${jsonencode("https://securetoken.google.com/${firebase_project_id}")}
+    x-google-jwks_uri: "https://www.googleapis.com/service_accounts/v1/metadata/x509/securetoken@system.gserviceaccount.com"
+    x-google-audiences: ${jsonencode(firebase_project_id)}
+paths:
+%{ for path, operations in paths ~}
+  ${jsonencode(path)}:
+%{ for operation in operations ~}
+    ${operation.method}:
+      operationId: ${jsonencode(operation.operation_id)}
+      summary: ${jsonencode(operation.summary)}
+%{ if operation.auth == "firebase" ~}
+      # Rejected with 401 by the gateway without a valid token; the claims reach the
+      # backend in X-Apigateway-Api-Userinfo (base64url).
+      security:
+        - firebase: []
+%{ endif ~}
+      # The gateway signs a Google ID token as its own service account
+      # (audience = the function URL), so the private proxy accepts the call.
+      x-google-backend:
+        address: ${jsonencode(operation.address)}
+        jwt_audience: ${jsonencode(operation.address)}
+        path_translation: APPEND_PATH_TO_ADDRESS
+        deadline: ${operation.deadline_seconds}
+      responses:
+        default:
+          description: Response returned by the backend proxy
+%{ endfor ~}
+%{ endfor ~}

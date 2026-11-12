@@ -89,6 +89,10 @@ run "gateway_proxy" {
     )
     error_message = "Gateway proxies accept network traffic without granting public IAM or a worker push identity."
   }
+  assert {
+    condition     = output.service_type == "proxy"
+    error_message = "The service type is exported so the gateway can refuse worker backends."
+  }
 }
 
 run "configured_function" {

@@ -6,6 +6,25 @@ Le module [function](modules/function/README.md) distingue les proxies (`service
 
 Ce squelette ne déploie encore aucune fonction : les modules seront instanciés lorsque les archives des proxies et workers seront produites par SRV-02. Le module `function` est prêt à être utilisé.
 
+## API Gateway — SRV-04a
+
+`gateway.tf` déclare le catalogue des routes de l'unique point d'entrée public
+(`/discord/interactions`, `/auth/*`, `/api/*`, et `/hello` temporairement pour SRV-09)
+et appelle le [module api-gateway](modules/api-gateway/README.md).
+
+Une route n'est publiée que lorsque sa fonction proxy est déployée : il suffit
+d'ajouter son entrée dans `local.gateway_backends`, à partir des outputs du module
+`function`. Tant qu'aucun proxy n'existe, la gateway n'est pas créée (API Gateway
+refuse une spécification sans backend) et l'output `gateway_url` vaut `null`.
+Les APIs nécessaires (`apigateway`, `servicemanagement`, `servicecontrol`) sont
+activées par `infra/iam`.
+
+Les routes exigent par défaut un ID token Firebase validé par la gateway (SRV-04c) ;
+`/discord/interactions` et `/auth/*` sont publiques à la gateway et vérifiées par
+leur proxy. Les routes appelées par le navigateur (`cors = true`) reçoivent une
+route `OPTIONS` publique pour le preflight CORS. Détails et étude de la limitation
+de débit : [module api-gateway](modules/api-gateway/README.md#authentification-des-routes--srv-04c).
+
 ## Secrets applicatifs — SRV-03
 
 Les conteneurs Secret Manager sont déclarés par le stack persistant `infra/iam`
@@ -54,7 +73,7 @@ terraform plan -var-file=dev.tfvars
 
 Remplacer `dev` par `prd` pour la production. Ces commandes ne font pas d'apply.
 
-La CI de PR détecte désormais `bootstrap`, `serverless` et le module `function` pour le formatage, la validation et les tests sans backend. Le module est testé séparément : Terraform ne découvre pas automatiquement ses tests depuis la racine.
+La CI de PR détecte désormais `bootstrap`, `serverless` et les modules `function` et `api-gateway` pour le formatage, la validation et les tests sans backend. Les modules sont testés séparément : Terraform ne découvre pas automatiquement ses tests depuis la racine.
 
 Déploiement : exécution manuelle → `foundation` et `bootstrap`, puis `serverless`
 en dev ; tag `v*` → même séquence en dev, puis en prd, avec `runners` en prd.
