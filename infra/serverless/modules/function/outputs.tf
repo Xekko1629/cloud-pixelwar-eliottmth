@@ -8,6 +8,11 @@ output "uri" {
   value       = google_cloudfunctions2_function.main.service_config[0].uri
 }
 
+output "service_type" {
+  description = "proxy or worker; module api-gateway only accepts proxies as backends"
+  value       = var.service_type
+}
+
 output "function_id" {
   description = "Cloud Functions v2 resource ID, not a standalone Cloud Run service"
   value       = google_cloudfunctions2_function.main.id

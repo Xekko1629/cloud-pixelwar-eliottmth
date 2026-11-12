@@ -1,0 +1,30 @@
+# OpenAPI 2.0 (Swagger): the only version API Gateway accepts.
+# Rendered by Terraform (main.tf): one operation per route whose backend is deployed.
+swagger: "2.0"
+info:
+  title: ${jsonencode(title)}
+  description: Single public entry point of the pixel canvas (subject section 3.1)
+  version: "1.0.0"
+schemes:
+  - https
+produces:
+  - application/json
+paths:
+%{ for path, operations in paths ~}
+  ${jsonencode(path)}:
+%{ for operation in operations ~}
+    ${operation.method}:
+      operationId: ${jsonencode(operation.operation_id)}
+      summary: ${jsonencode(operation.summary)}
+      # The gateway signs a Google ID token as its own service account
+      # (audience = the Cloud Run URL), so the private proxy accepts the call.
+      x-google-backend:
+        address: ${jsonencode(operation.address)}
+        jwt_audience: ${jsonencode(operation.address)}
+        path_translation: APPEND_PATH_TO_ADDRESS
+        deadline: ${operation.deadline_seconds}
+      responses:
+        default:
+          description: Response returned by the backend proxy
+%{ endfor ~}
+%{ endfor ~}
