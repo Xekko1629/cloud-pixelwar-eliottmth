@@ -62,12 +62,17 @@ resource "google_api_gateway_api" "main" {
 }
 
 # The managed service created for the API must be enabled in the project to serve traffic.
+# Its service config only exists once an API config has been created: enabling it
+# before returns 403 SERVICE_CONFIG_NOT_FOUND_OR_PERMISSION_DENIED.
 resource "google_project_service" "managed" {
   project = var.project_id
   service = google_api_gateway_api.main.managed_service
 
   # Disposable: the managed service disappears with the API.
   disable_on_destroy = true
+
+  # The API config publishes the service config this enablement targets.
+  depends_on = [google_api_gateway_api_config.main]
 }
 
 # An API config is immutable: any change in the spec creates a new config (random suffix),
@@ -102,8 +107,6 @@ resource "google_api_gateway_api_config" "main" {
       error_message = "At least one route must have a deployed backend: API Gateway rejects an empty spec."
     }
   }
-
-  depends_on = [google_project_service.managed]
 }
 
 resource "google_api_gateway_gateway" "main" {
@@ -115,6 +118,9 @@ resource "google_api_gateway_gateway" "main" {
   display_name = var.api_id
   api_config   = google_api_gateway_api_config.main.id
   labels       = var.labels
+
+  # Enable the managed service before serving traffic from the gateway.
+  depends_on = [google_project_service.managed]
 }
 
 # Proxies keep IAM authentication on: only the gateway identity may invoke them (SRV-04b).

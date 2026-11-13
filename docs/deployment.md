@@ -247,6 +247,7 @@ installe les dépendances depuis le manifeste généré, sans lockfile de déplo
 | Callback Discord refusé | Application/clé publique correspondantes, corps brut, signature, chemin et délai de réponse |
 | Conflit de nom lors d'un remplacement de fonction | Ordre du plan, ancien lifecycle hérité et séparation des states ; suivre le [guide Gateway](../infra/gateway/README.md) avant toute reprise |
 | Gateway bloqué sur un contrat absent | Vérifier la réussite du nouvel apply serverless et son output `gateway_contract`, ainsi que projet, environnement et région |
+| `SERVICE_CONFIG_NOT_FOUND_OR_PERMISSION_DENIED` sur le service géré | Le service géré ne peut être activé qu'après la première configuration d'API : vérifier l'ordre du graphe, et non élargir les droits IAM |
 
 Ne pas relancer un apply ou un enregistrement en boucle. Lire le plan, les logs
 et l'état effectif après une interruption. Ne pas forcer un déverrouillage de

@@ -7,7 +7,7 @@ Crée le point d'entrée HTTP public des proxies applicatifs Cloud Run functions
 - une configuration d'API générée à partir de [`openapi.yaml.tftpl`](openapi.yaml.tftpl) (OpenAPI 2.0, seule version acceptée par API Gateway) ;
 - un service account dédié `<api_id>-gateway`, avec lequel la gateway appelle les proxies ;
 - `roles/run.invoker` pour ce service account, **sur le service Cloud Run sous-jacent de chaque proxy routé uniquement**, jamais au niveau du projet ni sur un worker (SRV-04b) ;
-- l'activation du service géré créé pour l'API (`<api>-<hash>.apigateway.<projet>.cloud.goog`). Il est créé dynamiquement avec l'API, il ne peut donc pas être déclaré dans `infra/iam/apis.tf` comme les autres APIs.
+- l'activation du service géré créé pour l'API (`<api>-<hash>.apigateway.<projet>.cloud.goog`). Son nom est connu dès la création de l'API, mais sa configuration de service n'existe qu'après la première configuration d'API : l'activation est donc ordonnée après celle-ci, puis la gateway après l'activation. Il ne peut pas être déclaré dans `infra/iam/apis.tf` comme les autres APIs.
 
 Les ressources API Gateway n'existent que dans le provider `google-beta`. Les APIs `apigateway`, `servicemanagement` et `servicecontrol` sont activées par `infra/iam`.
 
