@@ -74,7 +74,10 @@ Si une autre version est utilisée, adapter la référence numérique avant la P
 Dans le dépôt GitHub :
 
 1. **Actions → Deploy → Run workflow**.
-2. Sélectionner la branche **`prod`**, après fusion du changement.
+2. Sélectionner la branche contenant la version approuvée pour l'essai dev
+   (par exemple `feature/discord-hello-check` pour tester avant fusion), ou
+   **`prod`** après fusion. Les restrictions de l'environnement GitHub `dev`
+   doivent autoriser la branche choisie.
 3. Renseigner **`runner = ubuntu-latest`** pour que les contrôles n'attendent pas
    un runner GKE disponible.
 4. Vérifier une dernière fois le commit et le périmètre, puis cliquer sur
@@ -85,7 +88,7 @@ Alternative CLI, à la place du clic — **ne pas exécuter les deux** :
 ```sh
 gh workflow run deploy.yml \
   --repo Xekko1629/cloud-pixelwar-eliottmth \
-  --ref prod -f runner=ubuntu-latest
+  --ref feature/discord-hello-check -f runner=ubuntu-latest
 ```
 
 Cette commande modifie GCP en lançant le workflow. L'exécution manuelle du
@@ -112,7 +115,7 @@ Discord pour tenter de résoudre un build ou une erreur IAM.
 
 ### 4. Récupérer les URLs sans nouvel apply
 
-Utiliser le checkout contenant le changement fusionné et une authentification
+Utiliser le checkout du commit effectivement déployé et une authentification
 GCP autorisée à lire le backend dev. Depuis la racine du dépôt :
 
 ```sh

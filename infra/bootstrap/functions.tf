@@ -1,5 +1,5 @@
-# Source archives are the promoted release artefact (ADR-0008). They survive a
-# serverless destroy so the same bytes can be re-applied or rolled back.
+# Function sources are rebuilt per environment (ADR-0009). The bucket survives
+# serverless destroy; versioning retains noncurrent/deleted source generations.
 resource "google_storage_bucket" "function_sources" {
   project                     = var.project_id
   name                        = "${var.project_id}-function-sources"
@@ -50,6 +50,30 @@ resource "google_storage_bucket_iam_member" "function_builder_source_reader" {
   bucket = google_storage_bucket.function_sources.name
   role   = "roles/storage.objectViewer"
   member = google_service_account.function_builder.member
+}
+
+data "google_project" "current" {
+  project_id = var.project_id
+}
+
+locals {
+  managed_function_source_prefix = "projects/_/buckets/gcf-v2-sources-${data.google_project.current.number}-${var.region}/objects/"
+}
+
+# Cloud Functions stages the submitted archive in its own regional bucket before
+# Cloud Build reads it. The bucket may not exist during the first bootstrap:
+# constrain a project grant to its objects rather than managing Google's bucket
+# or allowing reads across every bucket. No uploads bucket or CMEK is used here.
+resource "google_project_iam_member" "function_builder_managed_source_reader" {
+  project = var.project_id
+  role    = "roles/storage.objectViewer"
+  member  = google_service_account.function_builder.member
+
+  condition {
+    title       = "function-builder-managed-sources"
+    description = "Read only Cloud Functions staged source objects in this project and region."
+    expression  = "resource.type == \"storage.googleapis.com/Object\" && resource.name.startsWith(${jsonencode(local.managed_function_source_prefix)})"
+  }
 }
 
 resource "google_artifact_registry_repository_iam_member" "function_builder_writer" {

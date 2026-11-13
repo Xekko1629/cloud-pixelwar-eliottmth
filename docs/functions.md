@@ -6,7 +6,8 @@ La CI la construit, Terraform la zippe, la téléverse et la déploie ([ADR-0009
 ```text
 app/functions/<nom>/src   ──npm run build:functions──▶   app/dist/functions/<nom>/{index.js, package.json}
                           ──Terraform (function-source)─▶  gs://<projet>-function-sources/functions/<nom>/<sha256>.zip
-                          ──Terraform (function)────────▶  Cloud Build installe les dépendances, Google déploie la fonction
+                          ──Cloud Functions────────────▶  copie dans gcf-v2-sources-<numéro-projet>-<région>
+                          ──Cloud Build────────────────▶  installation des dépendances, puis déploiement par Google
 ```
 
 ## Ajouter une fonction
@@ -96,6 +97,21 @@ module "hello" {
   garde le même objet et n'est pas redéployée ; un changement de code crée un nouvel objet,
   donc une nouvelle révision.
 - `function` déploie depuis cet objet et sa génération exacte.
+
+Cloud Functions copie les sources dans un bucket intermédiaire géré par Google,
+`gcf-v2-sources-<numéro-projet>-<région>`, avant que Cloud Build les lise. L'identité
+`function-builder` doit donc lire le bucket de sources du bootstrap **et** ces
+objets intermédiaires. Sans ce second accès, le build échoue même si le ZIP a été
+correctement téléversé.
+
+Le bootstrap déclare `roles/storage.objectViewer` avec une condition IAM limitée
+aux objets du bucket intermédiaire du projet et de la région. Le binding est
+porté par le projet pour pouvoir être créé avant le premier build, lorsque le
+bucket géré n'existe pas encore ; sa condition ne donne pas la lecture des autres
+buckets, ni des secrets. Le bucket reste géré par Google, pas importé dans Terraform.
+Cette portée correspond au déploiement depuis le bucket du bootstrap, sans CMEK ;
+un changement de méthode d'envoi ou de chiffrement doit faire réexaminer la portée.
+Voir le [contrat Google des identités de build](https://cloud.google.com/functions/docs/building#provide_a_service_account_for_building_functions).
 
 La CI construit les fonctions avant chaque plan et apply du stack `serverless`
 (`_plan.yml`, `_apply.yml`), et la CI applicative vérifie que toutes se construisent. Un tag
