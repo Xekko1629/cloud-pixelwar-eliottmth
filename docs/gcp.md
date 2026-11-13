@@ -1,100 +1,106 @@
-# Projets GCP et coûts
+# Configuration GCP et maîtrise des coûts
 
-## Projets et facturation
+## Environnements et sources de configuration
 
-| Environnement | Projet | Numéro |
+| Environnement | Projet de référence | Configuration |
 | --- | --- | --- |
-| dev | `cloud-pixelwar-dev` | 604633290708 |
-| prd | `cloud-pixelwar-prod` | 241409932843 |
+| dev | `cloud-pixelwar-dev` | `infra/*/dev.tfvars`, `backends/dev.hcl` |
+| prd | `cloud-pixelwar-prod` | `infra/*/prd.tfvars`, `backends/prd.hcl` |
 
-Les deux projets sont liés au compte de facturation `0111A1-F02A73-B2E667`, qui porte les crédits gratuits.
+Le compte de facturation et les buckets de state sont référencés par les
+variables IAM. Leur nom peut être distinct de l'ID du projet. Pour installer
+d'autres projets, adapter l'ensemble des configurations avant les opérations,
+selon le [guide depuis zéro](deployment.md).
 
-## Budgets
+Les propriétés versionnées décrivent la configuration demandée, pas l'inventaire
+GCP effectif. Vérifier celui-ci avec le plan, les APIs et la console avant de
+calculer les coûts ou de supprimer des ressources.
 
-Chaque projet a un budget mensuel, créé par le stack `infra/iam` (`budget.tf`) :
+## Budgets et alertes
 
-| Projet | Montant | Alertes |
-| --- | --- | --- |
-| dev | 20 EUR | 50 %, 90 %, 100 % |
-| prd | 20 EUR | 50 %, 90 %, 100 % |
+`infra/iam/budget.tf` déclare un budget par projet, filtré sur son numéro GCP.
+`budget_amount`, `budget_currency` et `budget_alert_thresholds` définissent
+montant, devise et seuils. Vérifier les destinataires dans la configuration
+Cloud Billing et leur réception effective ; ne pas supposer que tous les membres
+du dépôt reçoivent les emails.
 
-Les alertes partent par e-mail aux administrateurs et aux utilisateurs du compte de facturation. Les adresses ne sont donc pas dans le dépôt, qui est public. Pour que les 3 membres les reçoivent, chacun doit avoir le rôle *Billing Account User* (`roles/billing.user`) ou *Billing Account Administrator* sur le compte de facturation : *Facturation > Gestion des comptes > Ajouter un compte principal*.
+Créer/modifier un budget demande des permissions sur le compte de facturation,
+en plus des droits projet. IAM est appliqué manuellement par une identité
+autorisée à gérer ces budgets.
 
-Créer ou modifier un budget demande aussi des droits sur le compte de facturation (`billing.budgets.*`, par exemple *Billing Account Costs Manager*). `infra/iam` n'est jamais appliqué par la CI : la personne qui l'applique doit avoir ce rôle.
+**Un budget n'arrête pas la consommation.** Les plafonds d'instances, de nœuds,
+de runners et les règles de conservation constituent d'autres contrôles, mais
+ne garantissent pas à eux seuls un plafond absolu de facture.
 
-Un budget ne coupe rien : il ne fait qu'envoyer des alertes. Sur un compte payant, c'est le seul garde-fou.
+Pour tester une alerte, utiliser un budget de test approuvé avec seuil adapté à
+une dépense réelle, attendre l'évaluation de facturation et vérifier la réception.
+Retirer le budget de test après vérification. Cette opération modifie Cloud
+Billing et doit être distinguée d'une consultation des coûts.
 
-### Vérifier qu'une alerte arrive
+## Régions et disponibilité des services
 
-Un budget n'a pas de bouton « envoyer un test ». Pour vérifier la chaîne d'envoi :
+Les stacks utilisent la variable `region` ; la région par défaut est
+`europe-west1`. Le cluster utilise la zone configurée par foundation. Les
+ressources globales et buckets peuvent avoir une autre portée ou localisation.
 
-1. Dans *Facturation > Budgets et alertes*, créer à la main un budget temporaire sur le projet prd, d'un montant inférieur à la dépense déjà faite ce mois-ci (par exemple 1 EUR), avec une alerte à 50 %.
-2. Attendre l'e-mail : la dépense est évaluée plusieurs fois par jour, l'alerte arrive en général en quelques heures.
-3. Vérifier que les 3 membres l'ont reçue, puis supprimer ce budget temporaire.
+Avant de changer de région, vérifier la disponibilité d'API Gateway, Cloud Run
+functions, Artifact Registry, GKE et des stockages utilisés, ainsi que les quotas,
+latences, prix et éventuels remplacements Terraform. Les localisations d'une base
+ou d'un bucket ne se modifient pas comme un simple paramètre de runtime.
 
-## Région : `europe-west1` (Belgique)
+- [Régions API Gateway](https://cloud.google.com/api-gateway/docs/deployment-model#choosing_a_gcp_region)
+- [Localisations Cloud Run](https://cloud.google.com/run/docs/locations)
+- [Caractéristiques carbone des régions](https://cloud.google.com/sustainability/region-carbon)
 
-Toutes les ressources sont dans `europe-west1`, et le cluster GKE dans la zone `europe-west1-b`.
+## Quotas et plafonds
 
-- **Coût** : `europe-west1` fait partie des régions européennes les moins chères (palier de prix 1 pour Cloud Run, mêmes tarifs Compute Engine que `us-central1` à quelques pourcents près). Paris (`europe-west9`) et Francfort (`europe-west3`) coûtent plus cher.
-- **Latence** : 10 à 20 ms depuis la France. Firebase Hosting passe de toute façon par un CDN.
-- **Empreinte carbone** : la région est marquée *Faible émission de CO2* dans la console (électricité décarbonée à environ 80 % selon Google).
-- **Services** : API Gateway n'existe que dans quelques régions, dont `europe-west1` ([liste des régions](https://cloud.google.com/api-gateway/docs/deployment-model#choosing_a_gcp_region)). `europe-west9` et `europe-west3` n'en font pas partie. Cloud Run, Pub/Sub, GKE et Firestore (`eur3` ou `europe-west1`) y sont aussi disponibles.
+Avant un premier déploiement, une montée en charge ou une modification de pool :
 
-## Quotas et plafonds du cluster
+1. Lire les quotas accordés au projet dans **IAM et administration → Quotas**.
+   Vérifier les métriques globales et régionales ; une limite relevée dans un
+   autre projet ne s'applique pas automatiquement.
+2. Additionner la consommation des machines système/runners et des autres usages,
+   en tenant compte de la méthode de comptage des types de machines.
+3. Inclure les disques de tous les nœuds et la capacité de mise à niveau/surge,
+   pas seulement le nombre nominal d'instances.
+4. Comparer avec `max_node_count`, les limites de pools, `maxRunners` et les
+   demandes CPU/mémoire des pods dans `infra/foundation` et `infra/runners`.
+5. Vérifier séparément les quotas Cloud Run functions, Cloud Build, Pub/Sub et
+   stockage ; ne pas les confondre avec les seuls quotas Compute Engine.
 
-Deux quotas de prd limitent la taille du cluster (vérifiés le 06/11, visibles dans *IAM et administration > Quotas*) :
+Exemples de consultation sans modification, après définition de `PROJECT_ID`
+et `REGION` :
 
-- `CPUS_ALL_REGIONS` : **16 vCPU** ;
-- `SSD_TOTAL_GB` dans `europe-west1` : **300 Go**. Les disques `pd-balanced` des nœuds comptent dans ce quota.
+```sh
+gcloud compute project-info describe --project="$PROJECT_ID" --format='json(quotas)'
+gcloud compute regions describe "$REGION" --project="$PROJECT_ID" --format='json(quotas)'
+```
 
-Les plafonds de Terraform sont choisis pour que le cluster tienne dans ces quotas même au maximum, au lieu de laisser le quota bloquer l'autoscaling avec des erreurs `QUOTA_EXCEEDED` :
+Une erreur `QUOTA_EXCEEDED` exige un diagnostic de la métrique et du périmètre.
+Demander une hausse approuvée ou réduire la configuration ; ne pas augmenter
+les plafonds de nœuds/runners sans vérifier quota et budget ensemble.
 
-| Pool | Machine | Nœuds | vCPU comptés dans le quota | Disque (30 Go par nœud) |
-| --- | --- | --- | --- | --- |
-| `system` | `e2-medium` spot | 1 à 2 | 1 à 2 | 30 à 60 Go |
-| `runners` | `e2-standard-2` | 0 à 6 | 0 à 12 | 0 à 180 Go |
-| **Total** | | **1 à 8** | **1 à 14** | **30 à 240 Go** |
+## Estimer et contrôler les coûts
 
-- Un `e2-medium` est une machine à cœur partagé : il ne compte que pour 1 vCPU dans le quota, même s'il expose 2 vCPU.
-- `max_node_count = 6` sur le pool `runners` (`infra/foundation/cluster.tf`) : 6 × 2 vCPU + 2 vCPU du pool `system` = 14 vCPU sur 16. Les 2 vCPU restants absorbent le nœud supplémentaire que GKE crée pendant une mise à niveau d'un pool.
-- `max_runners = 6` (`infra/runners/variables.tf`) : un pod runner demande 1 vCPU et 2 Gio, donc un seul runner tient sur un `e2-standard-2`. Le nombre de runners et le nombre de nœuds ont ainsi le même plafond.
-- Le pool `runners` redescend à 0 nœud quand aucun job ne tourne.
+Calculer par environnement et par période, avec hypothèses explicites et tarifs
+publics consultés à la date du calcul. Conserver les simulations datées dans les
+rapports d'exploitation ou tickets ; recalculer avant une modification de charge.
 
-Cloud Run ne compte pas dans le quota de vCPU. Pour aller au-delà de 6 runners, il faut d'abord demander une hausse du quota de vCPU (et du quota SSD au-delà de 10 nœuds), puis relever `max_node_count` et `max_runners` ensemble.
+| Poste | Paramètres à prendre en compte |
+| --- | --- |
+| GKE | Gestion du cluster, éligibilité au free tier, nœuds système et heures-nœuds runners |
+| Compute/réseau | Disques, IPv4, trafic sortant, NAT/équilibreurs si configurés, capacité de mise à niveau |
+| Fonctions | CPU, mémoire, durée, nombre de requêtes, instances minimales/maximales et builds |
+| Données | Lectures/écritures Firestore, Pub/Sub, stockage des objets et versions non courantes |
+| Artefacts et secrets | Registre, archives, rétention, versions de secrets et accès |
+| Observabilité | Ingestion/rétention de logs, traces, métriques personnalisées et échantillons Prometheus |
+| Hébergement/API | Trafic Hosting, requêtes Gateway et services auxiliaires utilisés |
 
-## Estimation du coût mensuel
+Comparer les estimations aux dépenses réelles dans **Facturation → Rapports**,
+en distinguant tarifs, crédits et quotas gratuits. Un crédit disponible n'est
+pas un mécanisme technique de limitation de charge.
 
-Prix publics de `europe-west1`, en dollars et arrondis. La facture est en euros, à un taux proche. Les postes à usage variable sont estimés pour la charge d'un projet d'école.
-
-### prd
-
-| Poste | Hypothèse | ≈ $ / mois |
-| --- | --- | --- |
-| Frais de gestion GKE | 1 cluster zonal, couvert par le free tier (un seul par compte de facturation) | 0 |
-| Nœuds `system` | 1 `e2-medium` spot 24 h/24, parfois 2 | 8 à 15 |
-| Disques des nœuds | `pd-balanced` de 30 Go par nœud (environ 3,5 $ par disque et par mois), dont 1 permanent | 4 à 6 |
-| IP externes des nœuds | 1 IPv4 permanente, plus une par nœud runner allumé | 2 à 4 |
-| Nœuds `runners` | `e2-standard-2` à la demande, environ 80 h-nœud de CI et de démo par mois | 6 |
-| Cloud Run `min_instances` | 1 instance minimale inactive, 1 vCPU / 512 Mio | ≈ 10 |
-| Cloud NAT | aucun aujourd'hui (les nœuds ont des IP publiques) ; avec des nœuds privés : 1 à 2 $ + 0,045 $/Go traité | 0 |
-| Managed Prometheus, métriques personnalisées | métriques système GKE gratuites ; 0,06 $ par million d'échantillons au-delà | 0 à 5 |
-| Firestore, Pub/Sub, Hosting, Logging, API Gateway | dans le free tier pour cette charge | ≈ 0 |
-| **Total** | | **≈ 30 à 45** |
-
-### dev
-
-Pas de cluster (`enable_cluster = false`) et pas d'instance minimale : seuls les services serverless consomment, dans le free tier. **≈ 0 à 5 $ / mois.**
-
-Si un cluster est un jour créé en dev, ses frais de gestion ne sont plus couverts par le free tier : 0,10 $/h, soit **≈ 73 $ / mois** de plus, nœuds non compris.
-
-### Jusqu'au 13/12
-
-Du 06/11 au 13/12, il reste environ 1,2 mois : **≈ 35 à 60 $** pour les deux environnements. Le crédit restant est affiché dans *Facturation > Crédits*. Il doit couvrir ce montant avec de la marge, et les budgets (20 EUR par projet) préviennent si la dépense dérape. L'estimation de prd dépasse 20 EUR : ses alertes à 90 % et 100 % arriveront donc chaque mois, ce qui est normal.
-
-Au pire, si les 8 nœuds tournaient en continu (runners bloqués à 6), le cluster coûterait environ 0,45 $/h, soit environ 11 $ par jour : l'alerte à 50 % du budget prd arriverait en un jour.
-
-### Économies possibles
-
-- Détruire le cluster prd en dehors des périodes de travail (`destroy.yml`). Ce sont le nœud `system` et son disque qui coûtent le plus.
-- Garder `min_instances = 0` en dev.
+Pour limiter les coûts, vérifier `min_instances`, plafonds de pools/runners,
+échantillonnage, rétentions et ressources conservées. La suppression des workloads
+via [Destroy](deployment.md#suppression) conserve IAM, accès et bootstrap :
+archives versionnées, secrets et states peuvent continuer à être facturés.

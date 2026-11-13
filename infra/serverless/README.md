@@ -1,96 +1,114 @@
-# Stack serverless — SRV-01
+# Stack serverless
 
-Choix retenu : **Cloud Run functions** (Cloud Functions v2), déployées depuis une archive de sources identifiée par son SHA-256 et copiée à l'identique entre dev et prd, conformément à [ADR-0008](../../docs/adr/0008-compute-cloud-run-functions.md). Google construit l'image d'exécution dans chaque projet ; l'artefact promu est l'archive, pas un digest d'image.
+## Objet et dépendances
 
-Le module [function](modules/function/README.md) distingue les proxies (`service_type = "proxy"`, ingress public avec IAM) des workers (`service_type = "worker"` par défaut, ingress interne et identité d'invocation Pub/Sub dédiée), conformément aux ADR-0002 et ADR-0008.
+Ce stack déclare les Cloud Run functions et leurs intégrations applicatives.
+Le module `function` utilise `google_cloudfunctions2_function` ; Google construit
+l'image à partir de sources dans GCS. Le compute est défini par ADR-0008 et le
+mécanisme de sources par ADR-0009.
 
-Ce squelette ne déploie encore aucune fonction : les modules seront instanciés lorsque les archives des proxies et workers seront produites par SRV-02. Le module `function` est prêt à être utilisé.
+| Ressource/prérequis | Responsable |
+| --- | --- |
+| APIs, identités de CI, state et conteneurs de secrets | `infra/iam`, manuel |
+| Accès humains | `infra/access`, manuel |
+| Bucket de sources, registre d'images internes et identité de build | `infra/bootstrap`, CI |
+| Réseau et cluster conditionnel | `infra/foundation`, CI |
+| Sources, fonctions et IAM runtime/invocation des workers | Ce stack, CI |
+| Gateway, catalogue HTTP et invocation des proxies | `infra/gateway`, CI après ce stack |
 
-## API Gateway — SRV-04a
+Pour une installation vide, suivre le [guide de déploiement](../../docs/deployment.md)
+avant le premier init GCS. Chaque environnement utilise ses propres
+`<env>.tfvars`, `backends/<env>.hcl` et secrets.
 
-`gateway.tf` déclare le catalogue des routes de l'unique point d'entrée public
-(`/discord/interactions`, `/auth/*`, `/api/*`, et `/hello` temporairement pour SRV-09)
-et appelle le [module api-gateway](modules/api-gateway/README.md).
+## Sources et fonctions
 
-Une route n'est publiée que lorsque sa fonction proxy est déployée : il suffit
-d'ajouter son entrée dans `local.gateway_backends`, à partir des outputs du module
-`function`. Tant qu'aucun proxy n'existe, la gateway n'est pas créée (API Gateway
-refuse une spécification sans backend) et l'output `gateway_url` vaut `null`.
-Les APIs nécessaires (`apigateway`, `servicemanagement`, `servicecontrol`) sont
-activées par `infra/iam`.
+Le [build applicatif](../../docs/functions.md) écrit les dossiers sous
+`app/dist/functions`. Le module `function-source` les zippe et les téléverse sous
+`functions/<nom>/<sha256>.zip`, puis fournit bucket, objet, SHA-256 et génération
+GCS au [module function](modules/function/README.md).
 
-Les routes exigent par défaut un ID token Firebase validé par la gateway (SRV-04c) ;
-`/discord/interactions` et `/auth/*` sont publiques à la gateway et vérifiées par
-leur proxy. Les routes appelées par le navigateur (`cors = true`) reçoivent une
-route `OPTIONS` publique pour le preflight CORS. Détails et étude de la limitation
-de débit : [module api-gateway](modules/api-gateway/README.md#authentification-des-routes--srv-04c).
+Les environnements construisent séparément depuis le commit choisi. Il n'y a
+pas de promotion par copie d'une archive unique ni de lockfile dans le bundle
+livré à Cloud Build. Le lockfile du dépôt verrouille le build CI ; les dépendances
+transitives du runtime sont résolues par Google à partir du manifeste généré.
 
-## Secrets applicatifs — SRV-03
+Le bucket de sources est privé, versionné et conservé par le bootstrap. Le
+registre reçoit les images internes, pas un artefact fourni par l'équipe.
+Vérifier les politiques de rétention et de nettoyage dans `infra/bootstrap` et
+les besoins de reprise avant leur modification.
 
-Les conteneurs Secret Manager sont déclarés par le stack persistant `infra/iam`
-(`secrets.tf`), plus ici : Secret Manager est la source de vérité, un destroy de
-`serverless` ne doit pas effacer les valeurs. Ce stack se contente de donner
-`secretAccessor` à chaque fonction sur les secrets qu'elle utilise (module
-`service`). Voir [SECRETS.md](../iam/SECRETS.md) pour le catalogue,
-l'alimentation hors Git, les accès par service et la rotation.
+## API Gateway et invocation
 
-## Organisation des states
+`gateway-backends.tf` exporte `gateway_contract`, avec les noms, URI et types des
+proxies réellement instanciés. Le catalogue de routes et la Gateway sont gérés
+dans le [stack Gateway](../gateway/README.md), avec un state indépendant pour
+isoler son `create_before_destroy` de celui des fonctions (ADR-0010). Une route
+n'est publiée que si sa clé de backend est exportée. Sans backend, le stack
+Gateway ne crée pas de Gateway et son output `gateway_url` est nul.
 
-| Stack | Préfixe GCS | Rôle |
-| --- | --- | --- |
-| `infra/iam` (à la main) | `iam` | APIs, identités de CI, secrets, bucket de state |
-| `infra/bootstrap` (CI, jamais détruit) | `bootstrap` | Registre d'images, bucket d'archives et identité de build persistants |
-| `infra/serverless` | `serverless` | Fonctions applicatives et leurs identités |
+- Proxies : `service_type="proxy"`, ingress `ALLOW_ALL`, mais invocation IAM
+  obligatoire. Le module Gateway accorde `roles/run.invoker` à son identité sur
+  les seuls proxies routés, pas sur les workers.
+- Workers : ingress interne et identité dédiée d'invocation Pub/Sub, distincte
+  du runtime. Les abonnements utilisent le push OIDC, sans `event_trigger`.
+- Routes API : Firebase par défaut ; routes de connexion et Discord publiques
+  à la Gateway, avec validation dans le handler concerné.
+- CORS : `cors=true` ajoute un `OPTIONS` public ; le backend doit fournir les
+  en-têtes de réponse CORS.
 
-Le bootstrap est appliqué par `Deploy`, avant `serverless`, en dev puis en prd ; `Destroy` ne le cible jamais. Ses APIs sont activées par `infra/iam`, à appliquer avant. Il crée :
+Voir le [contrat du module Gateway](modules/api-gateway/README.md). La
+[sonde Discord dev](../../docs/discord-hello.md) est activée par
+`enable_discord_hello`, n'est jamais instanciée en prd et publie seulement le
+callback `/discord/interactions` lorsqu'elle est activée.
 
-- le registre Artifact Registry qui reçoit les images internes construites par Google ;
-- le bucket `${project_id}-function-sources`, versionné, privé et non vidé par Terraform ;
-- l'identité `function-builder`, avec les trois rôles nécessaires au build.
+## Secrets
 
-Le registre et le bucket ne dépendent pas du state serverless : ils survivent à un destroy et permettent de rejouer ou de rollbacker la même release. La cleanup policy du registre ne garde que 10 versions récentes et reste initialement en **dry run**. Une image interne supprimée n'est pas un problème de release : réappliquer la même archive la reconstruit. Le dry run doit tout de même être vérifié avant d'activer les suppressions.
+Les conteneurs et valeurs vivent dans Secret Manager ; ce stack donne à chaque
+runtime `secretAccessor` sur les seuls secrets référencés dans le module
+`function`. Utiliser une version numérique activée, jamais une valeur de secret
+dans Terraform. Voir [alimentation et rotation](../iam/SECRETS.md).
 
-## Vérifications locales sans accès GCP
+## Vérification locale et plan
 
-Depuis chacun des répertoires `infra/bootstrap` et `infra/serverless` :
+Depuis la racine du dépôt, construire les sources avant un plan qui les archive :
 
 ```sh
+cd app
+npm ci
+npm run build:functions
+cd ../infra/serverless
 terraform init -backend=false
 terraform validate
+terraform test
 ```
 
-Le module peut aussi être validé depuis `infra/serverless/modules/function` avec les mêmes commandes. Depuis ce répertoire,
-`terraform test` exécute les tests du module avec un provider simulé, sans créer de ressource GCP.
-
-## Initialisation par environnement
-
-Exemple depuis le répertoire du stack concerné, avec une identité GCP autorisée :
+Les tests racine simulent les providers. Les tests de chaque module sont lancés
+séparément par la CI ; Terraform ne les découvre pas automatiquement depuis la
+racine. Pour un plan distant, réinitialiser ensuite le backend sélectionné :
 
 ```sh
 terraform init -reconfigure -backend-config=backends/dev.hcl
 terraform plan -var-file=dev.tfvars
 ```
 
-Remplacer `dev` par `prd` pour la production. Ces commandes ne font pas d'apply.
+Remplacer ensemble les références dev par prd pour viser prd. Un plan distant
+lit GCP et le state : ce n'est pas un test sans accès cloud.
 
-La CI de PR détecte désormais `bootstrap`, `serverless` et les modules `function` et `api-gateway` pour le formatage, la validation et les tests sans backend. Les modules sont testés séparément : Terraform ne découvre pas automatiquement ses tests depuis la racine.
+## Déploiement, vérification et retrait
 
-Déploiement : exécution manuelle → `foundation` et `bootstrap`, puis `serverless`
-en dev ; tag `v*` → même séquence en dev, puis en prd, avec `runners` en prd.
-Un merge/push sur la branche `prod` seul ne déclenche pas d'apply. Les contrôles
-de release incluent aussi `bootstrap`, `serverless` et le module `function`.
-`infra/iam` doit avoir été appliqué à la main avant, pour activer les APIs.
+Utiliser [Deploy](../../docs/deployment.md#6-déployer-dev-par-la-ci), pas un
+déploiement `gcloud functions deploy` parallèle à Terraform. Un lancement manuel
+vise dev ; un tag `v*` déclenche aussi prd. Lire les plans et valider la portée
+avant le déclenchement.
 
-Le destroy manuel supprime `serverless` (sans les secrets, gérés par `iam`) et
-`runners` en prd, puis `foundation`. `iam` et `bootstrap` sont conservés : le bucket
-d'archives permet de redéployer sans reconstruire la release.
-Un teardown complet du projet doit d'abord vider `${project_id}-function-sources`
-avec toutes ses générations (`gcloud storage rm --recursive --all-versions`) : le
-bucket est volontairement non vidé par Terraform pour protéger les releases.
-Chaque PR qui modifie ce stack ou son module publie un plan dev et prd ; le plan serverless est aussi
-calculé dans le job d'apply avant application. Relire ce plan de PR avant le
-premier déclenchement, voir [SECRETS.md](../iam/SECRETS.md).
-Le build des fonctions, leur archive et leur téléversement sont décrits dans
-[docs/functions.md](../../docs/functions.md) ([ADR-0009](../../docs/adr/0009-sources-fonctions-terraform.md)) :
-la CI lance `npm run build:functions` avant chaque plan et apply, et le module
-[`function-source`](modules/function-source/) zippe et téléverse chaque fonction.
+Après application, vérifier les outputs, URLs, génération de source, identité
+runtime et policies d'invocation. Tester un appel autorisé et un refus anonyme,
+puis l'intégration concernée : callback Discord, JWT Firebase ou push Pub/Sub.
+Les tests simulés ne prouvent ni ces permissions réelles ni le délai de réponse.
+
+`Destroy` supprime d'abord Gateway puis les ressources de ce stack, mais conserve `iam`, `access` et
+`bootstrap`. Les archives gérées dans ce state sont supprimées comme objets
+courants ; les versions/rétentions du bucket peuvent conserver des données et
+des coûts. Consulter [suppression et reprise](../../docs/deployment.md#suppression)
+avant tout nettoyage complet ; ne pas supprimer des generations ou states sans
+examiner leurs usages et sauvegardes.

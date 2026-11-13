@@ -1,112 +1,89 @@
-# Accès humains (ACC-01)
+# Accès humains GCP
 
-Stack séparé des workloads (sujet §1.3, §2.1, C03 §9) : un destroy de
-`foundation`, `runners` ou `serverless` ne retire l'accès à personne. Un state
-par environnement, **appliqué uniquement à la main par Xekko**, jamais par la CI :
+## Objet et périmètre
 
-| Env | Backend |
+`infra/access` gère les attributions humaines des projets et la lecture de
+certains secrets dev. Il possède un state distinct et ne fait partie d'aucun
+workflow d'apply/destroy. L'opérateur doit disposer des droits de gestion IAM
+sur les ressources concernées ; aucune personne particulière n'est requise par
+le code.
+
+| Environnement | Backend |
 | --- | --- |
-| dev | bucket `cloud-pixelwar-eliottmth-dev-tfstate`, préfixe `access` |
-| prd | bucket `cloud-pixelwar-eliottmth-prod-tfstate`, préfixe `access` |
+| dev | `backends/dev.hcl`, bucket `cloud-pixelwar-eliottmth-dev-tfstate`, préfixe `access` |
+| prd | `backends/prd.hcl`, bucket `cloud-pixelwar-eliottmth-prod-tfstate`, préfixe `access` |
 
-Aucune identité de CI ne peut modifier l'IAM d'un projet : un compte de service
-capable de donner `roles/editor` pourrait se le donner à lui-même, puis agir
-comme le deployer. La CI se contente de `fmt`, `validate` et `test`.
+## Configuration et droits gérés
 
-## Équipe et instructeur
+Les comptes sont configurés dans les `<env>.tfvars` ; ne pas maintenir une seconde
+liste de membres dans ce guide.
 
-| Principal | Rôle | Où |
-| --- | --- | --- |
-| Membres de `team_editors` (Benjamin, IncognitoDev) | `roles/editor` | dev et prd |
-| Instructeur `jeremie@jjaouen.com` | `roles/editor` | dev et prd |
-| Instructeur | `roles/billing.viewer` | compte de facturation `0111A1-F02A73-B2E667`, géré par prd seulement (commun aux deux projets) |
+- `team_editors` et `instructor_email` : `roles/editor` sur le projet.
+- Instructeur : `roles/billing.viewer` sur le compte de facturation, géré par prd.
+- `developer_emails` : `roles/secretmanager.secretAccessor` sur
+  `discord-bot-token` et `discord-application-id` **en dev seulement**.
 
-Attributions **additives** (`google_project_iam_member`,
-`google_billing_account_iam_member`) : la policy des projets n'est jamais
-remplacée. Le `roles/owner` d'Eliott reste volontairement hors Terraform, pour
-qu'une erreur ici ne puisse pas retirer le dernier accès admin ; les comptes de
-service de la CI sont gérés par `infra/iam`. Ces rôles existaient déjà, donnés à
-la main : le premier apply les fait passer sous Terraform sans changer les accès
-réels (sauf `billing.viewer`).
+Les attributions sont additives : elles ne remplacent pas la policy entière.
+La suppression d'un membre de la configuration peut supprimer son attribution
+gérée ; lire le plan même si le droit avait été accordé manuellement auparavant.
+Les droits hérités ou gérés par un autre mécanisme ne sont pas retirés par ce stack.
 
-Retirer un email des `tfvars` retire réellement le rôle, même s'il avait été
-donné à la main avant.
+Le droit secretAccessor concerne toutes les versions des deux secrets. Il ne
+concerne pas les secrets OAuth/admin ni prd. D'autres attributions, notamment
+`editor`, peuvent donner des droits supplémentaires : ne pas déduire le moindre
+privilège global de la seule lecture ciblée des secrets.
 
-## Lecture des secrets Discord dev
+Ce stack ne lit aucune valeur et ne crée pas les conteneurs Secret Manager,
+qui relèvent de `infra/iam`. Les identités de CI et leurs droits sont également
+gérés par `iam`, pas par ce stack.
 
-Six attributions **additives** `google_secret_manager_secret_iam_member`, en dev
-uniquement :
+## Installation initiale et application
 
-| Comptes Google | Secrets dans `cloud-pixelwar-dev` |
-| --- | --- |
-| `benjamin.melinette@gmail.com` | `discord-bot-token`, `discord-application-id` |
-| `eliott603@gmail.com` | mêmes deux secrets |
-| `zekyro.exe@gmail.com` | mêmes deux secrets |
+Suivre d'abord le [bootstrap de l'environnement](../../docs/deployment.md) :
+projet/facturation, bucket de state, authentification ADC et application de
+`infra/iam`. Ce dernier active notamment Cloud Billing, Resource Manager et
+Secret Manager.
 
-Rôle : `roles/secretmanager.secretAccessor`. Les emails sont normalisés en
-minuscules pour éviter les doublons de ressources Terraform.
-
-Pas de lecture de secret en prd, ni sur OAuth, l'allow-list ou les autres secrets. Pas de
-permission d'ajout de version, création de ressource ou gestion IAM accordée aux
-développeurs par ce stack. Il ne supprime pas les droits existants/hérités hors
-de ses propres attributions. La lecture autorise le contenu de **toutes les
-versions** des deux secrets, pas seulement `latest`.
-
-Aucune version/valeur n'est lue par Terraform. La réplication et les conteneurs
-restent gérés par `infra/iam` ; ce stack ne gère que les membres IAM.
-
-## Appliquer
-
-Avec ses propres identifiants (`gcloud auth application-default login`), après
-merge sur `prod`, **et après `infra/iam`** du même environnement : il active les
-APIs utilisées ici (Cloud Billing pour `billing.viewer`, Resource Manager,
-Secret Manager), avec le projet comme projet de quota :
+Depuis `infra/access`, définir `ENV=dev` ou `ENV=prd`. Remplacer le chemin du
+plan par un emplacement accessible hors du dépôt : il contient des données
+d'identité.
 
 ```sh
-cd infra/access
-terraform init -reconfigure -backend-config=backends/<env>.hcl
-terraform plan -var-file=<env>.tfvars -out=access.tfplan
-terraform apply access.tfplan
+terraform init -reconfigure -backend-config="backends/$ENV.hcl"
+terraform plan -var-file="$ENV.tfvars" -out=/chemin/hors-du-depot/access.tfplan
+terraform apply /chemin/hors-du-depot/access.tfplan
 ```
 
-Ou, pour `iam` puis `access` dans les deux environnements, avec confirmation
-avant chaque apply : `just manual` (voir `scripts/apply-manual.sh`).
+Lire et approuver le plan avant l'apply. Ne pas supposer un nombre fixe d'ajouts
+ni l'absence d'import : cela dépend de l'état réel. Un backend existant ou une
+ressource gérée par un autre state exige une vérification préalable.
 
-Relire tout le plan : seules des attributions `editor`, `billing.viewer` (prd)
-et `secretAccessor` (dev) doivent apparaître, sans suppression inattendue.
-Le plan contient des emails : ne pas le committer.
+Pour une application guidée sur backends existants, utiliser
+`scripts/apply-manual.sh <env> access` depuis la racine ou `just manual <env> access`.
+La commande présente le plan et demande confirmation.
 
-Ajouter ou retirer un email dans les `tfvars` → PR, CI, revue, merge, puis
-apply local. Retirer un email retire réellement le rôle, même s'il avait été
-donné à la main avant.
+## Vérification et mise à jour
 
-## Après un destroy
+Vérifier la policy projet et les policies des secrets, puis tester avec les
+identités concernées les accès autorisés et les refus attendus, sans afficher
+de valeurs de secrets dans les logs.
 
-Les secrets applicatifs sont gérés par `infra/iam`, persistant : un destroy de
-`serverless` ne les supprime pas, et les lectures accordées ici sont conservées.
+Pour ajouter/retirer un membre : modifier les variables, PR et review, puis
+appliquer manuellement la version intégrée. Une correction suit le même parcours ;
+ne pas rétablir un ancien membre sans vérifier qu'il est toujours autorisé.
 
-## Premier apply
+## Suppression et migration
 
-Au 06/11, aucun state `access` ne contient de ressource : le workflow
-`access-dev` n'a jamais été initialisé (ni bucket dédié ni identités créés),
-il n'y a donc rien à migrer. Plans attendus au premier apply :
+La destruction des workloads ne cible pas ce stack et conserve donc ses
+attributions. Le retrait d'accès doit être une modification IAM explicite et
+relue, sans retirer le dernier accès d'administration.
 
-- dev : **9 ajouts** (6 lectures de secrets, 3 `editor`) ;
-- prd : **4 ajouts** (3 `editor`, 1 `billing.viewer`).
+Pour migrer un state, identifier les ressources effectivement gérées, conserver
+une sauvegarde et vérifier l'état cible avant un import ou un déplacement.
+Ne jamais supprimer un ancien objet de state sur la seule hypothèse qu'il est
+vide, ni gérer la même attribution depuis deux states.
 
-Les rôles `editor` existaient déjà, donnés à la main : l'apply les fait passer
-sous Terraform sans changer les accès réels.
-
-Les préfixes `access-team/` des deux buckets de state viennent de l'ancien
-stack imbriqué `infra/access/team`, supprimé. Leurs states sont vides ; les
-retirer une fois `access` appliqué :
-
-```sh
-gcloud storage rm gs://cloud-pixelwar-eliottmth-dev-tfstate/access-team/default.tfstate
-gcloud storage rm gs://cloud-pixelwar-eliottmth-prod-tfstate/access-team/default.tfstate
-```
-
-## Vérifications locales sans GCP
+## Vérification locale
 
 ```sh
 terraform init -backend=false -input=false -lockfile=readonly
@@ -114,5 +91,6 @@ terraform validate
 terraform test
 ```
 
-Les tests utilisent des providers simulés. Ils ne prouvent pas les droits réels
-ni la propagation IAM.
+Les providers simulés vérifient la configuration, pas les droits réels ni leur
+propagation. Les résultats d'application et de test d'accès sont conservés dans
+les tickets ou rapports, pas comme un inventaire permanent dans ce guide.

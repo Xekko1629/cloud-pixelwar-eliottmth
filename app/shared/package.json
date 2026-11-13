@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     "./observability": "./src/observability/index.ts",
+    "./observability/logger": "./src/observability/logger.ts",
     "./observability/google": "./src/observability/google.ts",
     "./grid": "./src/grid/index.ts"
   },

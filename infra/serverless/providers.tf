@@ -6,7 +6,7 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 7.0"
     }
-    # API Gateway resources only exist in the beta provider.
+    # Kept while declaratively transferring any legacy Gateway state.
     google-beta = {
       source  = "hashicorp/google-beta"
       version = "~> 7.0"
@@ -30,8 +30,7 @@ provider "google" {
 }
 
 provider "google-beta" {
-  project = var.project_id
-  region  = var.region
-
+  project        = var.project_id
+  region         = var.region
   default_labels = local.labels
 }

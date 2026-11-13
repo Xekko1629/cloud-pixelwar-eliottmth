@@ -6,7 +6,7 @@ on:
       stacks:
         description: JSON list of stack directories under infra/
         type: string
-        default: '["foundation", "iam", "access", "runners", "bootstrap", "serverless", "serverless/modules/function", "serverless/modules/api-gateway", "serverless/modules/function-source"]'
+        default: '["foundation", "iam", "access", "runners", "bootstrap", "serverless", "gateway", "serverless/modules/function", "serverless/modules/api-gateway", "serverless/modules/function-source"]'
       runner:
         description: Runner label (empty = RUNNER_LABEL variable, then ubuntu-latest)
         type: string
@@ -40,3 +40,7 @@ jobs:
       # Runs the *.tftest.hcl files of the stack
       - name: Terraform test
         run: terraform test
+
+      - name: Gateway migration guard regression tests
+        if: matrix.stack == 'gateway'
+        run: python3 ../../scripts/tests/test_gateway_migration.py

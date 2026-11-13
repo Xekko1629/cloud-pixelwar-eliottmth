@@ -28,7 +28,7 @@ Il faut donc justifier cet écart apparent, et prévoir une solution de repli si
    - `users/{uid}` lisible uniquement par son propriétaire (`request.auth.uid == uid`) ;
    - rien d'autre n'est lisible : déduplication, compteurs de rate limit, overrides admin.
 4. Les workers accèdent à Firestore par les bibliothèques serveur, avec leur service account. Ces bibliothèques ne passent pas par les règles de sécurité : ce sont les rôles IAM qui limitent leurs droits.
-5. Les images de la vue éloignée (DATA-05c) suivent le même principe : lecture seule et authentifiée, par les règles Firebase Storage ou par des URL signées délivrées via la gateway. Le choix se fera dans DATA-05c.
+5. Les images de la vue éloignée suivent le même principe : lecture seule et authentifiée, par les règles Firebase Storage ou par des URL signées délivrées via la gateway. Le mécanisme retenu doit conserver cette frontière d'accès.
 
 ## Justification
 
@@ -49,8 +49,3 @@ Il faut donc justifier cet écart apparent, et prévoir une solution de repli si
 - La clé d'API web de Firebase, publique par nature, est restreinte aux domaines du frontend et aux seules APIs nécessaires (ADR-0005).
 - Le diagramme (ARCH-02) montre ce flux de lecture séparément du flux d'écriture, avec son mécanisme d'authentification.
 - Les lectures Firestore apparaissent dans le dashboard applicatif (OBS-02), pour repérer un abus ou un coût anormal.
-
-## En soutenance
-
-- « Toutes les écritures passent par la gateway et la file. Les lectures se font directement dans Firestore, avec le même token, et les règles de sécurité interdisent toute écriture depuis le navigateur. »
-- « Le support C07 cite les listeners Firestore comme solution de temps réel : c'est une lecture directe par définition. »

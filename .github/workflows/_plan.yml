@@ -62,9 +62,34 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
 
+      # Plans use the last applied serverless contract, not future/unknown endpoints.
+      # During the first migration it is absent: report a deferred Gateway plan,
+      # never substitute guessed backend URLs or silently treat it as empty.
+      - name: Check Gateway contract availability
+        if: inputs.stack == 'gateway'
+        id: contract
+        shell: bash
+        run: |
+          if terraform -chdir=../serverless init -no-color -input=false -backend-config="backends/${{ inputs.environment }}.hcl" > source-init.txt 2>&1; then
+            terraform -chdir=../serverless output -json > source-outputs.json
+            if jq -e 'has("gateway_contract")' source-outputs.json > /dev/null; then
+              echo "ready=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "ready=false" >> "$GITHUB_OUTPUT"
+              echo "::notice::Gateway plan deferred until serverless publishes gateway_contract. Static validation and tests still run."
+            fi
+          elif grep -q "object doesn't exist" source-init.txt; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Gateway plan deferred: serverless has not been applied yet."
+          else
+            cat source-init.txt
+            exit 1
+          fi
+
       # A stack never applied has no remote state: init would create it, which the read-only
       # planner cannot. Only in that case, plan against an empty local state instead.
       - name: Init
+        if: inputs.stack != 'gateway' || steps.contract.outputs.ready == 'true'
         id: init
         run: |
           if terraform init -no-color -backend-config="backends/${{ inputs.environment }}.hcl" 2>&1 | tee init.txt; then
@@ -80,9 +105,17 @@ jobs:
 
       # No lock: the planner can only read the state bucket
       - name: Plan
+        if: inputs.stack != 'gateway' || steps.contract.outputs.ready == 'true'
         run: terraform plan -no-color -lock=false -var-file="${{ inputs.environment }}.tfvars" | tee plan.txt
 
+      - name: Report deferred Gateway plan
+        if: inputs.stack == 'gateway' && steps.contract.outputs.ready != 'true'
+        run: |
+          echo '## Gateway plan deferred' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Apply serverless successfully to publish gateway_contract, then plan gateway. No live Gateway plan has been validated in this run.' >> "$GITHUB_STEP_SUMMARY"
+
       - name: Publish plan to run summary
+        if: inputs.stack != 'gateway' || steps.contract.outputs.ready == 'true'
         run: |
           {
             echo "## Plan \`${{ inputs.stack }}\` → \`${{ inputs.environment }}\`"

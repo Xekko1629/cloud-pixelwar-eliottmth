@@ -109,6 +109,10 @@ jobs:
           GITHUB_TOKEN: ${{ steps.github_app_token.outputs.token }}
         run: terraform plan -var-file="${{ inputs.environment }}.tfvars" -out=tfplan
 
+      - name: Check legacy Gateway ownership
+        if: inputs.stack == 'serverless'
+        run: bash ../../scripts/check-gateway-migration.sh
+
       - name: Apply
         env:
           GITHUB_TOKEN: ${{ steps.github_app_token.outputs.token }}

@@ -9,7 +9,7 @@
 
 - L'application doit être 100 % serverless et suivre le principe de responsabilité unique : une fonction par tâche, chacune avec son propre service account (§3.1).
 - L'ADR-0001 avait choisi des **services Cloud Run** avec des images construites par l'équipe. Son argument principal était de promouvoir le même digest d'image en dev et en prd (SRV-02). Il écartait les Cloud Run functions parce que Google reconstruit l'image à chaque déploiement, donc les deux environnements n'exécutent pas le même digest.
-- La revue du sujet et les retours de l'évaluateur ont depuis confirmé que **Cloud Run functions** est la cible attendue pour ce projet. Le sujet impose le serverless, pas un mode de packaging particulier ; les functions sont la forme moderne du produit.
+- La cible de compute retenue est **Cloud Run functions**. La contrainte serverless n'impose pas à elle seule un mode de packaging particulier.
 - L'objection de l'ADR-0001 reste vraie, mais elle porte sur le mauvais artefact. Ce qui doit être construit une seule fois et promu, c'est **l'archive de sources** ; l'image d'exécution est un détail interne à Google. Une archive identifiée par son SHA-256, copiée sans modification d'un projet à l'autre, garantit que dev et prd exécutent le même code, les mêmes dépendances et le même lockfile.
 - Ce choix a un coût assumé : les images produites par Google dans deux projets ne sont pas byte-identiques, et le runtime de base peut évoluer entre deux applies. L'invariant de release devient le SHA-256 de l'archive, pas le digest de l'image.
 
@@ -56,16 +56,16 @@ Toutes les briques backend sont des **Cloud Run functions HTTP** (`google_cloudf
 - Les secrets restent des références Secret Manager avec une version numérique, jamais des valeurs dans Terraform.
 - Les rôles d'observabilité (logs, traces, métriques, OTLP) restent attribués au niveau projet à l'identité d'exécution, comme pour les services Cloud Run.
 
-### Périmètre de ce changement
+### Répartition des responsabilités
 
-- Ce changement remplace le module de compute et prépare le bootstrap. Il n'instancie encore aucune fonction : le stack `serverless` ne déclare aucun module tant que les handlers et leurs archives n'existent pas.
-- L'empaquetage déterministe, l'upload dans chaque bucket et la promotion dev → prd sont livrés par SRV-02. Le contrat d'archive est fixé ici pour que ce ticket ne change plus l'infrastructure.
+- Le module de compute reçoit les références des sources et configure la fonction ; le bootstrap fournit les ressources persistantes nécessaires à son build.
+- L'empaquetage et la publication sont distincts de ce module. Le contrat d'artefact de cet ADR est historique et remplacé par ADR-0009 ; les procédures opérationnelles suivent ce dernier.
 
 ## Options écartées
 
 | Option | Pourquoi elle est écartée |
 |---|---|
-| Services Cloud Run avec images construites par l'équipe (ADR-0001) | Techniquement valide et elle garantit un digest identique, mais elle ne correspond plus à la cible Cloud Run functions retenue après les retours de l'évaluateur, et elle demande un Dockerfile, un serveur HTTP et un pipeline d'images à maintenir. |
+| Services Cloud Run avec images construites par l'équipe (ADR-0001) | Techniquement valide et garantit un digest identique, mais ne correspond pas à la cible Cloud Run functions retenue ; demande un Dockerfile, un serveur HTTP et un pipeline d'images à maintenir. |
 | Functions reconstruites depuis Git à chaque environnement | Même code source, mais le toolchain et l'image de base peuvent différer entre les deux builds : il n'existe aucun artefact unique à vérifier. C'est exactement le défaut que SRV-02 interdit. |
 | Déploiement depuis un chemin local avec `gcloud functions deploy` | Aucune identité d'archive, aucun hash, aucune promotion : le build a lieu pendant le déploiement et le contenu dépend de la machine. |
 | Déclencheur Eventarc sur Pub/Sub ou Cloud Storage | Eventarc gère lui-même l'abonnement : pas de DLQ configurable en Terraform, et format CloudEvents inutile ici (ADR-0002). |
@@ -75,7 +75,7 @@ Toutes les briques backend sont des **Cloud Run functions HTTP** (`google_cloudf
 
 **Ce qu'on y gagne**
 
-- La cible correspond au sujet et aux attentes de l'évaluateur, avec un seul langage et un seul paquet partagé.
+- La cible utilise un seul langage et un seul paquet partagé sur Cloud Run functions.
 - Moins de code d'infrastructure : pas de Dockerfile, pas de serveur HTTP, pas de port à écouter.
 - Google gère le runtime, les correctifs de sécurité et le scaling à zéro.
 - Une release est un fichier vérifiable par son SHA-256, copié à l'identique entre les environnements.
@@ -83,16 +83,10 @@ Toutes les briques backend sont des **Cloud Run functions HTTP** (`google_cloudf
 
 **Ce que ça coûte, et ce qu'il faut surveiller**
 
-- Les images dev et prd ne sont pas byte-identiques. À la soutenance, il faut expliquer que l'artefact promu est l'archive, pas l'image ; ne pas prétendre le contraire.
+- Les images dev et prd ne sont pas identiques à l'octet : le contrat d'artefact défini ici porte sur l'archive, pas l'image. Ce contrat est remplacé par ADR-0009.
 - Un build Cloud Build a lieu pendant `terraform apply`, ce qui allonge l'apply et peut échouer pour une raison externe (quota, build SA, registre). Le job doit exposer les logs de build.
 - L'archive doit être autonome : JavaScript compilé, `package.json` et `package-lock.json`. Cloud Build installe les dépendances verrouillées (`npm ci`) sans plage de versions ; aucune dépendance n'est ajoutée à la main au déploiement.
 - Le build SA doit garder ses trois rôles, et le deployer doit pouvoir `actAs` les identités d'exécution et de build. Une erreur IAM se manifeste souvent comme un échec de build opaque.
 - Le runtime Node.js 24 et l'image de base sont mis à jour par Google : une reconstruction peut changer l'image sans changer l'archive. Les tests de non-régression restent obligatoires.
 - Le développement local utilise le Functions Framework, pas le runtime de production : les écarts de comportement (timeouts, concurrence, cold start) doivent être testés en dev.
 - Le bucket versionné et le registre ont un coût de stockage ; la politique de rétention doit rester alignée sur le rejeu et les rollbacks.
-
-## En soutenance
-
-- « On déploie des Cloud Run functions : Google construit et héberge l'image, on n'écrit ni Dockerfile ni serveur HTTP. »
-- « La release est une archive ZIP identifiée par son SHA-256, construite une fois et copiée telle quelle en dev puis en prd ; Terraform épingle la génération GCS exacte. »
-- « Les workers sont en ingress interne et reçoivent Pub/Sub en push OIDC ; les proxies sont appelés par API Gateway avec IAM. Aucun service n'est public. »

@@ -1,4 +1,10 @@
-mock_provider "google" {}
+mock_provider "google" {
+  mock_data "google_project" {
+    defaults = {
+      number = "123456789012"
+    }
+  }
+}
 
 variables {
   project_id  = "pixelwar-test"
@@ -70,5 +76,60 @@ run "planner_reads_function_sources" {
       google_storage_bucket_iam_member.planner_source_reader.member == "serviceAccount:github-planner@pixelwar-test.iam.gserviceaccount.com"
     )
     error_message = "The planner only reads the function sources bucket, to refresh the uploaded objects."
+  }
+}
+
+run "builder_reads_only_regional_managed_source_objects" {
+  command = plan
+
+  override_resource {
+    target          = google_service_account.function_builder
+    override_during = plan
+    values = {
+      member = "serviceAccount:function-builder@pixelwar-test.iam.gserviceaccount.com"
+    }
+  }
+
+  assert {
+    condition = (
+      google_project_iam_member.function_builder_managed_source_reader.project == "pixelwar-test" &&
+      google_project_iam_member.function_builder_managed_source_reader.role == "roles/storage.objectViewer" &&
+      google_project_iam_member.function_builder_managed_source_reader.member == "serviceAccount:function-builder@pixelwar-test.iam.gserviceaccount.com"
+    )
+    error_message = "Managed source access must belong only to the dedicated build identity in this project."
+  }
+
+  assert {
+    condition = (
+      google_project_iam_member.function_builder_managed_source_reader.condition[0].expression ==
+      "resource.type == \"storage.googleapis.com/Object\" && resource.name.startsWith(\"projects/_/buckets/gcf-v2-sources-123456789012-europe-west1/objects/\")"
+    )
+    error_message = "Read only objects in the exact regional managed source bucket, not other buckets, bucket metadata or similarly prefixed bucket names."
+  }
+}
+
+run "managed_source_scope_follows_project_number_and_region" {
+  command = plan
+
+  variables {
+    project_id  = "pixelwar-other"
+    environment = "prd"
+    region      = "us-central1"
+  }
+
+  override_data {
+    target = data.google_project.current
+    values = {
+      number = "987654321098"
+    }
+  }
+
+  assert {
+    condition = (
+      google_project_iam_member.function_builder_managed_source_reader.project == "pixelwar-other" &&
+      google_project_iam_member.function_builder_managed_source_reader.condition[0].expression ==
+      "resource.type == \"storage.googleapis.com/Object\" && resource.name.startsWith(\"projects/_/buckets/gcf-v2-sources-987654321098-us-central1/objects/\")"
+    )
+    error_message = "Derive the bucket scope from the current project number and region, never from hardcoded dev values."
   }
 }

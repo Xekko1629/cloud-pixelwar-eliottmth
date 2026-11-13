@@ -73,6 +73,22 @@ jobs:
           client-id: ${{ steps.github_app.outputs.client_id }}
           private-key: ${{ steps.github_app.outputs.private_key }}
 
+      # archive_file is refreshed even during destroy. A fresh checkout has no dist/:
+      # build the source folders first, otherwise the first deployed function blocks teardown.
+      - uses: actions/setup-node@v4
+        if: inputs.stack == 'serverless'
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Build the functions for archive refresh
+        if: inputs.stack == 'serverless'
+        working-directory: app
+        run: |
+          npm ci
+          npm run build:functions
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
@@ -83,7 +99,30 @@ jobs:
           GITHUB_TOKEN: ${{ steps.github_app_token.outputs.token }}
         run: terraform init -backend-config="backends/${{ inputs.environment }}.hcl"
 
+      - name: Check whether Gateway state is empty
+        if: inputs.stack == 'gateway'
+        id: gateway_state
+        shell: bash
+        run: |
+          if terraform state list > state-resources.txt 2> state-error.txt; then
+            if [ -s state-resources.txt ]; then
+              echo "empty=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "empty=true" >> "$GITHUB_OUTPUT"
+            fi
+          elif grep -q 'No state file was found' state-error.txt; then
+            echo "empty=true" >> "$GITHUB_OUTPUT"
+          else
+            cat state-error.txt
+            exit 1
+          fi
+
+      - name: Check legacy Gateway ownership
+        if: inputs.stack == 'serverless'
+        run: bash ../../scripts/check-gateway-migration.sh
+
       - name: Destroy
+        if: inputs.stack != 'gateway' || steps.gateway_state.outputs.empty != 'true'
         env:
           GITHUB_TOKEN: ${{ steps.github_app_token.outputs.token }}
         run: terraform destroy -auto-approve -var-file="${{ inputs.environment }}.tfvars"

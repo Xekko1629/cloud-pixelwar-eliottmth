@@ -1,22 +1,26 @@
 # Module api-gateway
 
-Crée l'unique point d'entrée public de l'application (Sujet §3.1, C05 §3) devant les Cloud Run functions proxies ([ADR-0008](../../../../docs/adr/0008-compute-cloud-run-functions.md)) :
+Crée le point d'entrée HTTP public des proxies applicatifs Cloud Run functions
+([ADR-0008](../../../../docs/adr/0008-compute-cloud-run-functions.md)) :
 
 - une API et sa gateway régionale, joignable en HTTPS sur l'URL `*.gateway.dev` par défaut ;
 - une configuration d'API générée à partir de [`openapi.yaml.tftpl`](openapi.yaml.tftpl) (OpenAPI 2.0, seule version acceptée par API Gateway) ;
 - un service account dédié `<api_id>-gateway`, avec lequel la gateway appelle les proxies ;
 - `roles/run.invoker` pour ce service account, **sur le service Cloud Run sous-jacent de chaque proxy routé uniquement**, jamais au niveau du projet ni sur un worker (SRV-04b) ;
-- l'activation du service géré créé pour l'API (`<api>-<hash>.apigateway.<projet>.cloud.goog`). Il est créé dynamiquement avec l'API, il ne peut donc pas être déclaré dans `infra/iam/apis.tf` comme les autres APIs.
+- l'activation du service géré créé pour l'API (`<api>-<hash>.apigateway.<projet>.cloud.goog`). Son nom est connu dès la création de l'API, mais sa configuration de service n'existe qu'après la première configuration d'API : l'activation est donc ordonnée après celle-ci, puis la gateway après l'activation. Il ne peut pas être déclaré dans `infra/iam/apis.tf` comme les autres APIs.
 
 Les ressources API Gateway n'existent que dans le provider `google-beta`. Les APIs `apigateway`, `servicemanagement` et `servicecontrol` sont activées par `infra/iam`.
 
 ## Utilisation
 
-Le catalogue des routes et la liste des proxies déployés vivent dans le stack appelant ([`gateway.tf`](../../gateway.tf)). Les backends reprennent les outputs du module [`function`](../function/README.md) :
+Le catalogue des routes vit dans [`infra/gateway/routes.tf`](../../../gateway/routes.tf).
+Le stack appelant lit les proxies dans le contrat d'outputs appliqué de
+`serverless`, pas dans une référence directe aux ressources du module
+[`function`](../function/README.md) du même state (ADR-0010) :
 
 ```hcl
 module "api_gateway" {
-  source = "./modules/api-gateway"
+  source = "../serverless/modules/api-gateway"
 
   project_id = var.project_id
   region     = var.region
@@ -25,7 +29,7 @@ module "api_gateway" {
     { path = "/hello", method = "get", backend = "hello", operation_id = "hello", summary = "Hello" },
   ]
   backends = {
-    hello = { function_name = module.hello.name, uri = module.hello.uri, service_type = module.hello.service_type }
+    hello = { function_name = "hello-proxy", uri = "https://<URI-exportée>", service_type = "proxy" }
   }
 }
 ```
@@ -42,7 +46,7 @@ module "api_gateway" {
 - **Délais** : 15 s par défaut, 3 s pour les interactions Discord (le délai de réponse imposé par Discord).
 - **Configuration immuable** : une configuration d'API ne peut pas être modifiée. Elle porte un ID généré à partir de `api_config_id_prefix`, et `create_before_destroy` crée la nouvelle configuration, bascule la gateway dessus, puis supprime l'ancienne. Avec un ID fixe, chaque changement de spécification ferait échouer l'apply.
 
-## Authentification des routes — SRV-04c
+## Authentification des routes
 
 | Route | À la gateway | Vérifié ensuite par |
 | --- | --- | --- |
@@ -54,7 +58,12 @@ module "api_gateway" {
 
 - La définition `firebase` n'accepte que les ID tokens émis pour ce projet : émetteur `https://securetoken.google.com/<project_id>`, audience `<project_id>`, signature vérifiée avec les clés publiques de `securetoken@system.gserviceaccount.com`, expiration contrôlée. Un token de dev est donc refusé en prd. Sans token, ou avec un token invalide, la gateway répond **401 sans appeler la fonction** : la requête ne coûte aucune invocation.
 - La gateway remplace `Authorization` par son propre token pour appeler la fonction. L'identité de l'utilisateur arrive dans `X-Apigateway-Api-Userinfo` (claims JSON en base64url) : le proxy prend l'`uid` (= id Discord) à cet endroit, jamais dans le corps de la requête.
-- Les routes `OPTIONS` sont nécessaires : le navigateur envoie le preflight CORS sans `Authorization`. Sans route `OPTIONS` publique, il recevrait un 401 et aucun appel du frontend ne passerait. Le backend doit répondre au preflight (`Access-Control-Allow-Origin` limité à l'origine du frontend, `Access-Control-Allow-Headers: Authorization, Content-Type`) et ajouter ces en-têtes à ses réponses : à faire dans `web-proxy` (DRAW-01) et `auth-proxy` (WEB-02a).
+- Les routes `OPTIONS` sont nécessaires : le navigateur envoie le preflight CORS
+  sans `Authorization`. Sans route publique correspondante, il recevrait un 401.
+  Le backend doit répondre au preflight (`Access-Control-Allow-Origin` limité à
+  l'origine du frontend, `Access-Control-Allow-Headers: Authorization, Content-Type`)
+  et ajouter les en-têtes à ses réponses ; générer la route ne configure pas ces
+  réponses à sa place.
 
 ### Limitation de débit à la gateway : étude
 
@@ -73,12 +82,16 @@ La protection contre les rafales repose donc sur :
 
 ## Vérification sur un environnement déployé
 
-À faire une fois la fonction hello (#39) branchée dans `local.gateway_backends` :
+Prérequis de l'exemple : un backend HTTP de test est configuré et déployé sur la
+route **GET `/hello` avec authentification Firebase**, et un ID token du bon
+projet est disponible. Cet exemple n'est pas la slash command Discord `/hello`.
+Pour la sonde Discord sur `/discord/interactions`, suivre
+[son runbook](../../../../docs/discord-hello.md).
 
 ```sh
-GATEWAY=$(terraform output -raw gateway_url)
-FUNCTION_URL=<uri de la fonction hello>
-ID_TOKEN=<ID token Firebase de ce projet, obtenu après connexion (WEB-02a)>
+GATEWAY=$(terraform -chdir=infra/gateway output -raw gateway_url)
+: "${FUNCTION_URL:?Renseigner l'URI du backend de test}"
+: "${ID_TOKEN:?Fournir un ID token Firebase du projet sans l'afficher}"
 
 # Sans token : 401 renvoyé par la gateway, la fonction n'est pas invoquée (aucun log côté fonction).
 curl -i "$GATEWAY/hello"
@@ -100,8 +113,13 @@ curl -i -X OPTIONS -H "Origin: https://<frontend>" -H "Access-Control-Request-Me
 Vérifier aussi l'absence de binding public sur les proxies :
 
 ```sh
-gcloud run services get-iam-policy hello --region europe-west1   # seul pixelwar-gateway a run.invoker
+gcloud run services get-iam-policy NOM_DU_BACKEND --project=ID_DU_PROJET --region=europe-west1
 ```
+
+Adapter les noms et vérifier l'ensemble des membres autorisés, y compris les
+droits hérités ; aucun `allUsers` ou `allAuthenticatedUsers` ne doit permettre
+une invocation anonyme. Pour installation, mise à jour et retrait de la Gateway,
+utiliser le [runbook Gateway](../../../gateway/README.md).
 
 ## Tests
 

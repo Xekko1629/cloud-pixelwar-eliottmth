@@ -1,8 +1,7 @@
 name: Deploy
 
-# Tag v*: checks, foundation + bootstrap dev, serverless dev, then foundation + bootstrap prd,
-# then serverless prd and runners in parallel (runners only depend on the cluster of foundation).
-# Manual run from any branch: checks, foundation + bootstrap + serverless dev only.
+# Tag v*: foundation + bootstrap, then functions, then Gateway, dev before prd.
+# Runners prd only depend on foundation. Manual runs deploy dev only.
 # bootstrap (release artefacts) is applied here but never destroyed; iam and access are applied by hand.
 # Applies stay on GitHub-hosted runners, independent of the infrastructure being changed.
 on:
@@ -72,8 +71,19 @@ jobs:
       stack: serverless
       runner: ubuntu-latest
 
-  apply-prd:
+  apply-gateway-dev:
     needs: apply-serverless-dev
+    uses: ./.github/workflows/_apply.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: dev
+      stack: gateway
+      runner: ubuntu-latest
+
+  apply-prd:
+    needs: apply-gateway-dev
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/_apply.yml
     permissions:
@@ -85,7 +95,7 @@ jobs:
       runner: ubuntu-latest
 
   apply-bootstrap-prd:
-    needs: apply-serverless-dev
+    needs: apply-gateway-dev
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/_apply.yml
     permissions:
@@ -118,3 +128,14 @@ jobs:
       stack: runners
       runner: ubuntu-latest
       github_app: true
+
+  apply-gateway-prd:
+    needs: apply-serverless-prd
+    uses: ./.github/workflows/_apply.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: prd
+      stack: gateway
+      runner: ubuntu-latest

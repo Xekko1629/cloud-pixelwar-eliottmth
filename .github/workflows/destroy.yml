@@ -1,7 +1,7 @@
 name: Destroy
 
 # Manual only. Type the environment name in "confirm" to proceed.
-# Serverless and runners (prd) in parallel, then foundation, whose cluster hosts the runners.
+# Gateway before serverless; runners prd in parallel, then foundation.
 # Always on GitHub-hosted runners; bootstrap, iam (secrets, state bucket, APIs) and access are preserved.
 on:
   workflow_dispatch:
@@ -33,8 +33,19 @@ jobs:
             exit 1
           fi
 
-  destroy-serverless:
+  destroy-gateway:
     needs: confirm
+    uses: ./.github/workflows/_destroy.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: ${{ inputs.environment }}
+      stack: gateway
+      runner: ubuntu-latest
+
+  destroy-serverless:
+    needs: destroy-gateway
     uses: ./.github/workflows/_destroy.yml
     permissions:
       contents: read
