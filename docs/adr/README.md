@@ -31,6 +31,7 @@ contexte, contraintes techniques, choix retenu, alternatives et conséquences.
 | [0007](0007-modele-donnees-grille.md) | Données : grille infinie ou bornée par un admin, tuiles 64×64, régions 1024×1024, palette de 16 couleurs | Accepté |
 | [0008](0008-compute-cloud-run-functions.md) | Compute : Cloud Run functions déployées depuis une archive de sources identifiée par SHA-256 | Accepté, artefact de release remplacé par ADR-0009 |
 | [0009](0009-sources-fonctions-terraform.md) | Sources des fonctions : construites par la CI, zippées et téléversées par Terraform | Accepté |
+| [0010](0010-separation-gateway-serverless.md) | Séparation des cycles de vie Gateway et fonctions, avec contrat d'outputs | Proposé |
 
 Le build des sources est décrit par l'ADR-0009. Pour les procédures exécutables,
 consulter [Installation et déploiement](../deployment.md).

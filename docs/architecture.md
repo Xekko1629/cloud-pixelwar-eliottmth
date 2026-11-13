@@ -57,3 +57,9 @@ leurs propres contrats ; une archive backend ne constitue pas leur déploiement.
 
 Les responsabilités des stacks, l'initialisation des backends et l'ordre des
 opérations sont décrits dans [Installation et déploiement](deployment.md).
+
+Le [contrat proposé par ADR-0010](adr/0010-separation-gateway-serverless.md)
+sépare les states `serverless` (fonctions) et `gateway` (entrée HTTP). Le second
+consomme un contrat d'outputs après l'apply du premier ; sa création de config
+avant suppression ne se propage donc pas dans le graphe des fonctions. Cette
+séparation ne garantit pas l'absence d'interruption lors du remplacement d'une fonction.

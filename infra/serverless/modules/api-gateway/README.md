@@ -13,11 +13,14 @@ Les ressources API Gateway n'existent que dans le provider `google-beta`. Les AP
 
 ## Utilisation
 
-Le catalogue des routes et la liste des proxies déployés vivent dans le stack appelant ([`gateway.tf`](../../gateway.tf)). Les backends reprennent les outputs du module [`function`](../function/README.md) :
+Le catalogue des routes vit dans [`infra/gateway/routes.tf`](../../../gateway/routes.tf).
+Le stack appelant lit les proxies dans le contrat d'outputs appliqué de
+`serverless`, pas dans une référence directe aux ressources du module
+[`function`](../function/README.md) du même state (ADR-0010) :
 
 ```hcl
 module "api_gateway" {
-  source = "./modules/api-gateway"
+  source = "../serverless/modules/api-gateway"
 
   project_id = var.project_id
   region     = var.region
@@ -26,7 +29,7 @@ module "api_gateway" {
     { path = "/hello", method = "get", backend = "hello", operation_id = "hello", summary = "Hello" },
   ]
   backends = {
-    hello = { function_name = module.hello.name, uri = module.hello.uri, service_type = module.hello.service_type }
+    hello = { function_name = "hello-proxy", uri = "https://<URI-exportée>", service_type = "proxy" }
   }
 }
 ```
@@ -86,7 +89,7 @@ Pour la sonde Discord sur `/discord/interactions`, suivre
 [son runbook](../../../../docs/discord-hello.md).
 
 ```sh
-GATEWAY=$(terraform output -raw gateway_url)
+GATEWAY=$(terraform -chdir=infra/gateway output -raw gateway_url)
 : "${FUNCTION_URL:?Renseigner l'URI du backend de test}"
 : "${ID_TOKEN:?Fournir un ID token Firebase du projet sans l'afficher}"
 
@@ -116,7 +119,7 @@ gcloud run services get-iam-policy NOM_DU_BACKEND --project=ID_DU_PROJET --regio
 Adapter les noms et vérifier l'ensemble des membres autorisés, y compris les
 droits hérités ; aucun `allUsers` ou `allAuthenticatedUsers` ne doit permettre
 une invocation anonyme. Pour installation, mise à jour et retrait de la Gateway,
-utiliser le [runbook serverless](../../README.md).
+utiliser le [runbook Gateway](../../../gateway/README.md).
 
 ## Tests
 

@@ -1,7 +1,7 @@
 name: CI
 
 # PR from a feature branch to prod: checks, then plan dev + prd of the stacks the CI deploys
-# (foundation, bootstrap, serverless). Nothing is applied. iam and access are applied by hand; runners
+# (foundation, bootstrap, serverless, gateway). Nothing is applied. iam and access are applied by hand; runners
 # are not planned, the read-only planner cannot read the Kubernetes secrets of Helm releases.
 # Only the stacks whose directory changed are checked; "CI result" is the required check.
 on:
@@ -43,6 +43,7 @@ jobs:
             serverless:
               - 'infra/serverless/**'
               - '.github/workflows/**'
+              - 'scripts/check-gateway-migration.sh'
               # The plan zips the built functions: a code change is a redeployment.
               - 'app/functions/**'
               - 'app/shared/src/**'
@@ -54,6 +55,12 @@ jobs:
             'serverless/modules/api-gateway':
               - 'infra/serverless/modules/api-gateway/**'
               - '.github/workflows/**'
+            gateway:
+              - 'infra/gateway/**'
+              - 'infra/serverless/**'
+              - '.github/workflows/**'
+              - 'scripts/check-gateway-migration.sh'
+              - 'scripts/tests/**'
             'serverless/modules/function-source':
               - 'infra/serverless/modules/function-source/**'
               - '.github/workflows/**'
@@ -131,13 +138,28 @@ jobs:
       environment: ${{ matrix.environment }}
       stack: bootstrap
 
+  plan-gateway:
+    needs: [changes, fmt, lint, validate, test]
+    if: contains(fromJSON(needs.changes.outputs.stacks), 'gateway')
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, prd]
+    uses: ./.github/workflows/_plan.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: ${{ matrix.environment }}
+      stack: gateway
+
   application:
     uses: ./.github/workflows/_app-test.yml
 
   # Always reported, even when every other job is skipped: use it as the required status check
   result:
     name: CI result
-    needs: [changes, fmt, lint, validate, test, plan, plan-serverless, plan-bootstrap, application]
+    needs: [changes, fmt, lint, validate, test, plan, plan-serverless, plan-bootstrap, plan-gateway, application]
     if: always()
     runs-on: ubuntu-latest
     steps:

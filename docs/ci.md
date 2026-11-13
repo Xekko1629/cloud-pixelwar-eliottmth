@@ -15,10 +15,10 @@ supplémentaire n'est pas déployé automatiquement.
 
 | Événement | Contrôles | Plans distants | Effets |
 | --- | --- | --- | --- |
-| PR vers `prod` | Application et stacks sélectionnés | `foundation`, `bootstrap`, `serverless`, dev/prd selon les chemins | Aucun apply |
-| Lancement manuel de `Deploy` | Contrôles Terraform | Plan dans chaque job d'apply | `foundation` et `bootstrap` dev, puis `serverless` dev |
-| Push d'un tag `v*` | Contrôles Terraform | Plan dans chaque job d'apply | Dev, puis prd : `foundation` et `bootstrap`, puis `serverless` et `runners` prd selon leurs dépendances |
-| Lancement manuel de `Destroy` | Confirmation de l'environnement | Préparation du destroy | `serverless` et `runners` prd en parallèle, puis `foundation` |
+| PR vers `prod` | Application et stacks sélectionnés | `foundation`, `bootstrap`, `serverless`, `gateway`, dev/prd selon les chemins | Aucun apply |
+| Lancement manuel de `Deploy` | Contrôles Terraform | Plan dans chaque job d'apply | `foundation` et `bootstrap` dev, puis `serverless`, puis `gateway` dev |
+| Push d'un tag `v*` | Contrôles Terraform | Plan dans chaque job d'apply | Dev complet avant prd ; par environnement : prérequis, fonctions, Gateway ; runners prd après foundation |
+| Lancement manuel de `Destroy` | Confirmation de l'environnement | Préparation du destroy | `gateway` avant `serverless`, runners prd en parallèle, puis `foundation` |
 
 `iam` et `access` s'appliquent manuellement. `bootstrap` s'applique par CI mais
 n'est pas ciblé par `Destroy`. Les plans d'apply ne sont pas les fichiers de
@@ -63,7 +63,8 @@ par défaut.
 | --- | --- | --- |
 | `infra/foundation/**` | `foundation` | Oui |
 | `infra/bootstrap/**` | `bootstrap` | Oui |
-| `infra/serverless/**` | `serverless`, modules concernés | Oui |
+| `infra/serverless/**` | `serverless`, modules concernés et `gateway` | Oui |
+| `infra/gateway/**` | `gateway` | Oui |
 | `app/functions/**`, `app/shared/src/**`, manifeste partagé, lockfile npm | `serverless` | Oui |
 | `infra/iam/**`, `infra/access/**` | Stack concerné | Non, application manuelle |
 | `infra/runners/**` | `runners` | Non |
@@ -79,6 +80,13 @@ relance tous les jobs.
 Les plans de `runners` ne sont pas exécutés en PR : le rafraîchissement des
 releases Helm lit des secrets Kubernetes, ce que le planner ne doit pas faire.
 Le plan correspondant est visible dans le job d'apply.
+
+Le plan Gateway lit le dernier `gateway_contract` appliqué du state serverless.
+Il ne calcule pas les endpoints futurs d'un plan serverless. Si le contrat n'est
+pas encore publié, le job signale explicitement un **plan différé**, sans prétendre
+avoir validé le plan cloud. Les contrôles statiques et tests continuent de tourner.
+Après l'apply serverless réussi, le job d'apply Gateway recalcule son plan.
+Voir [le contrat et la migration](../infra/gateway/README.md).
 
 ## Authentification : fédération d'identité Workload Identity
 
@@ -113,6 +121,12 @@ ZIP et l'objet GCS ; `function` déploie depuis sa génération exacte.
 Avant le destroy serverless, le même build fournit les fichiers nécessaires au
 rafraîchissement de `archive_file` sur un runner neuf. Sans eux, la préparation
 du destroy peut échouer avant toute suppression.
+
+Gateway est appliqué dans un state distinct après les fonctions, pour empêcher
+la propagation de son `create_before_destroy` dans leur graphe. Avant tout
+apply/destroy serverless, un garde-fou bloque les installations qui possèdent
+encore des ressources de l'ancien `module.api_gateway` : leur transfert exige
+une procédure de migration approuvée, pas une recréation implicite.
 
 Le build CI utilise le lockfile du dépôt ; le manifeste livré à Cloud Build ne
 contient pas de lockfile de déploiement. Dev et prd construisent chacun depuis

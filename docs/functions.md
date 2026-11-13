@@ -126,6 +126,13 @@ l'application serverless. Le lancement manuel de `Deploy` vise dev ; le push
 d'un tag `v*` vise aussi prd. La présence d'un workspace ne suffit pas : instancier
 les modules source/fonction et, pour un proxy, configurer son backend Gateway.
 
+Le proxy est exporté dans `gateway_contract` par `infra/serverless/gateway-backends.tf`.
+Le stack `infra/gateway` lit ce contrat **après** l'apply des fonctions et publie
+les routes de `infra/gateway/routes.tf`. Les deux states isolent les cycles de vie :
+`create_before_destroy` des configurations Gateway ne doit pas remonter aux
+fonctions à nom fixe. Voir [ADR-0010](adr/0010-separation-gateway-serverless.md)
+et la [procédure de migration](../infra/gateway/README.md).
+
 Après application, contrôler le point d'entrée, l'URL, l'identité, les références
 de sources et les logs de build/runtime. Vérifier le refus des invocations
 anonymes et le déclencheur autorisé. Pour la sonde signée Discord, voir

@@ -38,6 +38,7 @@ identifier la permission et la ressource concernées.
 | `foundation` | Réseau et cluster GKE conditionnel | CI | `iam` | Oui |
 | `bootstrap` | Sources des fonctions, registre interne et identité de build | CI | `iam` | Non |
 | `serverless` | Archives, fonctions et intégrations déclarées | CI | `foundation`, `bootstrap`, versions de secrets utilisées | Oui |
+| `gateway` | API, configurations, Gateway et IAM d'invocation des proxies | CI | Contrat d'outputs d'un apply `serverless` réussi | Oui, avant `serverless` |
 | `runners` | External Secrets, ARC et routage des jobs | CI, prd | Cluster foundation, identités et secret GitHub App | Oui, prd |
 
 Avant toute commande, contrôler les `<env>.tfvars` et `backends/<env>.hcl` de
@@ -175,7 +176,8 @@ mode d'adoption des secrets à la place de l'opérateur.
 ### 6. Déployer dev par la CI
 
 Vérifier la CI et les plans de la version choisie, puis faire valider l'opération.
-Le lancement manuel applique `foundation` et `bootstrap` en dev, puis `serverless`.
+Le lancement manuel applique `foundation` et `bootstrap` en dev, puis `serverless`
+et enfin `gateway`, dans des states séparés.
 Il peut créer du réseau ou un cluster selon les variables : ce n'est pas une
 commande de déploiement d'une seule fonction.
 
@@ -199,6 +201,8 @@ Après réussite du run, initialiser le backend **dev** pour lire ses outputs :
 ```sh
 terraform -chdir=infra/serverless init -reconfigure -backend-config=backends/dev.hcl
 terraform -chdir=infra/serverless output
+terraform -chdir=infra/gateway init -reconfigure -backend-config=backends/dev.hcl
+terraform -chdir=infra/gateway output
 ```
 
 Contrôler les URLs, les ressources créées et les attributions IAM, puis effectuer
@@ -241,6 +245,8 @@ installe les dépendances depuis le manifeste généré, sans lockfile de déplo
 | Job bloqué en attente | Approbation de l'environnement ou runner indisponible ; renseigner le runner hébergé pour les contrôles |
 | Backend HTTP refusé | Identité invoker, audience, ingress, état de la fonction et secret activé |
 | Callback Discord refusé | Application/clé publique correspondantes, corps brut, signature, chemin et délai de réponse |
+| Conflit de nom lors d'un remplacement de fonction | Ordre du plan, ancien lifecycle hérité et séparation des states ; suivre le [guide Gateway](../infra/gateway/README.md) avant toute reprise |
+| Gateway bloqué sur un contrat absent | Vérifier la réussite du nouvel apply serverless et son output `gateway_contract`, ainsi que projet, environnement et région |
 
 Ne pas relancer un apply ou un enregistrement en boucle. Lire le plan, les logs
 et l'état effectif après une interruption. Ne pas forcer un déverrouillage de
@@ -267,8 +273,8 @@ Le workflow `Destroy` est manuel, avec environnement et confirmation saisie :
    commandes concernés avant de supprimer leurs backends.
 2. Dans **Actions → Destroy → Run workflow**, sélectionner la version relue,
    `dev` ou `prd`, puis saisir exactement le même nom dans `confirm`.
-3. Après validation explicite, lancer et vérifier les suppressions : `serverless`
-   et `runners` (prd) en parallèle, puis `foundation`.
+3. Après validation explicite, lancer et vérifier les suppressions : `gateway`
+   avant `serverless`, `runners` (prd) en parallèle, puis `foundation`.
 4. Contrôler les restes effectifs : fonctions, clusters, disques, IP, équilibreurs,
    objets et ressources externes. Ne pas considérer un run vert comme un bilan
    automatique d'absence de coût.

@@ -3,12 +3,12 @@ mock_provider "google" {
     defaults = { generation = 1 }
   }
 }
-mock_provider "google-beta" {}
 mock_provider "archive" {
   mock_data "archive_file" {
     defaults = { output_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
   }
 }
+mock_provider "google-beta" {}
 
 variables {
   project_id  = "pixelwar-test"
@@ -36,8 +36,8 @@ run "dev_probe_routing" {
   }
 
   assert {
-    condition     = length(module.discord_hello) == 1 && length(module.api_gateway) == 1
-    error_message = "Enabling the dev probe creates its function and gateway."
+    condition     = length(module.discord_hello) == 1 && toset(keys(output.gateway_contract.backends)) == toset(["discord"])
+    error_message = "Enabling the dev probe creates its function and exports a single proxy, not a Gateway."
   }
 
   assert {
@@ -46,8 +46,14 @@ run "dev_probe_routing" {
   }
 
   assert {
-    condition     = module.api_gateway[0].published_routes == ["POST /discord/interactions (none)"]
-    error_message = "Only the signed Discord callback is published, not Firebase hello or future business routes."
+    condition = (
+      output.gateway_contract.schema_version == 1 &&
+      output.gateway_contract.project_id == "pixelwar-test" &&
+      output.gateway_contract.environment == "dev" &&
+      output.gateway_contract.region == "europe-west1" &&
+      output.gateway_contract.backends.discord.service_type == "proxy"
+    )
+    error_message = "Gateway consumers must receive a versioned contract identifying the source project/environment/region."
   }
 }
 
@@ -60,7 +66,7 @@ run "never_enable_probe_in_prd" {
   }
 
   assert {
-    condition     = length(module.discord_hello) == 0 && length(module.discord_hello_source) == 0 && length(module.api_gateway) == 0
+    condition     = length(module.discord_hello) == 0 && length(module.discord_hello_source) == 0 && length(output.gateway_contract.backends) == 0
     error_message = "Even a mistakenly enabled flag must not deploy the temporary probe or gateway to prd."
   }
 }
@@ -69,7 +75,7 @@ run "probe_disabled_by_default" {
   command = plan
 
   assert {
-    condition     = length(module.discord_hello) == 0 && length(module.api_gateway) == 0
+    condition     = length(module.discord_hello) == 0 && length(output.gateway_contract.backends) == 0
     error_message = "The temporary probe must be opt-in (enabled explicitly by dev.tfvars)."
   }
 }

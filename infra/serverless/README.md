@@ -13,7 +13,8 @@ mécanisme de sources par ADR-0009.
 | Accès humains | `infra/access`, manuel |
 | Bucket de sources, registre d'images internes et identité de build | `infra/bootstrap`, CI |
 | Réseau et cluster conditionnel | `infra/foundation`, CI |
-| Sources, fonctions, IAM runtime/invocation et Gateway déclarés | Ce stack, CI |
+| Sources, fonctions et IAM runtime/invocation des workers | Ce stack, CI |
+| Gateway, catalogue HTTP et invocation des proxies | `infra/gateway`, CI après ce stack |
 
 Pour une installation vide, suivre le [guide de déploiement](../../docs/deployment.md)
 avant le premier init GCS. Chaque environnement utilise ses propres
@@ -38,9 +39,12 @@ les besoins de reprise avant leur modification.
 
 ## API Gateway et invocation
 
-`gateway.tf` contient le catalogue de routes et les backends configurés. Une route
-n'est publiée que si sa clé de backend est fournie. Sans backend, la Gateway
-n'est pas créée et `gateway_url` est nul.
+`gateway-backends.tf` exporte `gateway_contract`, avec les noms, URI et types des
+proxies réellement instanciés. Le catalogue de routes et la Gateway sont gérés
+dans le [stack Gateway](../gateway/README.md), avec un state indépendant pour
+isoler son `create_before_destroy` de celui des fonctions (ADR-0010). Une route
+n'est publiée que si sa clé de backend est exportée. Sans backend, le stack
+Gateway ne crée pas de Gateway et son output `gateway_url` est nul.
 
 - Proxies : `service_type="proxy"`, ingress `ALLOW_ALL`, mais invocation IAM
   obligatoire. Le module Gateway accorde `roles/run.invoker` à son identité sur
@@ -102,7 +106,7 @@ runtime et policies d'invocation. Tester un appel autorisé et un refus anonyme,
 puis l'intégration concernée : callback Discord, JWT Firebase ou push Pub/Sub.
 Les tests simulés ne prouvent ni ces permissions réelles ni le délai de réponse.
 
-`Destroy` supprime les ressources de ce stack, mais conserve `iam`, `access` et
+`Destroy` supprime d'abord Gateway puis les ressources de ce stack, mais conserve `iam`, `access` et
 `bootstrap`. Les archives gérées dans ce state sont supprimées comme objets
 courants ; les versions/rétentions du bucket peuvent conserver des données et
 des coûts. Consulter [suppression et reprise](../../docs/deployment.md#suppression)

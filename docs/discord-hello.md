@@ -93,7 +93,7 @@ gh workflow run deploy.yml \
 
 Cette commande modifie GCP en lançant le workflow. L'exécution manuelle du
 workflow actuel cible **dev seulement**, sans input d'environnement. Elle
-applique `foundation` et `bootstrap`, puis `serverless` : elle peut donc créer ou
+applique `foundation` et `bootstrap`, puis `serverless` et `gateway` : elle peut donc créer ou
 modifier le cluster/réseau et engendrer des coûts, pas seulement la fonction.
 `iam` et `access` doivent être prêts ; ils ne sont pas appliqués ici.
 
@@ -104,10 +104,11 @@ Ne pas poser de tag `v*` : le chemin de release sur tag vise également prd.
 Dans le run Actions, vérifier :
 
 - contrôles verts ;
-- `apply-dev`, `apply-bootstrap-dev` et `apply-serverless-dev` réussis ;
+- `apply-dev`, `apply-bootstrap-dev`, `apply-serverless-dev` et `apply-gateway-dev` réussis ;
 - jobs `apply-prd`, `apply-bootstrap-prd`, `apply-serverless-prd` et
-  `apply-runners-prd` **ignorés** ;
-- dans l'apply serverless : fonction `discord-hello`, Gateway et outputs non nuls.
+  `apply-runners-prd` et `apply-gateway-prd` **ignorés** ;
+- dans l'apply serverless : fonction `discord-hello` ; dans l'apply gateway :
+  Gateway créée et outputs non nuls.
 
 En cas d'erreur, arrêter ici. Pour un échec de construction de fonction,
 consulter le lien/identifiant Cloud Build dans les logs : ne pas modifier l'URL
@@ -121,13 +122,15 @@ GCP autorisée à lire le backend dev. Depuis la racine du dépôt :
 ```sh
 terraform -chdir=infra/serverless init -reconfigure \
   -backend-config=backends/dev.hcl
-GATEWAY_URL=$(terraform -chdir=infra/serverless output -raw gateway_url)
 FUNCTION_URL=$(terraform -chdir=infra/serverless output -raw discord_hello_function_uri)
+terraform -chdir=infra/gateway init -reconfigure \
+  -backend-config=backends/dev.hcl
+GATEWAY_URL=$(terraform -chdir=infra/gateway output -raw gateway_url)
 printf 'Callback Discord dev : %s/discord/interactions\n' "$GATEWAY_URL"
 ```
 
 Le backend dev est le bucket `cloud-pixelwar-eliottmth-dev-tfstate`, préfixe
-`serverless`. Ne pas utiliser le backend prd ni changer de workspace. Ces
+`serverless` pour la fonction et `gateway` pour la Gateway. Ne pas utiliser le backend prd ni changer de workspace. Ces
 commandes initialisent le client local et lisent le state ; elles ne déploient
 pas de ressource. Si un output est absent, vide ou nul, arrêter et vérifier le
 run, le commit et le backend.
@@ -152,8 +155,8 @@ ensuite l'essai distinct décrit dans la section de mesure.
 
 ## Vérifier le callback, avant d'ajouter `/hello`
 
-Après réussite du déploiement dev, récupérer les outputs `gateway_url` et
-`discord_hello_function_uri` du stack serverless via la procédure habituelle.
+Après réussite du déploiement dev, récupérer `gateway_url` du stack gateway et
+`discord_hello_function_uri` du stack serverless via la procédure ci-dessus.
 L'endpoint Discord est **`<gateway_url>/discord/interactions`**, et non `/hello`.
 
 1. Vérifier avec une requête POST JSON non signée que la gateway atteint bien le
@@ -232,7 +235,10 @@ d'instance chaude avant le premier essai : cela masquerait le cold start recherc
 Après validation explicite : retirer uniquement la commande guild `/hello` via
 son ID Discord (ne pas vider le catalogue), restaurer/mettre à jour le callback dev
 avant de supprimer sa fonction, puis mettre `enable_discord_hello = false` et
-appliquer en dev par la pipeline. Si aucune autre fonction n'est branchée, la
+appliquer en dev par la pipeline, en faisant relire les plans des deux stacks.
+Pour un retrait de proxy en service, retirer d'abord sa route dans le catalogue
+Gateway et appliquer cette configuration avant de supprimer la fonction.
+Si aucune autre fonction n'est branchée, la
 gateway temporaire sera également supprimée. Conserver les résultats de l'essai
 dans les tickets, sans secrets ni tokens d'interaction.
 

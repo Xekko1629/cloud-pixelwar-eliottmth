@@ -8,6 +8,7 @@
 - [Accès humains et lecture des secrets Discord dev](../infra/access/README.md)
 - [Création, alimentation et rotation des secrets](../infra/iam/SECRETS.md)
 - [Déploiement du stack serverless](../infra/serverless/README.md)
+- [Gateway, contrat des backends et migration des states](../infra/gateway/README.md)
 
 ## Développement et intégration
 

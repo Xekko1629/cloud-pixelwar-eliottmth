@@ -53,38 +53,4 @@ locals {
     },
   ]
 
-  # Deployed proxy functions only. Uncomment an entry when its module "function"
-  # (service_type = "proxy") exists, e.g. for hello:
-  #   hello = { function_name = module.hello.name, uri = module.hello.uri, service_type = module.hello.service_type }
-  # Same shape for discord (module.discord_proxy, BOT-03), auth (module.auth_proxy, WEB-02a)
-  # and api (module.web_proxy, DRAW-01).
-  gateway_backends = local.discord_hello_enabled ? {
-    discord = {
-      function_name = module.discord_hello[0].name
-      uri           = module.discord_hello[0].uri
-      service_type  = module.discord_hello[0].service_type
-    }
-  } : {}
-}
-
-# Not created until a proxy exists: API Gateway rejects a spec without any backend.
-# Labels come from the default_labels of the providers.
-module "api_gateway" {
-  source = "./modules/api-gateway"
-  count  = length(local.gateway_backends) > 0 ? 1 : 0
-
-  project_id = var.project_id
-  region     = var.region
-  routes     = local.gateway_routes
-  backends   = local.gateway_backends
-}
-
-output "gateway_url" {
-  description = "Public HTTPS entry point (Discord interactions endpoint, frontend API base URL); null until a proxy is deployed"
-  value       = one(module.api_gateway[*].url)
-}
-
-output "gateway_routes" {
-  description = "Routes currently published by the gateway"
-  value       = one(module.api_gateway[*].published_routes)
 }
