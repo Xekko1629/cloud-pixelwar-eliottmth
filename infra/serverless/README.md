@@ -61,6 +61,33 @@ Voir le [contrat du module Gateway](modules/api-gateway/README.md). La
 `enable_discord_hello`, n'est jamais instanciée en prd et publie seulement le
 callback `/discord/interactions` lorsqu'elle est activée.
 
+### Dispositif Discord de diagnostic (dev)
+
+`discord-proxy.tf` et `discord-command.tf` préparent le proxy, le topic, le worker
+privé de vérification, le push OIDC, les retries et la DLQ avec son abonnement
+d'inspection. Les deux abonnements conservent les messages non acquittés 7 jours,
+sans conserver les acquittés et sans expiration pour inactivité.
+
+- `enable_discord_pipeline=true` crée le dispositif en dev seulement.
+- `enable_discord_delivery=true` active ensuite le push et ses droits, après
+  l'initialisation IAM ciblée du deployer et du planner.
+- `use_discord_proxy=true` choisit séparément le proxy comme backend exporté.
+- `dev.tfvars` active la création, sans livraison, et **garde le routage sur hello**.
+- Ces trois flags n'ont aucun effet en prd ; leurs valeurs par défaut sont `false`.
+
+Cette configuration n'est pas appliquée. `infra/iam/discord-verify.tf` prépare
+les droits CI sur le seul nouvel invoker : opt-in dev après création du compte,
+apply IAM autorisé séparément avant activation de la livraison. Voir
+[les phases et prérequis](../../docs/discord-proxy.md).
+Le nom d'abonnement est partagé via une valeur locale pour éviter un cycle
+entre la fonction et l'abonnement.
+
+Revenir vers hello change seulement `use_discord_proxy`, pas les activations du
+pipeline et de la livraison. Les désactiver planifierait des suppressions. Le CLI
+ciblé `--draw` est prêt localement, son exécution réelle, l'alerte DLQ et la validation dev
+restent à faire. Le worker de
+diagnostic n'est pas le futur worker métier.
+
 ## Secrets
 
 Les conteneurs et valeurs vivent dans Secret Manager ; ce stack donne à chaque
@@ -100,6 +127,11 @@ Utiliser [Deploy](../../docs/deployment.md#6-déployer-dev-par-la-ci), pas un
 déploiement `gcloud functions deploy` parallèle à Terraform. Un lancement manuel
 vise dev ; un tag `v*` déclenche aussi prd. Lire les plans et valider la portée
 avant le déclenchement.
+
+Pour l'essai Discord, l'accord de préparation ne vaut pas accord de déploiement.
+Le workflow actuel ne s'arrête pas entre plan/apply et bascule Gateway : ne pas
+le lancer avant validation du mécanisme de revues séparées décrit dans le guide
+proxy. Aucun workflow de déploiement n'est modifié pour cet essai.
 
 Après application, vérifier les outputs, URLs, génération de source, identité
 runtime et policies d'invocation. Tester un appel autorisé et un refus anonyme,

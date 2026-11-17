@@ -11,6 +11,10 @@ Pour ajouter uniquement `/hello nom` en dev, utiliser `--hello` selon le
 [guide de la sonde](discord-hello.md). Ce mode fait un POST ciblé, pas un
 remplacement du catalogue.
 
+Pour l'essai `/draw` du proxy Q2, utiliser **`--draw`**, pas le mode normal :
+ce nouveau mode dev-only recherche la commande puis la crée ou la met à jour
+de façon ciblée. Il conserve `/hello` et les autres commandes.
+
 ## Contrat des définitions
 
 - `definitions.ts` est la source de vérité, sérialisée en JSON. Palette et bornes
@@ -46,7 +50,60 @@ remplacement du catalogue.
 | `DISCORD_GUILD_ID` | Obligatoire en dev ; absente en prd, même pas vide |
 | `DISCORD_BOT_TOKEN` | Requis seulement pour une modification réelle |
 
-## Prévisualiser puis enregistrer
+## Mode ciblé `/draw` en dev
+
+Ce mode reprend la définition `draw` de `definitions.ts`, sans recopier la
+palette ou les bornes dans un second catalogue. Il refuse prd et exige une
+guilde dev valide.
+
+Après configuration de `APP_ENV`, `DISCORD_APPLICATION_ID` et `DISCORD_GUILD_ID`,
+depuis `app/` :
+
+```sh
+npm run discord:commands -- --draw
+```
+
+Cet aperçu est **hors ligne**, sans token ni requête GET. Il affiche le payload,
+la cible et `strategy: GET_THEN_POST_OR_PATCH`. Il ne peut pas annoncer si la
+commande existe déjà. Ne pas le présenter comme une comparaison avec Discord.
+
+Seulement après accord explicite, chargement du token selon la procédure
+Secret Manager ci-dessous, et validation du backend et de l'abonnement :
+
+```sh
+npm run discord:commands -- --draw --apply --confirm-application-id "$DISCORD_APPLICATION_ID"
+```
+
+L'apply du CLI modifie Discord ; ce n'est pas un apply Terraform.
+
+1. Vérification de la cible, de la confirmation et du token avant tout appel.
+2. GET des commandes de la guilde, sans corps de requête.
+3. Validation du catalogue retourné (tableau borné, IDs, noms, types, cible si
+   présente). Recherche de `name=draw`, `type=1` ; un type omis vaut 1 selon
+   l'API Discord. Une commande contextuelle du même nom n'est pas modifiée.
+4. Absente : POST contenant uniquement la définition `/draw`.
+5. Présente : PATCH sur son ID validé, sans champ `type` non modifiable.
+
+Un catalogue malformé ou plusieurs slash commands `draw` provoquent un arrêt,
+pas une écriture de secours. Un PATCH 404 n'est pas suivi d'un POST, PUT ou DELETE.
+Les retries sont bornés à quatre tentatives **par requête** : jusqu'à quatre
+pour le GET, puis quatre pour l'écriture, pas quatre pour tout le parcours.
+Un échec réseau/timeout arrête le traitement avec un message sûr : vérifier
+l'état avant relance. Les réponses brutes et credentials ne sont pas affichés.
+
+`--hello` et `--draw` sont exclusifs ; les flags répétés sont refusés.
+Le mode normal PUT et le mode hello POST restent inchangés. Sérialiser les
+modifications d'une même portée : GET puis écriture n'est pas une transaction.
+Une relance converge vers le payload voulu, mais effectue tout de même un PATCH
+et consomme des requêtes, même si la définition existante est identique.
+
+**État de cette livraison :** code et tests avec API simulée uniquement ; aucun
+GET du catalogue réel ni enregistrement `/draw` exécuté pendant la réalisation.
+
+## Mode catalogue complet : prévisualiser puis enregistrer
+
+**Pour le test Q2 ciblé, suivre `--draw` ci-dessus.** Les commandes de cette
+section sans sélecteur utilisent le PUT qui remplace le catalogue complet.
 
 Exemple Bash depuis `app/`, avec les IDs réels et une version numérique de secret
 sélectionnée par l'opérateur. Pour dev :
@@ -95,7 +152,7 @@ des requêtes et quotas. Une autre portée n'est pas nettoyée automatiquement.
   permissions avec un compte normal et un compte autorisé.
 - Pour les actions : configurer le callback et tester le backend séparément.
   Le catalogue peut être enregistré indépendamment de la disponibilité du handler.
-- 429 : respecter `Retry-After` ou `retry_after` ; jusqu'à quatre tentatives,
+- 429 : respecter `Retry-After` ou `retry_after` ; jusqu'à quatre tentatives par requête,
   fractions de seconde acceptées, arrêt si le délai est invalide ou supérieur à 60 s.
 - 5xx : jusqu'à quatre tentatives, attentes de 1, 2 et 4 s. Autres 4xx : arrêt.
 - Timeout de 15 s ou erreur réseau : arrêter et vérifier l'état effectif avant

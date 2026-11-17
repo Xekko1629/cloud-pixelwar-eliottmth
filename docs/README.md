@@ -18,6 +18,7 @@
 - [Structure, construction et déploiement des fonctions](functions.md)
 - [Enregistrement des commandes Discord](discord-commands.md)
 - [Installation, vérification et retrait de la sonde Discord hello](discord-hello.md)
+- [Proxy Discord Q2 : contrat et tests locaux](discord-proxy.md)
 - [Contrat du calcul des quotas utilisateur](rate-limits.md)
 - [Instrumentation et validation de l'observabilité](observability.md)
 
@@ -27,6 +28,7 @@
 - [Décisions d'architecture et règles de rédaction](adr/README.md)
 - [Module Cloud Run function](../infra/serverless/modules/function/README.md)
 - [Module API Gateway](../infra/serverless/modules/api-gateway/README.md)
+- [Module topic Pub/Sub et droits publisher](../infra/serverless/modules/pubsub-topic/README.md)
 
 Les procédures correspondent au code de la version consultée. Elles ne
 constituent pas un inventaire des ressources réellement déployées. Le suivi

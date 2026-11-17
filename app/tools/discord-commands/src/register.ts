@@ -63,6 +63,50 @@ export async function registerHelloCommand(
   await sendRegistration(target, token, confirmation, dependencies, plan.url, plan.method, plan.commands[0]);
 }
 
+/** Offline preview: the exact POST/PATCH decision requires an authorized GET. */
+export function drawRegistrationPlan(target: Target) {
+  const plan = registrationPlan(target);
+  if (target.environment !== 'dev') throw new Error('Targeted draw registration is dev-only.');
+  const command = plan.commands.find((entry) => entry.type === 1 && entry.name === 'draw');
+  if (!command) throw new Error('Missing draw command definition.');
+  return {
+    url: plan.url, strategy: 'GET_THEN_POST_OR_PATCH' as const,
+    commands: [command],
+  };
+}
+
+export async function registerDrawCommand(
+  target: Target, token: string, confirmation: string,
+  dependencies: Dependencies = { fetch: globalThis.fetch, sleep: async (ms) => { await setTimeout(ms); } },
+): Promise<void> {
+  const plan = drawRegistrationPlan(target);
+  validateApply(target, token, confirmation);
+  const response = await discordRequest(token, dependencies, plan.url, 'GET');
+  let catalogue: unknown;
+  try { catalogue = await response.json(); }
+  catch { throw new Error('Invalid Discord command catalogue.'); }
+  // Do not use an unvalidated server-provided ID in a URL or log raw responses.
+  if (!Array.isArray(catalogue) || catalogue.length > 200 || !catalogue.every((entry: unknown) => {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return false;
+    const command = entry as Record<string, unknown>;
+    return typeof command.id === 'string' && snowflake.test(command.id) && BigInt(command.id) <= 0xffffffffffffffffn &&
+      typeof command.name === 'string' && command.name.length > 0 && command.name.length <= 32 &&
+      [1, 2, 3].includes((command.type === undefined ? 1 : command.type) as number) &&
+      (command.application_id === undefined || command.application_id === target.applicationId) &&
+      (command.guild_id === undefined || command.guild_id === target.guildId);
+  })) throw new Error('Invalid Discord command catalogue.');
+  const matches = (catalogue as { id: string; type: number; name: string }[])
+    .filter((command) => (command.type ?? 1) === 1 && command.name === 'draw');
+  if (matches.length > 1) throw new Error('Ambiguous Discord draw command catalogue.');
+  if (matches.length === 0) {
+    await sendRegistration(target, token, confirmation, dependencies, plan.url, 'POST', plan.commands[0]);
+  } else {
+    // Discord's edit endpoint does not accept a command type change.
+    const { type: _type, ...update } = plan.commands[0];
+    await sendRegistration(target, token, confirmation, dependencies, `${plan.url}/${matches[0].id}`, 'PATCH', update);
+  }
+}
+
 /** Deterministic PUT: replaces every command in this scope, including unlisted commands. */
 export async function registerCommands(
   target: Target,
@@ -76,23 +120,34 @@ export async function registerCommands(
 
 async function sendRegistration(
   target: Target, token: string, confirmation: string, dependencies: Dependencies,
-  url: string, method: 'PUT' | 'POST', payload: unknown,
+  url: string, method: 'PUT' | 'POST' | 'PATCH', payload: unknown,
 ): Promise<void> {
+  validateApply(target, token, confirmation);
+  const response = await discordRequest(token, dependencies, url, method, payload);
+  await response.body?.cancel();
+}
+
+function validateApply(target: Target, token: string, confirmation: string): void {
   if (confirmation !== target.applicationId) throw new Error('Confirm the target application ID before applying.');
   if (!token || /\s/.test(token)) throw new Error('A nonempty DISCORD_BOT_TOKEN without whitespace is required.');
-  const body = JSON.stringify(payload);
+}
+
+async function discordRequest(
+  token: string, dependencies: Dependencies, url: string, method: 'GET' | 'PUT' | 'POST' | 'PATCH', payload?: unknown,
+): Promise<Response> {
   // Four attempts maximum. Never print the token, raw errors or Discord response bodies.
   for (let attempt = 0; attempt < 4; attempt++) {
     let response: Response;
     try {
       response = await dependencies.fetch(url, {
         method, headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' },
-        body, redirect: 'error', signal: AbortSignal.timeout(15_000),
+        ...(method === 'GET' ? {} : { body: JSON.stringify(payload) }),
+        redirect: 'error', signal: AbortSignal.timeout(15_000),
       });
     } catch {
       throw new Error('Discord request failed or timed out; verify the target before retrying.');
     }
-    if (response.ok) { await response.body?.cancel(); return; }
+    if (response.ok) return response;
     if (response.status === 429) {
       const delay = await retryDelay(response);
       if (attempt === 3) throw new Error('Discord rate limit persists after four attempts.');
@@ -106,6 +161,7 @@ async function sendRegistration(
       }
     }
   }
+  throw new Error('Discord request attempts exhausted.');
 }
 
 async function retryDelay(response: Response): Promise<number> {

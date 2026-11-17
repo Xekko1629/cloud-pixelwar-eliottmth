@@ -37,6 +37,7 @@ npm-debug.log*
 .firebase/
 firebase-debug.log*
 firestore-debug.log*
+pubsub-debug.log*
 ui-debug.log*
 
 # OS / editor

@@ -1,0 +1,10 @@
+{
+  "name": "@pixelwar/function-discord-command-verify",
+  "private": true,
+  "type": "module",
+  "pixelwar": { "entryPoint": "handleDiscordCommandVerify" },
+  "dependencies": {
+    "@google-cloud/functions-framework": "5.0.5",
+    "@pixelwar/shared": "*"
+  }
+}

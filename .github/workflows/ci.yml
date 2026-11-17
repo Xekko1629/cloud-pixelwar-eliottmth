@@ -64,6 +64,9 @@ jobs:
             'serverless/modules/function-source':
               - 'infra/serverless/modules/function-source/**'
               - '.github/workflows/**'
+            'serverless/modules/pubsub-topic':
+              - 'infra/serverless/modules/pubsub-topic/**'
+              - '.github/workflows/**'
             runners:
               - 'infra/runners/**'
               - '.github/workflows/**'
