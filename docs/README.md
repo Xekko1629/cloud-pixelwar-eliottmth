@@ -21,6 +21,7 @@
 - [Proxy Discord Q2 : contrat et tests locaux](discord-proxy.md)
 - [Command worker : routage, autorisation et relivraisons](command-worker.md)
 - [Contrat du calcul des quotas utilisateur](rate-limits.md)
+- [Écriture transactionnelle et idempotence — DATA-02](drawing-transactions.md)
 - [Instrumentation et validation de l'observabilité](observability.md)
 
 ## Architecture et modules
