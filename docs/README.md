@@ -21,6 +21,7 @@
 - [Installation, vérification et retrait de la sonde Discord hello](discord-hello.md)
 - [Proxy Discord Q2 : contrat et tests locaux](discord-proxy.md)
 - [Contrat du calcul des quotas utilisateur](rate-limits.md)
+- [Catalogue des événements Pub/Sub](events.md)
 - [Instrumentation et validation de l'observabilité](observability.md)
 
 ## Architecture et modules
