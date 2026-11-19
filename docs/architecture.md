@@ -17,6 +17,7 @@ Ce document décrit les responsabilités et contrats, pas un inventaire GCP.
 | Fonction proxy | Validation de la requête et publication de l'événement | Invocation IAM par l'identité Gateway |
 | Pub/Sub | Distribution par topic/abonnement, retries et DLQ | Push OIDC avec une identité d'invocation dédiée |
 | Fonction worker | Traitement durable et idempotent avant acquittement | Ingress interne, runtime distinct de l'invoker |
+| Firestore | Tuiles, deltas, état utilisateur, config et déduplication (ADR-0007), index et TTL en Terraform | IAM seulement, par compte d'exécution ; aucun accès client, aucune règle |
 | Secret Manager | Valeurs sensibles et versions | Accès runtime secret par secret |
 | Sources GCS et Artifact Registry | Sources et images internes des fonctions | Identité de build distincte du runtime |
 | GKE et ARC | Exécution et autoscaling des runners CI | Aucun hébergement du backend applicatif |
