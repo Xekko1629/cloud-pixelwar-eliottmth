@@ -137,6 +137,23 @@ L'enregistrement des commandes Discord est une opération distincte, décrite
 dans [son guide](discord-commands.md). `Deploy` n'exécute pas ce script. Les PR et
 tests n'enregistrent aucune commande réelle.
 
+## Image du frontend
+
+`_frontend-image.yml` construit l'image du frontend une fois par commit, sur un
+runner GitHub hébergé (Docker y est disponible, pas sur les runners ARC), sous
+forme d'archive OCI aux horodatages reproductibles et sans attestation. Le job
+teste le conteneur, puis publie l'archive comme artefact `frontend-image`.
+
+- Plan PR (`plan-frontend`) : le planner lit le digest dans l'archive et planifie
+  avec ce digest. Il ne pousse rien.
+- Apply : le deployer pousse l'archive dans `pixelwar/frontend` de son projet avec
+  `skopeo copy --preserve-digests`, vérifie que le digest poussé est celui de
+  l'archive, puis applique `infra/frontend` avec `TF_VAR_image=<dépôt>@<digest>`.
+  Le tag du commit n'est qu'une aide à la lecture ; Terraform ne référence que le
+  digest.
+- `Deploy` construit l'image avant les applies ; `frontend` passe en dev après
+  `gateway`, et prd attend la fin du frontend dev.
+
 ## Runners auto-hébergés
 
 `infra/runners` installe External Secrets et ARC sur le cluster de foundation
