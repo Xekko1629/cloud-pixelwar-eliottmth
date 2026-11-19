@@ -22,7 +22,7 @@ Le navigateur s'abonne avec des **listeners Firestore** (`onSnapshot`) à une co
 - Pour chaque lot traité, il écrit **un document de delta par région touchée**, une région faisant 1024×1024 pixels (ADR-0007).
 - Contenu d'un delta : `encoding_version: 1`, `canvas_version`, `region`, `event_id` de l'événement source, `created_at` (horodatage serveur), `expire_at` (TTL court, par exemple 1 h) et `pixels`, un champ `Bytes` compact.
 - Format de `pixels` : 5 octets par pixel, concaténés dans l'ordre du lot. `x` et `y` sont les coordonnées **locales à la région** (`0..1023`) en uint16 little-endian ; la couleur est un uint8 de `1` à `16`. Un lot accepté fait au plus 500 pixels, soit 2 500 octets. Le codec partagé valide la longueur, les bornes, les doublons et la version du format.
-- Le champ `pixels`, comme les métadonnées de tuile, est **exclu de l'indexation**. Les index composites `(canvas_version, region, created_at)` et `(canvas_version, created_at)` sont déclarés dans `app/firestore.indexes.json`, référencé par `app/firebase.json`.
+- Le champ `pixels`, comme les métadonnées de tuile, est **exclu de l'indexation**. Les index composites `(canvas_version, region, created_at)` et `(canvas_version, created_at)` sont déclarés dans `infra/serverless/firestore.tf` (déplacés depuis `app/firestore.indexes.json` par SRV-06).
 - Il écrit le delta **dans la même transaction que les tuiles** qu'il modifie, avec le même horodatage serveur. Un client ne peut donc pas recevoir un delta sans que la tuile correspondante soit à jour, ni l'inverse.
 
 ### Côté lecture : le navigateur
