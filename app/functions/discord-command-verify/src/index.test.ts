@@ -128,6 +128,28 @@ describe('dev-only Discord command verification', () => {
     expect(res.send).not.toHaveBeenCalled();
     expect(JSON.stringify(res.json.mock.calls)).not.toContain('synthetic-interaction-token');
   });
+  it('writes the consumption log to stdout when no writer is injected', async () => {
+    const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+    try {
+      const handler = createDiscordCommandVerifyHandler({
+        environment: 'dev', subscription, applicationId: testApplication,
+      });
+      const res = { status: vi.fn(), json: vi.fn(), send: vi.fn(), set: vi.fn() };
+      res.status.mockReturnValue(res); res.set.mockReturnValue(res);
+      const body = pushBody();
+      await handler(
+        { path: '/', method: 'POST', body, rawBody: Buffer.from(JSON.stringify(body)) } as Parameters<HttpFunction>[0],
+        res as unknown as Parameters<HttpFunction>[1],
+      );
+      expect(res.status).toHaveBeenCalledWith(204);
+      expect(write).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(String(write.mock.calls[0][0]))).toMatchObject({
+        event_type: 'discord.command.verify.consumed',
+      });
+    } finally {
+      write.mockRestore();
+    }
+  });
   it('exports an unavailable entry point without configuration', async () => {
     const res = { status: vi.fn(), json: vi.fn() }; res.status.mockReturnValue(res);
     await handleDiscordCommandVerify({} as Parameters<HttpFunction>[0], res as unknown as Parameters<HttpFunction>[1]);
