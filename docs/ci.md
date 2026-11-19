@@ -147,16 +147,21 @@ l'autoscaling du pool.
 
 ### Affectation des jobs aux runners
 
-- Pour les contrôles/PR : input `runner`, puis `vars.RUNNER_LABEL`, puis
-  `ubuntu-latest` selon le job réutilisable.
+- Deux classes de runners, un scale set ARC chacune (variable `runner_sets`) :
+  - `small` (`pixelwar-small`, 0,5 vCPU / 1 Gi, jusqu'à trois par nœud) : `fmt`,
+    `lint`, `validate`, `plan` ;
+  - `medium` (`pixelwar-medium`, 1 vCPU / 2 Gi, un par nœud) : `terraform test`,
+    `apply`, `destroy`.
+- Pour les contrôles/PR : input `runner`, puis `vars.RUNNER_SMALL` ou
+  `vars.RUNNER_MEDIUM` selon la classe du job réutilisable, puis `ubuntu-latest`.
 - Les jobs d'apply/destroy orchestrés déclarent `ubuntu-latest` explicitement,
   pour rester indépendants de l'infrastructure modifiée.
 - `changes` et `CI result`, ainsi que les tests applicatifs, utilisent un runner
   GitHub hébergé conformément à leurs fichiers de workflow.
 
-`infra/runners` gère la variable de dépôt `RUNNER_LABEL`. Si elle pointe vers un
-scale set indisponible, un contrôle peut rester en file. Pour un workflow qui
-expose l'input, renseigner `runner=ubuntu-latest`. Le retrait de la variable est
+`infra/runners` gère les variables de dépôt `RUNNER_SMALL` et `RUNNER_MEDIUM`.
+Si l'une pointe vers un scale set indisponible, un contrôle peut rester en file. Pour un workflow qui
+expose l'input, renseigner `runner=ubuntu-latest`. Le retrait d'une variable est
 une modification GitHub distincte à valider, pas un diagnostic sans effet.
 
 ### Application GitHub pour les runners

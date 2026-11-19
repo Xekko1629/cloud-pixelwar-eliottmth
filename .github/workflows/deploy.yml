@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       runner:
-        description: Runner label (empty = RUNNER_LABEL variable, then ubuntu-latest)
+        description: Runner label (empty = RUNNER_MEDIUM variable, then ubuntu-latest)
         type: string
         default: ""
 

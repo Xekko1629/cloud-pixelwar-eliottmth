@@ -8,7 +8,7 @@ on:
         type: string
         default: '["foundation", "iam", "access", "runners", "bootstrap", "serverless", "gateway", "serverless/modules/function", "serverless/modules/api-gateway", "serverless/modules/function-source"]'
       runner:
-        description: Runner label (empty = RUNNER_LABEL variable, then ubuntu-latest)
+        description: Runner label (empty = RUNNER_SMALL variable, then ubuntu-latest)
         type: string
         default: ""
 
@@ -18,7 +18,7 @@ env:
 jobs:
   validate:
     name: validate (${{ matrix.stack }})
-    runs-on: ${{ inputs.runner || vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner || vars.RUNNER_SMALL || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:

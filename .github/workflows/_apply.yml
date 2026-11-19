@@ -12,7 +12,7 @@ on:
         type: string
         default: foundation
       runner:
-        description: Runner label (empty = RUNNER_LABEL variable, then ubuntu-latest)
+        description: Runner label (empty = RUNNER_MEDIUM variable, then ubuntu-latest)
         type: string
         default: ""
       github_app:
@@ -28,7 +28,7 @@ env:
 jobs:
   apply:
     name: apply ${{ inputs.stack }} (${{ inputs.environment }})
-    runs-on: ${{ inputs.runner || vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner || vars.RUNNER_MEDIUM || 'ubuntu-latest' }}
     environment: ${{ inputs.environment }}
     # One apply/destroy at a time per environment and stack, never cancelled midway
     concurrency:
@@ -54,7 +54,7 @@ jobs:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.DEPLOYER_SA }}
 
-      # Short-lived GitHub App installation token for the Terraform github provider (stacks managing RUNNER_LABEL)
+      # Short-lived GitHub App installation token for the Terraform github provider (stacks managing RUNNER_SMALL and RUNNER_MEDIUM)
       - name: Read GitHub App credentials
         id: github_app
         if: inputs.github_app
