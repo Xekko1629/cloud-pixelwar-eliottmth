@@ -5,9 +5,11 @@
   "exports": {
     "./observability": "./src/observability/index.ts",
     "./observability/google": "./src/observability/google.ts",
-    "./grid": "./src/grid/index.ts"
+    "./grid": "./src/grid/index.ts",
+    "./drawing": "./src/drawing/index.ts"
   },
   "dependencies": {
+    "@google-cloud/firestore": "9.4.0",
     "@opentelemetry/api": "1.10.0",
     "@opentelemetry/context-async-hooks": "3.0.0",
     "@opentelemetry/core": "3.0.0",

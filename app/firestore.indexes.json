@@ -30,7 +30,9 @@
     { "collectionGroup": "tile_colors", "fieldPath": "colors", "indexes": [] },
     { "collectionGroup": "tile_metadata", "fieldPath": "pixels", "indexes": [] },
     { "collectionGroup": "deltas", "fieldPath": "pixels", "indexes": [] },
-    { "collectionGroup": "deltas", "fieldPath": "expire_at", "indexes": [] },
-    { "collectionGroup": "processed_events", "fieldPath": "expire_at", "indexes": [] }
+    { "collectionGroup": "deltas", "fieldPath": "expire_at", "ttl": true, "indexes": [] },
+    { "collectionGroup": "processed_events", "fieldPath": "expire_at", "ttl": true, "indexes": [] },
+    { "collectionGroup": "processed_events", "fieldPath": "request_digest", "indexes": [] },
+    { "collectionGroup": "processed_events", "fieldPath": "result", "indexes": [] }
   ]
 }
