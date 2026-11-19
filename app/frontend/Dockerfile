@@ -21,8 +21,8 @@ USER root
 RUN rm -f /etc/nginx/conf.d/default.conf && chown 101:0 /etc/nginx/conf.d && chmod 775 /etc/nginx/conf.d
 USER 101
 
-COPY --chown=101:0 nginx/default.conf.template /etc/nginx/templates/default.conf.template
-COPY --chown=101:0 --chmod=755 nginx/05-check-config.envsh /docker-entrypoint.d/05-check-config.envsh
+COPY --chown=101:0 frontend/nginx/default.conf.template /etc/nginx/templates/default.conf.template
+COPY --chown=101:0 --chmod=755 frontend/nginx/05-check-config.envsh /docker-entrypoint.d/05-check-config.envsh
 COPY --from=build --chown=101:0 /app/frontend/dist /usr/share/nginx/html
 
 EXPOSE 8080
