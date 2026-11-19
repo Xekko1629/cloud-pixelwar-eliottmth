@@ -9,16 +9,17 @@ schemes:
   - https
 produces:
   - application/json
-# Firebase ID token (ADR-0005), checked by the gateway: signature against Google's keys,
-# issuer, audience and expiry. A route opts in with "security: - firebase: []".
+# Session JWT (ADR-0012), checked by the gateway: signature against the public keys of
+# the session signer service account, issuer, audience and expiry.
+# A route opts in with "security: - session: []".
 securityDefinitions:
-  firebase:
+  session:
     authorizationUrl: ""
     flow: "implicit"
     type: "oauth2"
-    x-google-issuer: ${jsonencode("https://securetoken.google.com/${firebase_project_id}")}
-    x-google-jwks_uri: "https://www.googleapis.com/service_accounts/v1/metadata/x509/securetoken@system.gserviceaccount.com"
-    x-google-audiences: ${jsonencode(firebase_project_id)}
+    x-google-issuer: ${jsonencode(session_issuer)}
+    x-google-jwks_uri: ${jsonencode("https://www.googleapis.com/robot/v1/metadata/x509/${session_issuer}")}
+    x-google-audiences: ${jsonencode(session_audience)}
 paths:
 %{ for path, operations in paths ~}
   ${jsonencode(path)}:
@@ -26,11 +27,11 @@ paths:
     ${operation.method}:
       operationId: ${jsonencode(operation.operation_id)}
       summary: ${jsonencode(operation.summary)}
-%{ if operation.auth == "firebase" ~}
+%{ if operation.auth == "session" ~}
       # Rejected with 401 by the gateway without a valid token; the claims reach the
       # backend in X-Apigateway-Api-Userinfo (base64url).
       security:
-        - firebase: []
+        - session: []
 %{ endif ~}
       # The gateway signs a Google ID token as its own service account
       # (audience = the function URL), so the private proxy accepts the call.

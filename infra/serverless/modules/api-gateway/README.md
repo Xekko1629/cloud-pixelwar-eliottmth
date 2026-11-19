@@ -36,7 +36,7 @@ module "api_gateway" {
 
 - Une route dont la clé `backend` est absente de `backends` n'est pas publiée. Au moins une route doit l'être, sinon le plan échoue sur une précondition.
 - Un backend `service_type = "worker"` est refusé : les workers ne sont appelés que par Pub/Sub (ADR-0002).
-- `auth` vaut `firebase` par défaut : une route publique doit l'écrire explicitement (`auth = "none"`). Une route sous `/api/` (`protected_path_prefixes`) sans `firebase` est refusée au plan.
+- `auth` vaut `session` par défaut : une route publique doit l'écrire explicitement (`auth = "none"`). Une route sous `/api/` (`protected_path_prefixes`) sans `session` est refusée au plan.
 - `cors = true` ajoute la route `OPTIONS` du même chemin, sans `security`, vers le même backend. Une route `options` déclarée à la main est refusée.
 
 ## Fonctionnement
@@ -51,12 +51,12 @@ module "api_gateway" {
 | Route | À la gateway | Vérifié ensuite par |
 | --- | --- | --- |
 | `POST /discord/interactions` | publique | `discord-proxy` : signature Ed25519 sur le corps brut, avant tout traitement (Sujet §3.2) |
-| `GET /auth/login`, `POST /auth/exchange` | publiques (l'utilisateur n'a pas encore de token) | `auth-proxy` : `state` signé, échange du code OAuth2 (ADR-0005) |
-| `POST /api/*` | **ID token Firebase obligatoire** | le proxy lit l'identité dans `X-Apigateway-Api-Userinfo` |
+| `GET /auth/login`, `POST /auth/exchange` | publiques (l'utilisateur n'a pas encore de token) | `auth-proxy` : `state` signé, échange du code OAuth2 (ADR-0012) |
+| `POST /api/*` | **JWT de session obligatoire** | le proxy lit l'identité dans `X-Apigateway-Api-Userinfo` |
 | `OPTIONS` des routes `cors = true` | publiques | le backend renvoie les en-têtes CORS |
-| `GET /hello` (temporaire, #39) | ID token Firebase obligatoire | — |
+| `GET /hello` (temporaire, #39) | JWT de session obligatoire | — |
 
-- La définition `firebase` n'accepte que les ID tokens émis pour ce projet : émetteur `https://securetoken.google.com/<project_id>`, audience `<project_id>`, signature vérifiée avec les clés publiques de `securetoken@system.gserviceaccount.com`, expiration contrôlée. Un token de dev est donc refusé en prd. Sans token, ou avec un token invalide, la gateway répond **401 sans appeler la fonction** : la requête ne coûte aucune invocation.
+- La définition `session` n'accepte que les JWT de session de cet environnement (ADR-0012) : émetteur `session-signer@<project_id>.iam.gserviceaccount.com`, audience `<project_id>` (modifiable par `session_audience`), signature vérifiée avec les clés publiques de ce compte de service (`https://www.googleapis.com/robot/v1/metadata/x509/<email>`), expiration contrôlée. Un token de dev est donc refusé en prd. Sans token, ou avec un token invalide, la gateway répond **401 sans appeler la fonction** : la requête ne coûte aucune invocation.
 - La gateway remplace `Authorization` par son propre token pour appeler la fonction. L'identité de l'utilisateur arrive dans `X-Apigateway-Api-Userinfo` (claims JSON en base64url) : le proxy prend l'`uid` (= id Discord) à cet endroit, jamais dans le corps de la requête.
 - Les routes `OPTIONS` sont nécessaires : le navigateur envoie le preflight CORS
   sans `Authorization`. Sans route publique correspondante, il recevrait un 401.
@@ -75,7 +75,7 @@ Sur GCP, API Gateway ne limite le débit que par **quotas de consommateur** (`x-
 
 La protection contre les rafales repose donc sur :
 
-1. la gateway, qui rejette sans invocation tout appel `/api/*` sans ID token valide ;
+1. la gateway, qui rejette sans invocation tout appel `/api/*` sans JWT de session valide ;
 2. le `max_instances` de chaque fonction proxy, qui plafonne la concurrence et le coût ;
 3. Pub/Sub, qui absorbe les pics entre les proxies et les workers ;
 4. la limite par utilisateur du worker, avec rejet métier publié (ADR-0002).
@@ -83,7 +83,7 @@ La protection contre les rafales repose donc sur :
 ## Vérification sur un environnement déployé
 
 Prérequis de l'exemple : un backend HTTP de test est configuré et déployé sur la
-route **GET `/hello` avec authentification Firebase**, et un ID token du bon
+route **GET `/hello` avec authentification par JWT de session**, et un JWT de session du bon
 projet est disponible. Cet exemple n'est pas la slash command Discord `/hello`.
 Pour la sonde Discord sur `/discord/interactions`, suivre
 [son runbook](../../../../docs/discord-hello.md).
@@ -91,7 +91,7 @@ Pour la sonde Discord sur `/discord/interactions`, suivre
 ```sh
 GATEWAY=$(terraform -chdir=infra/gateway output -raw gateway_url)
 : "${FUNCTION_URL:?Renseigner l'URI du backend de test}"
-: "${ID_TOKEN:?Fournir un ID token Firebase du projet sans l'afficher}"
+: "${ID_TOKEN:?Fournir un JWT de session du projet sans l'afficher}"
 
 # Sans token : 401 renvoyé par la gateway, la fonction n'est pas invoquée (aucun log côté fonction).
 curl -i "$GATEWAY/hello"
@@ -128,4 +128,4 @@ terraform init -backend=false
 terraform test
 ```
 
-Les tests utilisent des providers simulés : aucune ressource GCP n'est créée. Ils vérifient le rendu de la spécification (chemin, audience, délai), le filtrage des routes, l'ID de configuration généré, la portée des droits `run.invoker`, le refus d'un worker comme backend, la validation Firebase sur `/api/*`, l'absence de `security` sur Discord, `/auth/*` et les preflights, et le refus d'une route `/api/*` publique.
+Les tests utilisent des providers simulés : aucune ressource GCP n'est créée. Ils vérifient le rendu de la spécification (chemin, audience, délai), le filtrage des routes, l'ID de configuration généré, la portée des droits `run.invoker`, le refus d'un worker comme backend, la validation du JWT de session sur `/api/*`, l'absence de `security` sur Discord, `/auth/*` et les preflights, et le refus d'une route `/api/*` publique.

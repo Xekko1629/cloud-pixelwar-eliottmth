@@ -55,9 +55,9 @@ variable "routes" {
     operation_id     = string
     summary          = string
     deadline_seconds = optional(number, 15)
-    # firebase: the gateway validates a Firebase ID token before calling the backend.
+    # session: the gateway validates a session JWT (ADR-0012) before calling the backend.
     # none: public at the gateway (Discord signature or OAuth login checked by the proxy).
-    auth = optional(string, "firebase")
+    auth = optional(string, "session")
     # true: called from the browser, the gateway also publishes an OPTIONS preflight route.
     cors = optional(bool, false)
   }))
@@ -68,8 +68,8 @@ variable "routes" {
   }
 
   validation {
-    condition     = alltrue([for route in var.routes : contains(["firebase", "none"], route.auth)])
-    error_message = "Route auth must be firebase or none."
+    condition     = alltrue([for route in var.routes : contains(["session", "none"], route.auth)])
+    error_message = "Route auth must be session or none."
   }
 
   validation {
@@ -89,10 +89,10 @@ variable "routes" {
 
   validation {
     condition = alltrue([
-      for route in var.routes : route.auth == "firebase"
+      for route in var.routes : route.auth == "session"
       if anytrue([for prefix in var.protected_path_prefixes : startswith(route.path, prefix)])
     ])
-    error_message = "Routes under a protected prefix (/api/ by default) must require a Firebase ID token."
+    error_message = "Routes under a protected prefix (/api/ by default) must require a session JWT."
   }
 
   validation {
@@ -105,7 +105,19 @@ variable "routes" {
 }
 
 variable "protected_path_prefixes" {
-  description = "Path prefixes whose routes must validate a Firebase ID token at the gateway (subject section 3.4)"
+  description = "Path prefixes whose routes must validate a session JWT at the gateway (subject section 3.4)"
   type        = list(string)
   default     = ["/api/"]
+}
+
+variable "session_signer_account_id" {
+  description = "Account ID of the service account that signs the session JWTs (ADR-0012); its email is the token issuer"
+  type        = string
+  default     = "session-signer"
+}
+
+variable "session_audience" {
+  description = "Audience (aud claim) of the session JWTs; null = the project ID, so a dev token is refused in prd"
+  type        = string
+  default     = null
 }

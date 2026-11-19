@@ -41,9 +41,9 @@ run "routing" {
   assert {
     condition = toset(output.published_routes) == toset([
       "POST /discord/interactions (none)",
-      "POST /api/pixels (firebase)",
+      "POST /api/pixels (session)",
       "OPTIONS /api/pixels (none)",
-      "GET /hello (firebase)",
+      "GET /hello (session)",
     ])
     error_message = "Only routes whose backend is deployed must be published."
   }
@@ -79,16 +79,17 @@ run "route_authentication" {
 
   assert {
     condition = (
-      yamldecode(output.openapi).securityDefinitions.firebase["x-google-issuer"] == "https://securetoken.google.com/pixelwar-test" &&
-      yamldecode(output.openapi).securityDefinitions.firebase["x-google-audiences"] == "pixelwar-test" &&
-      yamldecode(output.openapi).securityDefinitions.firebase["x-google-jwks_uri"] == "https://www.googleapis.com/service_accounts/v1/metadata/x509/securetoken@system.gserviceaccount.com"
+      yamldecode(output.openapi).securityDefinitions.session["x-google-issuer"] == "session-signer@pixelwar-test.iam.gserviceaccount.com" &&
+      yamldecode(output.openapi).securityDefinitions.session["x-google-audiences"] == "pixelwar-test" &&
+      yamldecode(output.openapi).securityDefinitions.session["x-google-jwks_uri"] == "https://www.googleapis.com/robot/v1/metadata/x509/session-signer@pixelwar-test.iam.gserviceaccount.com" &&
+      !can(yamldecode(output.openapi).securityDefinitions.firebase)
     )
-    error_message = "The gateway must only accept Firebase ID tokens issued for this project."
+    error_message = "The gateway must only accept session JWTs signed for this project, never Firebase tokens."
   }
 
   assert {
-    condition     = yamldecode(output.openapi).paths["/api/pixels"].post.security == [{ firebase = [] }]
-    error_message = "/api/* must require a Firebase ID token at the gateway."
+    condition     = yamldecode(output.openapi).paths["/api/pixels"].post.security == [{ session = [] }]
+    error_message = "/api/* must require a session JWT at the gateway."
   }
 
   assert {
