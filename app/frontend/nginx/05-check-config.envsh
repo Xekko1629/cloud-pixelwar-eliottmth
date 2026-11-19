@@ -1,0 +1,36 @@
+#!/bin/sh
+# Sourced (*.envsh) by the entrypoint of the nginx image, before the template rendering
+# of 20-envsubst-on-templates.sh: its exports reach envsubst, and a failure stops the
+# container. The values end up in a JavaScript string and in a CSP header: anything other
+# than a plain https origin or a Discord snowflake is refused, so the service fails to
+# start instead of serving a broken or injectable configuration.
+# Sourced into the entrypoint shell: no "set -u", no global side effect besides the exports.
+
+pixelwar_fail() {
+  echo "05-check-config: $1" >&2
+  exit 1
+}
+
+pixelwar_check_origin() {
+  [ -z "$2" ] && return 0
+  printf '%s' "$2" | grep -Eq '^https://[A-Za-z0-9.-]+(:[0-9]+)?$' ||
+    pixelwar_fail "$1 must be an https origin without path"
+}
+
+case "${APP_ENV:-}" in
+  dev | prd) ;;
+  *) pixelwar_fail "APP_ENV must be dev or prd" ;;
+esac
+
+pixelwar_check_origin GATEWAY_URL "${GATEWAY_URL:-}"
+pixelwar_check_origin REALTIME_URL "${REALTIME_URL:-}"
+
+if [ -n "${DISCORD_CLIENT_ID:-}" ]; then
+  printf '%s' "$DISCORD_CLIENT_ID" | grep -Eq '^[1-9][0-9]{0,19}$' ||
+    pixelwar_fail "DISCORD_CLIENT_ID must be a Discord snowflake"
+fi
+
+# envsubst only replaces variables that exist: define the optional ones as empty.
+export GATEWAY_URL="${GATEWAY_URL:-}"
+export REALTIME_URL="${REALTIME_URL:-}"
+export DISCORD_CLIENT_ID="${DISCORD_CLIENT_ID:-}"
