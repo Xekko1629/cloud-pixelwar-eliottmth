@@ -1,6 +1,6 @@
 # ADR-0004 · Lectures directes de Firestore depuis le navigateur
 
-- **Statut** : Proposé
+- **Statut** : Remplacé par [ADR-0013](0013-lectures-temps-reel-sans-firebase.md)
 - **Date** : 2026-10-23
 - **Tickets** : ARCH-01 (#26). Utilisé par SRV-06, DRAW-03a, DRAW-04, WEB-03b, WEB-04, DATA-05c.
 - **Références** : Sujet §3.1, §3.4 · C07 §3.3, §4, §5

@@ -24,14 +24,17 @@ contexte, contraintes techniques, choix retenu, alternatives et conséquences.
 |---|---|---|
 | [0001](0001-compute-cloud-run-typescript.md) | Compute : services Cloud Run, en TypeScript sur Node.js 24 | Remplacé par ADR-0008 |
 | [0002](0002-broker-pubsub-push.md) | Broker : Pub/Sub en push authentifié par OIDC | Accepté |
-| [0003](0003-temps-reel-listeners-firestore.md) | Temps réel : listeners Firestore sur des deltas par région | Accepté |
-| [0004](0004-lectures-directes-firestore.md) | Lectures directes de Firestore depuis le navigateur | Proposé |
-| [0005](0005-identite-web-firebase-auth.md) | Identité web : OAuth2 Discord côté serveur, puis custom token Firebase | Accepté |
-| [0006](0006-hebergement-frontend-firebase-hosting.md) | Hébergement du frontend : Firebase Hosting | Accepté |
+| [0003](0003-temps-reel-listeners-firestore.md) | Temps réel : listeners Firestore sur des deltas par région | Écriture acceptée, lecture remplacée par ADR-0013 |
+| [0004](0004-lectures-directes-firestore.md) | Lectures directes de Firestore depuis le navigateur | Remplacé par ADR-0013 |
+| [0005](0005-identite-web-firebase-auth.md) | Identité web : OAuth2 Discord côté serveur, puis custom token Firebase | Remplacé par ADR-0012 |
+| [0006](0006-hebergement-frontend-firebase-hosting.md) | Hébergement du frontend : Firebase Hosting | Remplacé par ADR-0011 |
 | [0007](0007-modele-donnees-grille.md) | Données : grille infinie ou bornée par un admin, tuiles 64×64, régions 1024×1024, palette de 16 couleurs | Accepté |
 | [0008](0008-compute-cloud-run-functions.md) | Compute : Cloud Run functions déployées depuis une archive de sources identifiée par SHA-256 | Accepté, artefact de release remplacé par ADR-0009 |
 | [0009](0009-sources-fonctions-terraform.md) | Sources des fonctions : construites par la CI, zippées et téléversées par Terraform | Accepté |
 | [0010](0010-separation-gateway-serverless.md) | Séparation des cycles de vie Gateway et fonctions, avec contrat d'outputs | Proposé |
+| [0011](0011-frontend-image-cloud-run.md) | Frontend : application React servie par une image Docker sur Cloud Run | Accepté |
+| [0012](0012-identite-web-jwt-session.md) | Identité web : OAuth2 Discord, puis JWT de session signé par un compte de service | Accepté |
+| [0013](0013-lectures-temps-reel-sans-firebase.md) | Lectures via la gateway et temps réel par un service SSE, sans SDK Firebase | Proposé |
 
 Le build des sources est décrit par l'ADR-0009. Pour les procédures exécutables,
 consulter [Installation et déploiement](../deployment.md).
