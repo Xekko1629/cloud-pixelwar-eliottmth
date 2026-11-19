@@ -1,0 +1,12 @@
+{
+  "name": "@pixelwar/function-draw-worker",
+  "private": true,
+  "type": "module",
+  "pixelwar": { "entryPoint": "handleDrawWorker" },
+  "dependencies": {
+    "@google-cloud/functions-framework": "5.0.5",
+    "@google-cloud/firestore": "9.4.0",
+    "@google-cloud/pubsub": "6.3.2",
+    "@pixelwar/shared": "*"
+  }
+}
