@@ -43,6 +43,12 @@ variable "planner_roles" {
   ]
 }
 
+variable "enable_discord_verify_iam" {
+  description = "Dev-only opt-in: grant CI policy management, actAs and read access on the existing diagnostic invoker, after serverless phase 1"
+  type        = bool
+  default     = false
+}
+
 variable "deploy_reviewers" {
   description = "GitHub usernames whose approval is required before a deploy to this environment"
   type        = list(string)

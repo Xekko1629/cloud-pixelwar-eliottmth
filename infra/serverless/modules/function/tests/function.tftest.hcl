@@ -128,6 +128,15 @@ run "configured_function" {
   }
 }
 
+run "diagnostic_invoker_naming_contract" {
+  command = plan
+  variables { name = "discord-command-verify" }
+  assert {
+    condition     = google_service_account.invoker[0].account_id == "invoke-e34c8c0323d1f404f6dd"
+    error_message = "The diagnostic invoker name is also looked up by infra/iam: review both stacks together before changing this naming contract."
+  }
+}
+
 run "reject_unknown_service_type" {
   command = plan
   variables { service_type = "public" }

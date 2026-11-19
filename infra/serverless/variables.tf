@@ -35,3 +35,43 @@ variable "discord_hello_public_key_version" {
     error_message = "Select an explicit numeric secret version, not latest."
   }
 }
+
+variable "enable_discord_pipeline" {
+  description = "Create the Discord proxy and diagnostic Pub/Sub pipeline in dev only; does not route Gateway traffic"
+  type        = bool
+  default     = false
+}
+
+variable "use_discord_proxy" {
+  description = "Explicit dev Gateway backend selection, independent of resource creation; requires pipeline and authenticated delivery"
+  type        = bool
+  default     = false
+}
+
+variable "enable_discord_delivery" {
+  description = "Enable dev authenticated push and forwarding IAM only after the invoker exists and its scoped CI permissions have been applied"
+  type        = bool
+  default     = false
+}
+
+variable "discord_proxy_public_key_version" {
+  description = "Explicit numeric Secret Manager version of discord-public-key for the dev proxy"
+  type        = string
+  default     = "1"
+
+  validation {
+    condition     = can(regex("^[1-9][0-9]*$", var.discord_proxy_public_key_version))
+    error_message = "Select an explicit numeric secret version, not latest."
+  }
+}
+
+variable "discord_application_id_version" {
+  description = "Explicit numeric Secret Manager version of discord-application-id for the dev proxy and verifier"
+  type        = string
+  default     = "1"
+
+  validation {
+    condition     = can(regex("^[1-9][0-9]*$", var.discord_application_id_version))
+    error_message = "Select an explicit numeric secret version, not latest."
+  }
+}

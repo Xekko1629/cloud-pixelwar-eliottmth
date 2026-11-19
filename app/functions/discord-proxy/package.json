@@ -1,0 +1,11 @@
+{
+  "name": "@pixelwar/function-discord-proxy",
+  "private": true,
+  "type": "module",
+  "pixelwar": { "entryPoint": "handleDiscordProxy" },
+  "dependencies": {
+    "@google-cloud/functions-framework": "5.0.5",
+    "@google-cloud/pubsub": "6.3.2",
+    "@pixelwar/shared": "*"
+  }
+}
