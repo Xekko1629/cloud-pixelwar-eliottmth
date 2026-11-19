@@ -1,0 +1,42 @@
+# Rendered at container start by the nginx image (envsubst on /etc/nginx/templates).
+# Only APP_ENV, GATEWAY_URL, REALTIME_URL and DISCORD_CLIENT_ID are substituted
+# (NGINX_ENVSUBST_FILTER in the Dockerfile); nginx variables such as $uri stay untouched.
+# The values are checked first by /docker-entrypoint.d/05-check-config.envsh.
+#
+# nginx rule: an add_header inside a location replaces every add_header of the server
+# block, so each location declares its complete set of headers.
+server {
+    listen 8080;
+    server_name _;
+    root /usr/share/nginx/html;
+
+    server_tokens off;
+    # Cloud Run terminates TLS in front of nginx: never build redirects with :8080.
+    absolute_redirect off;
+
+    # Runtime configuration of this environment (ADR-0011): public values only.
+    location = /config.js {
+        default_type application/javascript;
+        add_header Cache-Control "no-store" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        return 200 'window.__PIXELWAR_CONFIG__ = {"environment":"${APP_ENV}","gatewayUrl":"${GATEWAY_URL}","realtimeUrl":"${REALTIME_URL}","discordClientId":"${DISCORD_CLIENT_ID}"};\n';
+    }
+
+    # Hashed file names: cached for a year, never revalidated.
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        try_files $uri =404;
+    }
+
+    # Single-page application: every other route, /auth/callback included, gets index.html.
+    location / {
+        add_header Cache-Control "no-cache" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://cdn.discordapp.com; connect-src 'self' ${GATEWAY_URL} ${REALTIME_URL}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        try_files $uri /index.html;
+    }
+}

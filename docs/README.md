@@ -9,6 +9,7 @@
 - [Création, alimentation et rotation des secrets](../infra/iam/SECRETS.md)
 - [Déploiement du stack serverless](../infra/serverless/README.md)
 - [Gateway, contrat des backends et migration des states](../infra/gateway/README.md)
+- [Frontend : image, configuration et service Cloud Run](../infra/frontend/README.md)
 
 ## Développement et intégration
 

@@ -47,8 +47,9 @@
   transmet son **digest** à Terraform.
 - Le build se fait sur un runner GitHub hébergé (`docker buildx`), authentifié
   par Workload Identity : les runners ARC n'ont pas de démon Docker.
-- `infra/serverless` déclare un `google_cloud_run_v2_service` `frontend` qui
-  référence l'image **par digest**, jamais par tag.
+- Un `google_cloud_run_v2_service` `frontend` référence l'image **par digest**,
+  jamais par tag. Précision (WEB-01) : il est déclaré dans un stack
+  `infra/frontend` distinct, appliqué après `infra/gateway` dont il lit l'URL.
 - `min_instance_count = 0`, `max_instance_count` plafonné (2 en dev, 4 en prd).
 
 ### Identité et accès
