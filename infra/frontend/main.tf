@@ -11,7 +11,15 @@ locals {
   gateway_url = try(data.terraform_remote_state.gateway.outputs.gateway_url, null)
 
   image_repository = "${var.region}-docker.pkg.dev/${var.project_id}/pixelwar/frontend"
-  deployed         = var.image != null
+  # Deterministic Cloud Run URL (https://<service>-<project number>.<region>.run.app). The
+  # auth-proxy computes the same one for CORS and the Discord redirect URI: users must use this
+  # origin, since the OAuth state is kept in the sessionStorage of the origin.
+  frontend_url = "https://frontend-${data.google_project.current.number}.${var.region}.run.app"
+  deployed     = var.image != null
+}
+
+data "google_project" "current" {
+  project_id = var.project_id
 }
 
 data "terraform_remote_state" "gateway" {
@@ -109,13 +117,13 @@ resource "google_cloud_run_v2_service_iam_member" "public" {
 }
 
 output "frontend_url" {
-  description = "Public HTTPS URL of the frontend; null when no image is deployed"
-  value       = one(google_cloud_run_v2_service.frontend[*].uri)
+  description = "Public HTTPS URL of the frontend (deterministic form); null when no image is deployed"
+  value       = local.deployed ? local.frontend_url : null
 }
 
 output "discord_redirect_uri" {
-  description = "Redirect URI to register in the Discord application of this environment (WEB-02)"
-  value       = local.deployed ? "${google_cloud_run_v2_service.frontend[0].uri}/auth/callback" : null
+  description = "Redirect URI to register in the Discord application of this environment (known before the first deploy)"
+  value       = "${local.frontend_url}/auth/callback"
 }
 
 output "image_repository" {
