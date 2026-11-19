@@ -19,6 +19,7 @@
 - [Enregistrement des commandes Discord](discord-commands.md)
 - [Installation, vérification et retrait de la sonde Discord hello](discord-hello.md)
 - [Proxy Discord Q2 : contrat et tests locaux](discord-proxy.md)
+- [Command worker : routage, autorisation et relivraisons](command-worker.md)
 - [Contrat du calcul des quotas utilisateur](rate-limits.md)
 - [Instrumentation et validation de l'observabilité](observability.md)
 

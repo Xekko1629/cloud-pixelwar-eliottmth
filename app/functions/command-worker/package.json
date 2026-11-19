@@ -1,0 +1,11 @@
+{
+  "name": "@pixelwar/function-command-worker",
+  "private": true,
+  "type": "module",
+  "pixelwar": { "entryPoint": "handleCommandWorker" },
+  "dependencies": {
+    "@google-cloud/functions-framework": "5.0.5",
+    "@google-cloud/pubsub": "6.3.2",
+    "@pixelwar/shared": "*"
+  }
+}
