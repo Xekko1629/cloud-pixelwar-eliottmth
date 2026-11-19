@@ -11,7 +11,9 @@ Ce document décrit les responsabilités et contrats, pas un inventaire GCP.
 
 | Composant | Responsabilité | Frontière |
 | --- | --- | --- |
-| API Gateway | Routage HTTP et validation Firebase des routes protégées | Point d'entrée HTTP des proxies |
+| Frontend (Cloud Run) | Image nginx qui sert l'application React (ADR-0011) | Seul service public avec `realtime` ; aucun rôle GCP |
+| API Gateway | Routage HTTP et validation du JWT de session des routes protégées (ADR-0012) | Point d'entrée HTTP des proxies |
+| Service `realtime` (Cloud Run) | Flux SSE des deltas, état utilisateur et config (ADR-0013) | JWT de session vérifié dans le code ; lecture Firestore seule |
 | Fonction proxy | Validation de la requête et publication de l'événement | Invocation IAM par l'identité Gateway |
 | Pub/Sub | Distribution par topic/abonnement, retries et DLQ | Push OIDC avec une identité d'invocation dédiée |
 | Fonction worker | Traitement durable et idempotent avant acquittement | Ingress interne, runtime distinct de l'invoker |
@@ -20,9 +22,10 @@ Ce document décrit les responsabilités et contrats, pas un inventaire GCP.
 | GKE et ARC | Exécution et autoscaling des runners CI | Aucun hébergement du backend applicatif |
 
 Les contrats de données, identité web, temps réel et hébergement sont décrits
-respectivement par ADR-0007, ADR-0005, ADR-0003 et ADR-0006. ADR-0004 décrit une
-**proposition** de lectures directes Firestore ; ce statut ne doit pas être
-assimilé à une exception approuvée. Les runbooks d'un composant déployable
+respectivement par ADR-0007, ADR-0012, ADR-0013 et ADR-0011. Aucun produit
+Firebase n'est utilisé (revue intermédiaire) : le navigateur ne parle jamais à
+Firestore, ses lectures passent par la gateway et son temps réel par le service
+`realtime`, dont l'accès direct reste **à valider** (ADR-0013). Les runbooks d'un composant déployable
 doivent correspondre à ses modules et handlers, pas seulement à un ADR.
 
 ## Entrée HTTP et événements
