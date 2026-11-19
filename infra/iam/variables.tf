@@ -26,12 +26,53 @@ variable "github_repository" {
 }
 
 variable "deployer_roles" {
-  description = "Project roles of the CI deployer (apply, destroy)"
+  description = "Project roles of the CI deployer (apply, destroy) in every environment. Never roles/editor nor roles/owner."
   type        = set(string)
   default = [
-    "roles/editor",
-    "roles/resourcemanager.projectIamAdmin",
-    "roles/container.admin", # Helm charts of the runners create CRDs and cluster RBAC
+    # infra/bootstrap: sources bucket, image registry, build identity
+    "roles/storage.admin",           # state objects, function sources bucket and objects
+    "roles/artifactregistry.admin",  # pixelwar repository (function images, frontend image)
+    "roles/iam.serviceAccountAdmin", # runtime, invoker, build and gateway identities
+    "roles/iam.serviceAccountUser",  # actAs those identities when attaching them to a function or gateway
+    # infra/serverless: functions, frontend service, broker, data, scheduled jobs
+    "roles/cloudfunctions.admin",
+    "roles/run.admin",
+    "roles/pubsub.admin",
+    "roles/datastore.owner", # Firestore database, indexes and TTL policies
+    "roles/cloudscheduler.admin",
+    # infra/gateway: API, configs, gateway, and the managed service it enables
+    "roles/apigateway.admin",
+    "roles/serviceusage.serviceUsageAdmin",
+    # Alert policies, dashboards and log-based metrics (OBS tickets)
+    "roles/monitoring.editor",
+    "roles/logging.configWriter",
+    # infra/foundation: VPC and subnet (present in both environments)
+    "roles/compute.networkAdmin",
+  ]
+}
+
+variable "deployer_cluster_roles" {
+  description = "Extra project roles of the CI deployer where enable_runners = true (GKE cluster and Helm releases of the runners)"
+  type        = set(string)
+  default = [
+    "roles/container.admin", # cluster, node pools, and the CRDs and cluster RBAC of the Helm charts
+  ]
+}
+
+variable "deployer_grantable_roles" {
+  description = "The only roles the CI deployer may grant at project level (conditional projectIamAdmin)"
+  type        = set(string)
+  default = [
+    # Runtime identities of the functions (modules/function): observability
+    "roles/logging.logWriter",
+    "roles/monitoring.metricWriter",
+    "roles/cloudtrace.agent",
+    "roles/telemetry.tracesWriter",
+    # Runtime identities that read or write Firestore (workers, readers)
+    "roles/datastore.user",
+    "roles/datastore.viewer",
+    # GKE nodes (infra/foundation)
+    "roles/artifactregistry.reader",
   ]
 }
 

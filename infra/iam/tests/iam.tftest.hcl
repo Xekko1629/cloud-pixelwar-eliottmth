@@ -110,20 +110,53 @@ run "runners_identities_prd" {
   }
 }
 
-run "ci_resource_iam_roles" {
+run "planner_resource_iam_read_only" {
   command = plan
-
-  assert {
-    condition = (
-      contains(google_project_iam_custom_role.deployer_resource_iam_policy.permissions, "run.services.setIamPolicy") &&
-      contains(google_project_iam_custom_role.deployer_resource_iam_policy.permissions, "storage.buckets.setIamPolicy") &&
-      alltrue([for permission in google_project_iam_custom_role.deployer_resource_iam_policy.permissions : endswith(permission, "IamPolicy")])
-    )
-    error_message = "The deployer resource role only manages IAM policies of the resources the CI creates."
-  }
 
   assert {
     condition     = alltrue([for permission in google_project_iam_custom_role.planner_resource_iam_read.permissions : endswith(permission, ".getIamPolicy")])
     error_message = "The planner stays read-only."
+  }
+}
+
+run "deployer_least_privilege" {
+  command = plan
+
+  assert {
+    condition = length(setintersection(
+      toset([for binding in google_project_iam_member.deployer : binding.role]),
+      toset(["roles/owner", "roles/editor", "roles/resourcemanager.projectIamAdmin", "roles/iam.securityAdmin"])
+    )) == 0
+    error_message = "The deployer never gets owner, editor or an unconditional IAM admin role."
+  }
+
+  assert {
+    condition = (
+      google_project_iam_member.deployer_project_iam.role == "roles/resourcemanager.projectIamAdmin" &&
+      strcontains(google_project_iam_member.deployer_project_iam.condition[0].expression, "modifiedGrantsByRole") &&
+      !strcontains(google_project_iam_member.deployer_project_iam.condition[0].expression, "roles/owner") &&
+      !strcontains(google_project_iam_member.deployer_project_iam.condition[0].expression, "roles/editor")
+    )
+    error_message = "Project IAM is delegated with a condition listing only the runtime roles."
+  }
+
+  assert {
+    condition     = !contains([for binding in google_project_iam_member.deployer : binding.role], "roles/container.admin")
+    error_message = "Without a cluster (dev), the deployer gets no GKE role."
+  }
+}
+
+run "deployer_cluster_roles_prd" {
+  command = plan
+
+  variables {
+    project_id     = "cloud-pixelwar-prod"
+    environment    = "prd"
+    enable_runners = true
+  }
+
+  assert {
+    condition     = contains([for binding in google_project_iam_member.deployer : binding.role], "roles/container.admin")
+    error_message = "Where the runners cluster exists, the deployer manages it."
   }
 }

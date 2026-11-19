@@ -41,12 +41,29 @@ resource "google_service_account_iam_member" "deployer_wif" {
   member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.environment/${local.deploy_environment}"
 }
 
+# No roles/editor: one predefined role per kind of resource the CI manages (variables.tf).
+# The cluster roles are only granted where the cluster exists (prd).
 resource "google_project_iam_member" "deployer" {
-  for_each = var.deployer_roles
+  for_each = setunion(var.deployer_roles, var.enable_runners ? var.deployer_cluster_roles : toset([]))
 
   project = var.project_id
   role    = each.value
   member  = google_service_account.deployer.member
+}
+
+# Project IAM is delegated, not handed over: the deployer may only add or remove
+# bindings of the roles listed in deployer_grantable_roles. It cannot grant itself
+# (or anyone) owner, editor or projectIamAdmin.
+resource "google_project_iam_member" "deployer_project_iam" {
+  project = var.project_id
+  role    = "roles/resourcemanager.projectIamAdmin"
+  member  = google_service_account.deployer.member
+
+  condition {
+    title       = "grantable-roles-only"
+    description = "Only the runtime roles of deployer_grantable_roles"
+    expression  = "api.getAttribute('iam.googleapis.com/modifiedGrantsByRole', []).hasOnly(${jsonencode(sort(tolist(var.deployer_grantable_roles)))})"
+  }
 }
 
 resource "google_service_account" "planner" {
