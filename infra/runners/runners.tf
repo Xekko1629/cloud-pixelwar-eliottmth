@@ -68,9 +68,12 @@ resource "helm_release" "arc_controller" {
   values = [file("${path.module}/values/controller-${var.environment}.yaml")]
 }
 
-# Registers runners dynamically on the repository: one ephemeral pod per job, removed afterwards
+# Registers runners dynamically on the repository: one ephemeral pod per job, removed afterwards.
+# One scale set per size class (small, medium), so light jobs do not reserve a whole node.
 resource "helm_release" "arc_runner_set" {
-  name             = var.runner_scale_set_name
+  for_each = var.runner_sets
+
+  name             = each.value.name
   repository       = "oci://ghcr.io/actions/actions-runner-controller-charts"
   chart            = "gha-runner-scale-set"
   version          = var.arc_chart_version
@@ -81,9 +84,12 @@ resource "helm_release" "arc_runner_set" {
   values = [templatefile("${path.module}/values/runners-${var.environment}.yaml.tftpl", {
     github_config_url     = "https://github.com/${var.github_repository}"
     github_config_secret  = local.arc_github_secret
-    runner_scale_set_name = var.runner_scale_set_name
-    min_runners           = var.min_runners
-    max_runners           = var.max_runners
+    runner_scale_set_name = each.value.name
+    min_runners           = each.value.min_runners
+    max_runners           = each.value.max_runners
+    cpu_request           = each.value.cpu
+    memory_request        = each.value.memory
+    memory_limit          = each.value.memory_limit
     controller_namespace  = local.arc_controller_namespace
     # Service account of the controller chart: "<release name>-gha-rs-controller"
     controller_service_account = "${helm_release.arc_controller.name}-gha-rs-controller"
@@ -92,12 +98,18 @@ resource "helm_release" "arc_runner_set" {
   depends_on = [helm_release.arc_controller, helm_release.arc_github_secret]
 }
 
-# Routes CI jobs to these runners (runs-on: vars.RUNNER_LABEL || 'ubuntu-latest').
+# Routes CI jobs to these runners (runs-on: vars.RUNNER_SMALL / vars.RUNNER_MEDIUM || 'ubuntu-latest').
 # Removed on destroy, which sends every job back to GitHub-hosted runners.
 resource "github_actions_variable" "runner_label" {
+  for_each = var.runner_sets
+
   repository    = local.github_repo
-  variable_name = "RUNNER_LABEL"
-  value         = var.runner_scale_set_name
+  variable_name = "RUNNER_${upper(each.key)}"
+  value         = each.value.name
 
   depends_on = [helm_release.arc_runner_set]
 }
+
+# Migration from the single pixelwar-runners scale set: the old helm release and the
+# RUNNER_LABEL variable have no instance key, so the next apply deletes them and creates
+# one release and one variable per class. Jobs fall back to GitHub-hosted runners meanwhile.

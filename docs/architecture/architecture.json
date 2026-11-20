@@ -1,0 +1,901 @@
+{
+  "generated_by": "docs/architecture/diagram.py",
+  "components": [
+    {
+      "id": "discord",
+      "label": "Discord",
+      "view": "application",
+      "group": "Utilisateurs",
+      "status": "external",
+      "terraform": []
+    },
+    {
+      "id": "browser",
+      "label": "Navigateur",
+      "view": "application",
+      "group": "Utilisateurs",
+      "status": "external",
+      "terraform": []
+    },
+    {
+      "id": "discord_api",
+      "label": "API Discord",
+      "view": "application",
+      "group": "Réponses",
+      "status": "external",
+      "terraform": []
+    },
+    {
+      "id": "frontend",
+      "label": "frontend",
+      "view": "application",
+      "group": "Entrée publique",
+      "status": "deployed",
+      "terraform": [
+        "frontend:google_cloud_run_v2_service.frontend"
+      ]
+    },
+    {
+      "id": "gateway",
+      "label": "API Gateway",
+      "view": "application",
+      "group": "Entrée publique",
+      "status": "deployed",
+      "terraform": [
+        "gateway:module.api_gateway"
+      ]
+    },
+    {
+      "id": "discord_proxy",
+      "label": "discord-proxy",
+      "view": "application",
+      "group": "Proxies (Cloud Run functions)",
+      "status": "deployed",
+      "terraform": [
+        "serverless:module.discord_proxy"
+      ]
+    },
+    {
+      "id": "discord_hello",
+      "label": "discord-hello",
+      "view": "application",
+      "group": "Proxies (Cloud Run functions)",
+      "status": "deployed",
+      "terraform": [
+        "serverless:module.discord_hello"
+      ]
+    },
+    {
+      "id": "web_proxy",
+      "label": "web-proxy",
+      "view": "application",
+      "group": "Proxies (Cloud Run functions)",
+      "status": "planned",
+      "terraform": [
+        "serverless:module.web_proxy"
+      ]
+    },
+    {
+      "id": "auth_proxy",
+      "label": "auth-proxy",
+      "view": "application",
+      "group": "Proxies (Cloud Run functions)",
+      "status": "deployed",
+      "terraform": [
+        "serverless:module.auth_proxy"
+      ]
+    },
+    {
+      "id": "tile_reader",
+      "label": "tile-reader",
+      "view": "application",
+      "group": "Proxies (Cloud Run functions)",
+      "status": "planned",
+      "terraform": [
+        "serverless:module.tile_reader"
+      ]
+    },
+    {
+      "id": "session_signer",
+      "label": "session-signer",
+      "view": "application",
+      "group": "Proxies (Cloud Run functions)",
+      "status": "deployed",
+      "terraform": [
+        "serverless:google_service_account.session_signer"
+      ]
+    },
+    {
+      "id": "t_discord_command",
+      "label": "discord-command",
+      "view": "application",
+      "group": "Pub/Sub · entrée",
+      "status": "deployed",
+      "terraform": [
+        "serverless:module.discord_commands"
+      ]
+    },
+    {
+      "id": "t_dlq",
+      "label": "DLQ",
+      "view": "application",
+      "group": "Pub/Sub · entrée",
+      "status": "deployed",
+      "terraform": [
+        "serverless:module.discord_command_dlq"
+      ]
+    },
+    {
+      "id": "t_pixel_draw",
+      "label": "pixel-draw",
+      "view": "application",
+      "group": "Pub/Sub · entrée",
+      "status": "planned",
+      "terraform": [
+        "serverless:module.pixel_draw"
+      ]
+    },
+    {
+      "id": "t_pixel_result",
+      "label": "pixel-processed / rejected",
+      "view": "application",
+      "group": "Pub/Sub · suites",
+      "status": "planned",
+      "terraform": [
+        "serverless:module.pixel_processed",
+        "serverless:module.pixel_rejected"
+      ]
+    },
+    {
+      "id": "t_render",
+      "label": "render-requested",
+      "view": "application",
+      "group": "Pub/Sub · suites",
+      "status": "planned",
+      "terraform": [
+        "serverless:module.render_requested"
+      ]
+    },
+    {
+      "id": "t_snapshot",
+      "label": "snapshot-requested",
+      "view": "application",
+      "group": "Pub/Sub · suites",
+      "status": "planned",
+      "terraform": [
+        "serverless:module.snapshot_requested"
+      ]
+    },
+    {
+      "id": "t_snapshot_ready",
+      "label": "snapshot-ready",
+      "view": "application",
+      "group": "Pub/Sub · suites",
+      "status": "deployed",
+      "terraform": [
+        "serverless:module.snapshot_ready"
+      ]
+    },
+    {
+      "id": "t_overview",
+      "label": "overview-tick",
+      "view": "application",
+      "group": "Pub/Sub · suites",
+      "status": "planned",
+      "terraform": [
+        "serverless:module.overview_tick"
+      ]
+    },
+    {
+      "id": "scheduler",
+      "label": "Cloud Scheduler",
+      "view": "application",
+      "group": "Pub/Sub · suites",
+      "status": "planned",
+      "terraform": [
+        "serverless:google_cloud_scheduler_job.overview"
+      ]
+    },
+    {
+      "id": "discord_verify",
+      "label": "discord-command-verify",
+      "view": "application",
+      "group": "Workers · étape 1 (ingress interne)",
+      "status": "deployed",
+      "terraform": [
+        "serverless:module.discord_command_verify"
+      ]
+    },
+    {
+      "id": "command_worker",
+      "label": "command-worker",
+      "view": "application",
+      "group": "Workers · étape 1 (ingress interne)",
+      "status": "planned",
+      "terraform": [
+        "serverless:module.command_worker"
+      ]
+    },
+    {
+      "id": "draw_worker",
+      "label": "draw-worker",
+      "view": "application",
+      "group": "Workers · étape 1 (ingress interne)",
+      "status": "planned",
+      "terraform": [
+        "serverless:module.draw_worker"
+      ]
+    },
+    {
+      "id": "discord_notifier",
+      "label": "discord-notifier",
+      "view": "application",
+      "group": "Workers · étape 2 (ingress interne)",
+      "status": "planned",
+      "terraform": [
+        "serverless:module.discord_notifier"
+      ]
+    },
+    {
+      "id": "render_worker",
+      "label": "render-worker",
+      "view": "application",
+      "group": "Workers · étape 2 (ingress interne)",
+      "status": "planned",
+      "terraform": [
+        "serverless:module.render_worker"
+      ]
+    },
+    {
+      "id": "snapshot_worker",
+      "label": "snapshot-worker",
+      "view": "application",
+      "group": "Workers · étape 2 (ingress interne)",
+      "status": "planned",
+      "terraform": [
+        "serverless:module.snapshot_worker"
+      ]
+    },
+    {
+      "id": "snapshot_notifier",
+      "label": "snapshot-notifier",
+      "view": "application",
+      "group": "Workers · étape 2 (ingress interne)",
+      "status": "planned",
+      "terraform": [
+        "serverless:module.snapshot_notifier"
+      ]
+    },
+    {
+      "id": "overview_worker",
+      "label": "overview-worker",
+      "view": "application",
+      "group": "Workers · étape 2 (ingress interne)",
+      "status": "planned",
+      "terraform": [
+        "serverless:module.overview_worker"
+      ]
+    },
+    {
+      "id": "firestore",
+      "label": "Firestore",
+      "view": "application",
+      "group": "Données",
+      "status": "deployed",
+      "terraform": [
+        "serverless:google_firestore_database.main"
+      ]
+    },
+    {
+      "id": "rules",
+      "label": "Security Rules",
+      "view": "application",
+      "group": "Données",
+      "status": "planned",
+      "terraform": [
+        "serverless:google_firebaserules_release.firestore"
+      ]
+    },
+    {
+      "id": "b_snapshots",
+      "label": "bucket snapshots",
+      "view": "application",
+      "group": "Données",
+      "status": "deployed",
+      "terraform": [
+        "serverless:google_storage_bucket.application"
+      ]
+    },
+    {
+      "id": "b_overview",
+      "label": "bucket overview",
+      "view": "application",
+      "group": "Données",
+      "status": "deployed",
+      "terraform": [
+        "serverless:google_storage_bucket.application"
+      ]
+    },
+    {
+      "id": "secrets",
+      "label": "Secret Manager",
+      "view": "application",
+      "group": "Données",
+      "status": "deployed",
+      "terraform": [
+        "iam:google_secret_manager_secret.application"
+      ]
+    },
+    {
+      "id": "telemetry",
+      "label": "Logging / Monitoring / Trace",
+      "view": "application",
+      "group": "Observabilité",
+      "status": "external",
+      "terraform": []
+    },
+    {
+      "id": "alerts",
+      "label": "Alertes et dashboards",
+      "view": "application",
+      "group": "Observabilité",
+      "status": "planned",
+      "terraform": [
+        "*:google_monitoring_alert_policy.*",
+        "*:google_monitoring_dashboard.*"
+      ]
+    },
+    {
+      "id": "github",
+      "label": "GitHub",
+      "view": "plateforme",
+      "group": "GitHub",
+      "status": "external",
+      "terraform": []
+    },
+    {
+      "id": "actions",
+      "label": "GitHub Actions",
+      "view": "plateforme",
+      "group": "GitHub",
+      "status": "external",
+      "terraform": []
+    },
+    {
+      "id": "humans",
+      "label": "Équipe + encadrant",
+      "view": "plateforme",
+      "group": "GitHub",
+      "status": "deployed",
+      "terraform": [
+        "access:google_project_iam_member.editor"
+      ]
+    },
+    {
+      "id": "wif",
+      "label": "Workload Identity Federation",
+      "view": "plateforme",
+      "group": "Identités (stack iam)",
+      "status": "deployed",
+      "terraform": [
+        "iam:google_iam_workload_identity_pool.github"
+      ]
+    },
+    {
+      "id": "deployer",
+      "label": "SA deployer / planner",
+      "view": "plateforme",
+      "group": "Identités (stack iam)",
+      "status": "deployed",
+      "terraform": [
+        "iam:google_service_account.deployer",
+        "iam:google_service_account.planner"
+      ]
+    },
+    {
+      "id": "budget",
+      "label": "Budget",
+      "view": "plateforme",
+      "group": "Identités (stack iam)",
+      "status": "deployed",
+      "terraform": [
+        "iam:google_billing_budget.project"
+      ]
+    },
+    {
+      "id": "tfstate",
+      "label": "state Terraform",
+      "view": "plateforme",
+      "group": "Identités (stack iam)",
+      "status": "deployed",
+      "terraform": [
+        "iam:google_storage_bucket.tfstate"
+      ]
+    },
+    {
+      "id": "ci_secrets",
+      "label": "Secret Manager",
+      "view": "plateforme",
+      "group": "Identités (stack iam)",
+      "status": "deployed",
+      "terraform": [
+        "iam:google_secret_manager_secret.arc_github_app"
+      ]
+    },
+    {
+      "id": "registry",
+      "label": "Artifact Registry",
+      "view": "plateforme",
+      "group": "Build (stack bootstrap)",
+      "status": "deployed",
+      "terraform": [
+        "bootstrap:google_artifact_registry_repository.containers"
+      ]
+    },
+    {
+      "id": "sources",
+      "label": "sources des fonctions",
+      "view": "plateforme",
+      "group": "Build (stack bootstrap)",
+      "status": "deployed",
+      "terraform": [
+        "bootstrap:google_storage_bucket.function_sources"
+      ]
+    },
+    {
+      "id": "cloudbuild",
+      "label": "Cloud Build",
+      "view": "plateforme",
+      "group": "Build (stack bootstrap)",
+      "status": "deployed",
+      "terraform": [
+        "bootstrap:google_service_account.function_builder"
+      ]
+    },
+    {
+      "id": "vpc",
+      "label": "VPC + sous-réseau",
+      "view": "plateforme",
+      "group": "Foundation",
+      "status": "deployed",
+      "terraform": [
+        "foundation:google_compute_network.main"
+      ]
+    },
+    {
+      "id": "gke",
+      "label": "GKE",
+      "view": "plateforme",
+      "group": "Foundation",
+      "status": "deployed",
+      "terraform": [
+        "foundation:google_container_cluster.main"
+      ]
+    },
+    {
+      "id": "runner_pool",
+      "label": "pool runners",
+      "view": "plateforme",
+      "group": "Foundation",
+      "status": "deployed",
+      "terraform": [
+        "foundation:google_container_node_pool.runners",
+        "foundation:google_container_node_pool.system"
+      ]
+    },
+    {
+      "id": "arc",
+      "label": "ARC + runners",
+      "view": "plateforme",
+      "group": "Foundation",
+      "status": "deployed",
+      "terraform": [
+        "runners:helm_release.arc_controller",
+        "runners:helm_release.arc_runner_set"
+      ]
+    },
+    {
+      "id": "eso",
+      "label": "External Secrets",
+      "view": "plateforme",
+      "group": "Foundation",
+      "status": "deployed",
+      "terraform": [
+        "runners:helm_release.external_secrets",
+        "runners:helm_release.arc_github_secret"
+      ]
+    },
+    {
+      "id": "cluster_monitoring",
+      "label": "Cloud Monitoring",
+      "view": "plateforme",
+      "group": "Foundation",
+      "status": "external",
+      "terraform": []
+    },
+    {
+      "id": "application",
+      "label": "Application serverless",
+      "view": "plateforme",
+      "group": "Projet dev / prd",
+      "status": "deployed",
+      "terraform": [
+        "serverless:google_firestore_database.main",
+        "gateway:module.api_gateway"
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "from": "discord",
+      "to": "gateway",
+      "label": "HTTPS POST /discord/interactions",
+      "kind": "request",
+      "status": "deployed"
+    },
+    {
+      "from": "browser",
+      "to": "frontend",
+      "label": "HTTPS (fichiers statiques)",
+      "kind": "request",
+      "status": "deployed"
+    },
+    {
+      "from": "browser",
+      "to": "gateway",
+      "label": "HTTPS + JWT de session",
+      "kind": "request",
+      "status": "deployed"
+    },
+    {
+      "from": "gateway",
+      "to": "discord_proxy",
+      "label": "ID token Google (run.invoker)",
+      "kind": "request",
+      "status": "deployed"
+    },
+    {
+      "from": "gateway",
+      "to": "discord_hello",
+      "label": "ID token Google",
+      "kind": "request",
+      "status": "deployed"
+    },
+    {
+      "from": "gateway",
+      "to": "web_proxy",
+      "label": "POST /api/pixels (1 à 500)",
+      "kind": "request",
+      "status": "planned"
+    },
+    {
+      "from": "gateway",
+      "to": "auth_proxy",
+      "label": "/auth/login, /auth/exchange",
+      "kind": "request",
+      "status": "deployed"
+    },
+    {
+      "from": "gateway",
+      "to": "tile_reader",
+      "label": "GET /api/regions, /api/state",
+      "kind": "request",
+      "status": "planned"
+    },
+    {
+      "from": "auth_proxy",
+      "to": "session_signer",
+      "label": "signJwt",
+      "kind": "request",
+      "status": "deployed"
+    },
+    {
+      "from": "discord_proxy",
+      "to": "t_discord_command",
+      "label": "publish",
+      "kind": "event",
+      "status": "deployed"
+    },
+    {
+      "from": "web_proxy",
+      "to": "t_pixel_draw",
+      "label": "publish × N",
+      "kind": "event",
+      "status": "planned"
+    },
+    {
+      "from": "t_discord_command",
+      "to": "discord_verify",
+      "label": "push OIDC",
+      "kind": "event",
+      "status": "deployed"
+    },
+    {
+      "from": "t_discord_command",
+      "to": "command_worker",
+      "label": "push OIDC",
+      "kind": "event",
+      "status": "planned"
+    },
+    {
+      "from": "command_worker",
+      "to": "t_pixel_draw",
+      "label": "/draw",
+      "kind": "event",
+      "status": "planned"
+    },
+    {
+      "from": "command_worker",
+      "to": "t_render",
+      "label": "/get",
+      "kind": "event",
+      "status": "planned"
+    },
+    {
+      "from": "command_worker",
+      "to": "t_snapshot",
+      "label": "/snapshot",
+      "kind": "event",
+      "status": "planned"
+    },
+    {
+      "from": "t_pixel_draw",
+      "to": "draw_worker",
+      "label": "push OIDC",
+      "kind": "event",
+      "status": "planned"
+    },
+    {
+      "from": "draw_worker",
+      "to": "firestore",
+      "label": "transaction : tuile + delta + quota",
+      "kind": "request",
+      "status": "planned"
+    },
+    {
+      "from": "draw_worker",
+      "to": "t_pixel_result",
+      "label": "publish",
+      "kind": "event",
+      "status": "planned"
+    },
+    {
+      "from": "t_pixel_result",
+      "to": "discord_notifier",
+      "label": "push OIDC",
+      "kind": "event",
+      "status": "planned"
+    },
+    {
+      "from": "t_render",
+      "to": "render_worker",
+      "label": "push OIDC",
+      "kind": "event",
+      "status": "planned"
+    },
+    {
+      "from": "t_snapshot",
+      "to": "snapshot_worker",
+      "label": "push OIDC",
+      "kind": "event",
+      "status": "planned"
+    },
+    {
+      "from": "snapshot_worker",
+      "to": "b_snapshots",
+      "label": "PNG horodaté",
+      "kind": "request",
+      "status": "planned"
+    },
+    {
+      "from": "b_snapshots",
+      "to": "t_snapshot_ready",
+      "label": "OBJECT_FINALIZE",
+      "kind": "event",
+      "status": "deployed"
+    },
+    {
+      "from": "t_snapshot_ready",
+      "to": "snapshot_notifier",
+      "label": "push OIDC",
+      "kind": "event",
+      "status": "planned"
+    },
+    {
+      "from": "scheduler",
+      "to": "t_overview",
+      "label": "publish",
+      "kind": "event",
+      "status": "planned"
+    },
+    {
+      "from": "t_overview",
+      "to": "overview_worker",
+      "label": "push OIDC",
+      "kind": "event",
+      "status": "planned"
+    },
+    {
+      "from": "overview_worker",
+      "to": "b_overview",
+      "label": "images basse résolution",
+      "kind": "request",
+      "status": "planned"
+    },
+    {
+      "from": "t_discord_command",
+      "to": "t_dlq",
+      "label": "échecs répétés",
+      "kind": "event",
+      "status": "deployed"
+    },
+    {
+      "from": "discord_notifier",
+      "to": "discord_api",
+      "label": "HTTPS PATCH (réponse)",
+      "kind": "request",
+      "status": "planned"
+    },
+    {
+      "from": "render_worker",
+      "to": "discord_api",
+      "label": "HTTPS (image)",
+      "kind": "request",
+      "status": "planned"
+    },
+    {
+      "from": "snapshot_notifier",
+      "to": "discord_api",
+      "label": "HTTPS (URL signée)",
+      "kind": "request",
+      "status": "planned"
+    },
+    {
+      "from": "tile_reader",
+      "to": "firestore",
+      "label": "lecture (IAM)",
+      "kind": "read",
+      "status": "planned"
+    },
+    {
+      "from": "render_worker",
+      "to": "firestore",
+      "label": "lecture",
+      "kind": "read",
+      "status": "planned"
+    },
+    {
+      "from": "browser",
+      "to": "rules",
+      "label": "onSnapshot : deltas, config",
+      "kind": "read",
+      "status": "planned"
+    },
+    {
+      "from": "rules",
+      "to": "firestore",
+      "label": "lecture seule",
+      "kind": "read",
+      "status": "planned"
+    },
+    {
+      "from": "humans",
+      "to": "github",
+      "label": "PR signées",
+      "kind": "request",
+      "status": "deployed"
+    },
+    {
+      "from": "github",
+      "to": "actions",
+      "label": "PR → plan, tag → apply",
+      "kind": "request",
+      "status": "deployed"
+    },
+    {
+      "from": "actions",
+      "to": "wif",
+      "label": "token OIDC",
+      "kind": "deploy",
+      "status": "deployed"
+    },
+    {
+      "from": "wif",
+      "to": "deployer",
+      "label": "credentials courts",
+      "kind": "deploy",
+      "status": "deployed"
+    },
+    {
+      "from": "deployer",
+      "to": "tfstate",
+      "label": "state",
+      "kind": "deploy",
+      "status": "deployed"
+    },
+    {
+      "from": "deployer",
+      "to": "registry",
+      "label": "push image",
+      "kind": "deploy",
+      "status": "deployed"
+    },
+    {
+      "from": "deployer",
+      "to": "sources",
+      "label": "ZIP",
+      "kind": "deploy",
+      "status": "deployed"
+    },
+    {
+      "from": "sources",
+      "to": "cloudbuild",
+      "label": "build",
+      "kind": "deploy",
+      "status": "deployed"
+    },
+    {
+      "from": "deployer",
+      "to": "gke",
+      "label": "terraform + helm",
+      "kind": "deploy",
+      "status": "deployed"
+    },
+    {
+      "from": "deployer",
+      "to": "application",
+      "label": "terraform apply dev → prd",
+      "kind": "deploy",
+      "status": "deployed"
+    },
+    {
+      "from": "vpc",
+      "to": "gke",
+      "label": "réseau",
+      "kind": "read",
+      "status": "deployed"
+    },
+    {
+      "from": "gke",
+      "to": "runner_pool",
+      "label": "node pools",
+      "kind": "read",
+      "status": "deployed"
+    },
+    {
+      "from": "runner_pool",
+      "to": "arc",
+      "label": "pods runners",
+      "kind": "read",
+      "status": "deployed"
+    },
+    {
+      "from": "ci_secrets",
+      "to": "eso",
+      "label": "GitHub App",
+      "kind": "secret",
+      "status": "deployed"
+    },
+    {
+      "from": "eso",
+      "to": "arc",
+      "label": "secret k8s",
+      "kind": "secret",
+      "status": "deployed"
+    },
+    {
+      "from": "arc",
+      "to": "actions",
+      "label": "jobs (runs-on)",
+      "kind": "request",
+      "status": "deployed"
+    },
+    {
+      "from": "gke",
+      "to": "cluster_monitoring",
+      "label": "métriques",
+      "kind": "read",
+      "status": "deployed"
+    }
+  ]
+}

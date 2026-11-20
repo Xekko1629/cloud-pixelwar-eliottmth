@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       runner:
-        description: Runner label (empty = RUNNER_LABEL variable, then ubuntu-latest)
+        description: Runner label (empty = RUNNER_SMALL variable, then ubuntu-latest)
         type: string
         default: ""
 
@@ -14,7 +14,7 @@ env:
 jobs:
   lint:
     name: tflint
-    runs-on: ${{ inputs.runner || vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner || vars.RUNNER_SMALL || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
 
