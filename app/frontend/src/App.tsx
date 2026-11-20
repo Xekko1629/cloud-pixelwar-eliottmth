@@ -13,11 +13,12 @@ export function App({ config }: { config: FrontendConfig }) {
       <header className="app__header">
         <h1>Pixel War</h1>
         <span className="app__environment" data-environment={config.environment}>{config.environment}</span>
-        <p className="app__status" aria-label="État des services">
-          API : {config.gatewayUrl ? 'disponible' : 'pas encore publiée'} · Temps réel :{' '}
-          {config.realtimeUrl ? 'disponible' : 'pas encore déployé'} · Données factices
-        </p>
+        <span className="app__status">Données factices</span>
       </header>
+      <section className="app__status" aria-label="État des services">
+        <p>API : {config.gatewayUrl ? 'disponible' : 'pas encore publiée'}</p>
+        <p>Temps réel : {config.realtimeUrl ? 'disponible' : 'pas encore déployé'}</p>
+      </section>
       <PixelCanvas source={source} />
     </main>
   );

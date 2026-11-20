@@ -55,6 +55,17 @@ body {
   font-size: 13px;
 }
 
+section.app__status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 0 16px 8px;
+}
+
+section.app__status p {
+  margin: 0;
+}
+
 .pixel-canvas {
   position: relative;
   flex: 1;
