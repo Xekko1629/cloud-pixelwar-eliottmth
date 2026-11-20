@@ -1,49 +1,7 @@
-import { crc32, inflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
+import { decodePng } from '../../../testing/png-reader';
 import { PALETTE, TILE_PIXELS, TILE_SIDE, emptyTileColors } from '../grid';
 import { encodeIndexedPng, renderTilePng, storedColorToPngIndex, tileToIndexedImage } from '.';
-
-interface DecodedPng { width: number; height: number; bitDepth: number; colorType: number; rgb: string[] }
-
-// Minimal independent reader for the subset the encoder writes: indexed, no filter.
-function decodePng(png: Uint8Array): DecodedPng {
-  expect(Array.from(png.subarray(0, 8))).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-  const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
-  const chunks: { type: string; data: Uint8Array }[] = [];
-  let offset = 8;
-  while (offset < png.byteLength) {
-    const length = view.getUint32(offset);
-    const type = String.fromCharCode(...png.subarray(offset + 4, offset + 8));
-    const data = png.subarray(offset + 8, offset + 8 + length);
-    expect(view.getUint32(offset + 8 + length)).toBe(crc32(png.subarray(offset + 4, offset + 8 + length)));
-    chunks.push({ type, data });
-    offset += 12 + length;
-  }
-  expect(chunks.map((c) => c.type)).toEqual(['IHDR', 'PLTE', 'IDAT', 'IEND']);
-
-  const header = new DataView(chunks[0].data.buffer, chunks[0].data.byteOffset, 13);
-  const width = header.getUint32(0);
-  const height = header.getUint32(4);
-  const bitDepth = chunks[0].data[8];
-  const colorType = chunks[0].data[9];
-  const palette = chunks[1].data;
-  const raw = inflateSync(chunks[2].data);
-  const rowBytes = Math.ceil((width * bitDepth) / 8);
-  expect(raw.byteLength).toBe((rowBytes + 1) * height);
-
-  const rgb: string[] = [];
-  for (let y = 0; y < height; y += 1) {
-    const row = y * (rowBytes + 1);
-    expect(raw[row]).toBe(0);
-    for (let x = 0; x < width; x += 1) {
-      const byte = raw[row + 1 + (x >> 1)];
-      const entry = x % 2 === 0 ? byte >> 4 : byte & 0x0f;
-      const [r, g, b] = palette.subarray(entry * 3, entry * 3 + 3);
-      rgb.push(`#${[r, g, b].map((c) => c.toString(16).padStart(2, '0')).join('').toUpperCase()}`);
-    }
-  }
-  return { width, height, bitDepth, colorType, rgb };
-}
 
 describe('renderTilePng', () => {
   it('renders an empty tile as a white 64×64 image', () => {
