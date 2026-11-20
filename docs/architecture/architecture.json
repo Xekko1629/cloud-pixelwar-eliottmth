@@ -80,7 +80,7 @@
       "label": "auth-proxy",
       "view": "application",
       "group": "Proxies (Cloud Run functions)",
-      "status": "planned",
+      "status": "deployed",
       "terraform": [
         "serverless:module.auth_proxy"
       ]
@@ -171,7 +171,7 @@
       "label": "snapshot-ready",
       "view": "application",
       "group": "Pub/Sub · suites",
-      "status": "planned",
+      "status": "deployed",
       "terraform": [
         "serverless:module.snapshot_ready"
       ]
@@ -301,9 +301,9 @@
       "label": "bucket snapshots",
       "view": "application",
       "group": "Données",
-      "status": "planned",
+      "status": "deployed",
       "terraform": [
-        "serverless:google_storage_bucket.snapshots"
+        "serverless:google_storage_bucket.application"
       ]
     },
     {
@@ -311,9 +311,9 @@
       "label": "bucket overview",
       "view": "application",
       "group": "Données",
-      "status": "planned",
+      "status": "deployed",
       "terraform": [
-        "serverless:google_storage_bucket.overview"
+        "serverless:google_storage_bucket.application"
       ]
     },
     {
@@ -573,7 +573,7 @@
       "to": "auth_proxy",
       "label": "/auth/login, /auth/exchange",
       "kind": "request",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "gateway",
@@ -587,7 +587,7 @@
       "to": "session_signer",
       "label": "signJwt",
       "kind": "request",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "discord_proxy",
@@ -692,7 +692,7 @@
       "to": "t_snapshot_ready",
       "label": "OBJECT_FINALIZE",
       "kind": "event",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "t_snapshot_ready",

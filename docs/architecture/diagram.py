@@ -126,9 +126,9 @@ COMPONENTS = [
     C('rules', 'Security Rules', 'gcp.security.Iam', 'application', 'Données',
       ('serverless:google_firebaserules_release.firestore',), 'lecture seule : deltas, config/global'),
     C('b_snapshots', 'bucket snapshots', 'gcp.storage.GCS', 'application', 'Données',
-      ('serverless:google_storage_bucket.snapshots',), 'privé'),
+      ('serverless:google_storage_bucket.application',), 'privé'),
     C('b_overview', 'bucket overview', 'gcp.storage.GCS', 'application', 'Données',
-      ('serverless:google_storage_bucket.overview',), 'privé'),
+      ('serverless:google_storage_bucket.application',), 'privé'),
     C('secrets', 'Secret Manager', 'gcp.security.SecretManager', 'application', 'Données',
       ('iam:google_secret_manager_secret.application',), 'lu par discord-proxy, auth-proxy,\ncommand-worker, discord-notifier (IAM par secret)'),
     # --- Observability -------------------------------------------------------------------------------
