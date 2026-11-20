@@ -35,7 +35,8 @@ son ID Discord, également pour le web authentifié.
 
 Les attributs sont exactement `correlation_id` et `traceparent` W3C valide,
 sampled ou non. Le premier doit correspondre à l'enveloppe métier ; le contexte
-est propagé sans inventer de span Cloud Trace.
+est restauré dans un span consommateur SRV-08, puis propagé avec le nouvel ID de
+span. Les tests en mémoire vérifient les liens ; ils ne prouvent pas l'ingestion GCP.
 
 Pour `source: discord`, `payload.discord` doit contenir l'application,
 l'interaction, le serveur, le canal et le token attendus. L'ID de l'événement et

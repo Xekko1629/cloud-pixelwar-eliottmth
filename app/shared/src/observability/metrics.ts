@@ -31,3 +31,53 @@ export function createPixelMetrics(meter: Meter) {
     },
   };
 }
+
+export type FunctionOutcome = 'published' | 'rejected' | 'updated' | 'expired' | 'skipped_web' | 'error';
+export type FunctionReason = 'none' | 'paused' | 'rate_limit' | 'out_of_bounds' | 'expired' | 'batch_budget_exceeded' |
+  'unauthorized' | 'network' | 'http' | 'rate_limited' | 'invalid_clock' | 'publish' | 'processing';
+export interface DrawObservation {
+  source: PixelSource;
+  type: 'pixel-processed' | 'pixel-rejected';
+  reason?: string;
+  requested_pixels: number;
+  applied_pixels: number;
+  ignored_pixels: number;
+  occurred_at: string;
+  processed_at: string;
+}
+const outcomes = ['published', 'rejected', 'updated', 'expired', 'skipped_web', 'error'];
+const reasons = ['none', 'paused', 'rate_limit', 'out_of_bounds', 'expired', 'batch_budget_exceeded', 'unauthorized', 'network', 'http', 'rate_limited', 'invalid_clock', 'publish', 'processing'];
+
+/** Attempt/result observations, deliberately NOT an exactly-once accounting ledger. */
+export function createFunctionMetrics(meter: Meter) {
+  const attempts = meter.createCounter('pixelwar.function.attempts', { unit: '{attempt}', description: 'Validated processing attempts, including redeliveries' });
+  const duration = meter.createHistogram('pixelwar.function.duration', { unit: 's', description: 'Validated operation duration before telemetry flush' });
+  const resultPixels = meter.createCounter('pixelwar.draw.result_pixels', { unit: '{pixel}', description: 'Pixels in observed results, including replayed results' });
+  const commitAge = meter.createHistogram('pixelwar.draw.result_age', { unit: 's', description: 'Stored commit time minus source creation time, observed on each result' });
+  const notificationAge = meter.createHistogram('pixelwar.notification.age', { unit: 's', description: 'Interaction age at a notification attempt' });
+  const labels = (source: PixelSource, outcome: FunctionOutcome, reason: FunctionReason) => {
+    if (!['web', 'discord'].includes(source) || !outcomes.includes(outcome) || !reasons.includes(reason)) throw new Error('Invalid metric labels');
+    return { source, outcome, reason };
+  };
+  return {
+    attempt(source: PixelSource, outcome: FunctionOutcome, reason: FunctionReason, seconds: number) {
+      const attributes = labels(source, outcome, reason);
+      if (!Number.isFinite(seconds) || seconds < 0) throw new Error('Invalid operation duration');
+      attempts.add(1, attributes); duration.record(seconds, attributes);
+    },
+    drawResult(result: DrawObservation) {
+      const outcome = result.type === 'pixel-rejected' ? 'rejected' : 'published';
+      const attributes = labels(result.source, outcome, (result.reason ?? 'none') as FunctionReason);
+      const counts = { requested: result.requested_pixels, applied: result.applied_pixels, ignored: result.ignored_pixels };
+      if (!['pixel-processed', 'pixel-rejected'].includes(result.type) || Object.values(counts).some((value) => !Number.isSafeInteger(value) || value < 0)) throw new Error('Invalid observed result');
+      const age = Date.parse(result.processed_at) - Date.parse(result.occurred_at);
+      if (!Number.isFinite(age)) throw new Error('Invalid observed result timing');
+      for (const [category, count] of Object.entries(counts)) resultPixels.add(count, { ...attributes, category });
+      commitAge.record(Math.max(0, age) / 1000, attributes);
+    },
+    notificationAge(seconds: number) {
+      if (!Number.isFinite(seconds) || seconds < 0) throw new Error('Invalid notification age');
+      notificationAge.record(seconds);
+    },
+  };
+}

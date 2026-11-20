@@ -5,6 +5,7 @@
   "exports": {
     "./observability": "./src/observability/index.ts",
     "./observability/logger": "./src/observability/logger.ts",
+    "./observability/function": "./src/observability/function.ts",
     "./observability/google": "./src/observability/google.ts",
     "./grid": "./src/grid/index.ts",
     "./events": "./src/events/index.ts",

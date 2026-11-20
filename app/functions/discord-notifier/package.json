@@ -1,0 +1,10 @@
+{
+  "name": "@pixelwar/function-discord-notifier",
+  "private": true,
+  "type": "module",
+  "pixelwar": { "entryPoint": "handleDiscordNotifier" },
+  "dependencies": {
+    "@google-cloud/functions-framework": "5.0.5",
+    "@pixelwar/shared": "*"
+  }
+}

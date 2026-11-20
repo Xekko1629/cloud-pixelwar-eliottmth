@@ -82,7 +82,8 @@ describe('draw-worker with real local Firestore and Pub/Sub', () => {
     expect(results[0].event).toEqual(results[1].event);
     expect((await ref(`users/${event.actor.uid}`).get()).get('used_pixels')).toBe(1);
     expect((await db.collection(`${root}/deltas`).get()).size).toBe(1);
-    expect(results[0].message.attributes).toEqual(drawPush(event).message.attributes);
+    expect(results[0].message.attributes.correlation_id).toBe(drawPush(event).message.attributes.correlation_id);
+    expect(results[0].message.attributes.traceparent.split('-')[1]).toBe(drawPush(event).message.attributes.traceparent.split('-')[1]);
   });
   it('does not let a late message overwrite a newer pixel', async () => {
     const newer = command(); const older = command(); older.occurred_at = new Date(drawNow - 1000).toISOString();

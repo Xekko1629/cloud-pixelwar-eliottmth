@@ -60,7 +60,7 @@ export function validatePush(body: unknown, subscription: string, applicationId:
   // Only these transport attributes are permitted; no arbitrary attributes are logged.
   if (!record(attributes) || Object.keys(attributes).sort().join(',') !== 'correlation_id,traceparent' ||
       attributes.correlation_id !== event.event_id || typeof attributes.traceparent !== 'string' ||
-      !/^00-(?!0{32}-)[a-f0-9]{32}-(?!0{16}-)[a-f0-9]{16}-00$/.test(attributes.traceparent)) {
+      !/^00-(?!0{32}-)[a-f0-9]{32}-(?!0{16}-)[a-f0-9]{16}-0[01]$/.test(attributes.traceparent)) {
     throw new InvalidMessage('invalid_attributes');
   }
   return { event_id: event.event_id, correlation_id: event.event_id, message_id: messageId };

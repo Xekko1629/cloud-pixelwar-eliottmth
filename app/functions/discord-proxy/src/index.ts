@@ -1,6 +1,7 @@
-import { createPublicKey, randomBytes, verify } from 'node:crypto';
+import { createPublicKey, verify } from 'node:crypto';
 import type { HttpFunction } from '@google-cloud/functions-framework';
 import { createLogger } from '@pixelwar/shared/observability/logger';
+import { createFunctionTelemetry, type FunctionTelemetry } from '@pixelwar/shared/observability/function';
 import { commandEvent, record } from './event';
 import { createCommandPublisher, type PublishCommand } from './publisher';
 
@@ -10,6 +11,7 @@ interface Options {
   publish?: PublishCommand;
   now?: () => number;
   log?: ReturnType<typeof createLogger>;
+  telemetry?: FunctionTelemetry;
 }
 
 export function createDiscordProxyHandler(options: Options): HttpFunction {
@@ -19,6 +21,12 @@ export function createDiscordProxyHandler(options: Options): HttpFunction {
   }) : undefined;
   const now = options.now ?? Date.now;
   const log = options.log ?? createLogger({ serviceName: 'discord-proxy', projectId: process.env.GOOGLE_CLOUD_PROJECT ?? '' });
+  const telemetry = options.telemetry ?? createFunctionTelemetry('discord-proxy', {
+    writeLog: options.log ? (line) => {
+      const record = JSON.parse(line);
+      log(record.severity, record.message ?? 'Telemetry unavailable.', { event_type: record.event_type });
+    } : undefined,
+  });
   return async (req, res): Promise<void> => {
     if (!key || !options.applicationId || !options.publish) {
       res.status(503).json({ error: 'Proxy unavailable.' }); return;
@@ -56,20 +64,19 @@ export function createDiscordProxyHandler(options: Options): HttpFunction {
     try { event = commandEvent(interaction, options.applicationId); } catch {
       res.status(400).json({ error: 'Invalid draw interaction.' }); return;
     }
-    // Fresh, unsampled context: propagate W3C without trusting public headers.
-    // No exported Cloud Trace span is claimed by this minimal Q2 handler.
-    const attributes = {
-      correlation_id: event.correlation_id,
-      traceparent: `00-${randomBytes(16).toString('hex')}-${randomBytes(8).toString('hex')}-00`,
-    };
     try {
-      await options.publish(event, attributes);
+      // Root trace only after signature/command validation; never trust public trace headers.
+      await telemetry.request(event.correlation_id, async (operation) => {
+        operation.outcome('error', 'publish');
+        await options.publish!(event, operation.attributes());
+        operation.outcome('published');
+        operation.log('INFO', 'Discord command published.', 'discord.proxy.published');
+      });
     } catch {
       // Never log the SDK Error: it may include the message and interaction token.
       log('ERROR', 'Discord command publication failed; delivery may be uncertain.', { event_type: 'discord.proxy.publish_failed' });
       res.status(503).json({ error: 'Command publication unavailable.' }); return;
     }
-    log('INFO', 'Discord command published.', { event_type: 'discord.proxy.published' });
     res.status(200).json({ type: 5 });
   };
 }

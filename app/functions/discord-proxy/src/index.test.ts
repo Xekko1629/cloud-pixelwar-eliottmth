@@ -40,7 +40,7 @@ describe('Q2 Discord proxy', () => {
     });
     expect(event.event_id).toMatch(/^[a-f0-9-]{14}8[a-f0-9-]{21}$/);
     expect(attributes.correlation_id).toBe(event.event_id);
-    expect(attributes.traceparent).toMatch(/^00-[a-f0-9]{32}-[a-f0-9]{16}-00$/);
+    expect(attributes.traceparent).toMatch(/^00-[a-f0-9]{32}-[a-f0-9]{16}-0[01]$/);
     expect(res.json).toHaveBeenCalledWith({ type: 5 });
     expect(publish.mock.invocationCallOrder[0]).toBeLessThan(res.json.mock.invocationCallOrder[0]);
     expect(JSON.stringify(log.mock.calls)).not.toContain('synthetic-interaction-token');

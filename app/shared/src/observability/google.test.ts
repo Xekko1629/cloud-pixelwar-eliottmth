@@ -46,3 +46,10 @@ it('reports ADC startup failure without silently claiming telemetry is enabled',
   await expect(createGoogleObservability(options)).rejects.toThrow('ADC unavailable');
   expect(mocks.runtime).not.toHaveBeenCalled();
 });
+
+it('applies the configured export budget to both HTTP exporters and the SDK reader', async () => {
+  await createGoogleObservability({ ...options, exportTimeoutMillis: 500 });
+  expect(mocks.traces.mock.calls[0][0].timeoutMillis).toBe(500);
+  expect(mocks.metricExporter.mock.calls[0][0].timeoutMillis).toBe(500);
+  expect(mocks.reader.mock.calls[0][0].exportTimeoutMillis).toBe(1500);
+});

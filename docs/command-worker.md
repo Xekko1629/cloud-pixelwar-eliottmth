@@ -90,9 +90,10 @@ republier le même ID. « Une seule publication » n'est **pas** garanti ; le ch
 retenu porte sur l'idempotence des effets métier, conformément à ADR-0002.
 
 Les attributs de transport sont limités à `correlation_id` et `traceparent` W3C
-valide (sampled ou non), sans copie d'attribut arbitraire ni de token. Les logs
-utilisent uniquement des champs techniques explicitement sélectionnés ; les
-erreurs SDK ne sont jamais sérialisées.
+valide (sampled ou non), sans copie d'attribut arbitraire ni de token. Le routeur
+ouvre un span consommateur SRV-08, publie le contexte de son propre span et relie
+ses logs à la trace. Les logs utilisent uniquement des champs techniques
+explicitement sélectionnés ; les erreurs SDK ne sont jamais sérialisées.
 
 ## Configuration et raccordement ultérieur
 

@@ -48,6 +48,23 @@ app/functions/<nom>/
 
 Puis `npm install` depuis `app/` pour mettre à jour `package-lock.json`.
 
+### Observabilité dans la définition de terminé
+
+Une fonction métier doit être livrée avec son instrumentation, pas seulement
+son handler et ses tests :
+
+- utiliser le socle SRV-08 et [le helper de fonction](observability.md#instrumentation-des-fonctions-du-parcours-draw) ;
+- restaurer le contexte validé d'un message et propager le nouveau `traceparent` ;
+- produire des logs corrélés et des métriques aux labels bornés ;
+- attendre le flush avant réponse, sans rejouer le métier sur une panne d'export ;
+- tester parenté des spans, isolation concurrente, métriques, absence de secrets
+  et panne d'export ; distinguer ces preuves locales de l'ingestion GCP réelle.
+
+Les IDs d'événement, de message et d'utilisateur ne sont pas des labels de
+métriques. Aucun corps, token ou chemin HTTP contenant un token ne doit entrer
+dans les spans. Les sondes temporaires hello/diagnostic restent distinctes du
+parcours métier instrumenté.
+
 ## Construire
 
 ```sh

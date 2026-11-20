@@ -25,6 +25,7 @@ describe('command worker acknowledgement', () => {
     const publish = vi.fn(() => new Promise<void>((done) => { resolve = done; }));
     const { invoke, res, write } = setup({ publish });
     const pending = invoke();
+    await vi.waitFor(() => expect(publish).toHaveBeenCalledTimes(1));
     expect(publish).toHaveBeenCalledTimes(1);
     expect(res.status).not.toHaveBeenCalled();
     resolve(); await pending;
@@ -40,14 +41,17 @@ describe('command worker acknowledgement', () => {
     expect(res.send).not.toHaveBeenCalled();
     const body = commandPush(); body.message.messageId = '456';
     await invoke(body); expect(res.status).toHaveBeenLastCalledWith(204);
-    expect(publish.mock.calls[0]).toEqual(publish.mock.calls[1]);
+    expect(publish.mock.calls[0][0]).toEqual(publish.mock.calls[1][0]);
+    expect(publish.mock.calls[0][1].correlation_id).toBe(publish.mock.calls[1][1].correlation_id);
+    expect(publish.mock.calls[0][1].traceparent.split('-')[1]).toBe(publish.mock.calls[1][1].traceparent.split('-')[1]);
     expect(JSON.stringify([write.mock.calls, res.json.mock.calls])).not.toContain('synthetic-interaction-token');
   });
   it('routes each concurrent delivery using the same ID without promising a single publication', async () => {
     const { invoke, publish } = setup();
     await Promise.all([invoke(), invoke()]);
     expect(publish).toHaveBeenCalledTimes(2);
-    expect(publish.mock.calls[0]).toEqual(publish.mock.calls[1]);
+    expect(publish.mock.calls[0][0]).toEqual(publish.mock.calls[1][0]);
+    expect(publish.mock.calls[0][1].correlation_id).toBe(publish.mock.calls[1][1].correlation_id);
   });
   it('publishes an unauthorized refusal before acknowledging', async () => {
     const { invoke, publish, res, write } = setup();

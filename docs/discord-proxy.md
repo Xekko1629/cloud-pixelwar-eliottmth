@@ -49,10 +49,13 @@ du consommateur. Ce document ne remplace pas le catalogue complet des événemen
 | `payload.options` | `x`, `y`, `color`, entiers validés |
 | `payload` (contexte) | `interaction_id`, `application_id`, `guild_id`, `channel_id`, `interaction_token` |
 
-Les attributs Pub/Sub contiennent `correlation_id` et un `traceparent` W3C
-non échantillonné, neuf par tentative. Le proxy ne fait pas confiance au
-contexte de trace HTTP public. Cette propagation ne prouve pas l'export de
-spans Cloud Trace ; l'instrumentation complète reste à réaliser.
+Les attributs Pub/Sub contiennent `correlation_id` et un `traceparent` W3C.
+Le proxy démarre un span racine neuf après validation de la signature et de la
+commande, sans reprendre le contexte de trace HTTP public. Le `correlation_id`
+reste l'ID métier stable ; les traces peuvent être échantillonnées (`01`).
+Le socle SRV-08 est branché, avec export avant réponse lorsqu'il est configuré ;
+les tests locaux ne prouvent pas la réception par Cloud Trace. Voir
+[le contrat d'observabilité](observability.md#instrumentation-des-fonctions-du-parcours-draw).
 
 Le proxy ne déduplique pas : deux livraisons peuvent produire deux messages
 avec la même identité métier. Le consommateur doit être idempotent. En cas de

@@ -8,6 +8,7 @@ import { createObservability, type ObservabilityOptions } from './runtime';
 export async function createGoogleObservability(
   options: Omit<ObservabilityOptions, 'spanExporter' | 'metricReader'>,
 ) {
+  const timeout = options.exportTimeoutMillis ?? 2000;
   const client = await new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] }).getClient();
   const headers = async (): Promise<Record<string, string>> => {
     const result: Record<string, string> = {};
@@ -18,14 +19,14 @@ export async function createGoogleObservability(
   return createObservability({
     ...options,
     spanExporter: new OTLPTraceExporter({
-      url: 'https://telemetry.googleapis.com/v1/traces', headers, timeoutMillis: 2000,
+      url: 'https://telemetry.googleapis.com/v1/traces', headers, timeoutMillis: timeout,
     }),
     metricReader: new PeriodicExportingMetricReader({
       exporter: new OTLPMetricExporter({
-        url: 'https://telemetry.googleapis.com/v1/metrics', headers, timeoutMillis: 2000,
+        url: 'https://telemetry.googleapis.com/v1/metrics', headers, timeoutMillis: timeout,
       }),
       exportIntervalMillis: 60_000,
-      exportTimeoutMillis: 3000,
+      exportTimeoutMillis: timeout + 1000,
       maxExportBatchSize: 200,
     }),
   });
