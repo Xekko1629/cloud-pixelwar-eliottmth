@@ -34,7 +34,9 @@ contexte, contraintes techniques, choix retenu, alternatives et conséquences.
 | [0010](0010-separation-gateway-serverless.md) | Séparation des cycles de vie Gateway et fonctions, avec contrat d'outputs | Proposé |
 | [0011](0011-frontend-image-cloud-run.md) | Frontend : application React servie par une image Docker sur Cloud Run | Accepté |
 | [0012](0012-identite-web-jwt-session.md) | Identité web : OAuth2 Discord, puis JWT de session signé par un compte de service | Accepté |
-| [0013](0013-lectures-temps-reel-sans-firebase.md) | Lectures via la gateway et temps réel par un service SSE, sans SDK Firebase | Proposé |
+| [0013](0013-lectures-temps-reel-sans-firebase.md) | Lectures via la gateway et temps réel par un service SSE, sans SDK Firebase | Proposé ; temps réel à remplacer par ADR-0015 |
+| [0014](0014-un-evenement-par-pixel.md) | Dessin : un événement Pub/Sub par pixel, la requête web restant une liste | Proposé |
+| [0015](0015-temps-reel-listeners-firestore-navigateur.md) | Temps réel : listeners Firestore dans le navigateur, lecture seule des deltas et de la config | Proposé |
 
 Le build des sources est décrit par l'ADR-0009. Pour les procédures exécutables,
 consulter [Installation et déploiement](../deployment.md).

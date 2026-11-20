@@ -85,9 +85,14 @@ resource "google_cloud_run_v2_service" "frontend" {
         name  = "GATEWAY_URL"
         value = local.gateway_url == null ? "" : local.gateway_url
       }
+      # Firestore listeners in the browser, read-only by the Security Rules (ADR-0015).
       env {
-        name  = "REALTIME_URL"
-        value = var.realtime_url
+        name  = "FIRESTORE_PROJECT_ID"
+        value = var.project_id
+      }
+      env {
+        name  = "FIRESTORE_API_KEY"
+        value = var.firestore_api_key
       }
       env {
         name  = "DISCORD_CLIENT_ID"
@@ -104,8 +109,8 @@ resource "google_cloud_run_v2_service" "frontend" {
   }
 }
 
-# The only public service of the project with realtime (ADR-0011, ADR-0013): static files
-# only, no API. SEC-01 lists this binding as an accepted exception.
+# The only public service of the project (ADR-0011, ADR-0015): static files only, no API.
+# SEC-01 lists this binding as the accepted exception.
 resource "google_cloud_run_v2_service_iam_member" "public" {
   count = local.deployed ? 1 : 0
 
