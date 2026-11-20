@@ -33,6 +33,8 @@ jobs:
             iam:
               - 'infra/iam/**'
               - '.github/workflows/**'
+              - 'scripts/check-no-public.sh'
+              - 'scripts/tests/test_no_public.py'
             access:
               - 'infra/access/**'
               - '.github/workflows/**'

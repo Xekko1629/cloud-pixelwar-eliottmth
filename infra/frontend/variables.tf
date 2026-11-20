@@ -50,14 +50,14 @@ variable "max_instances" {
   }
 }
 
-variable "realtime_url" {
-  description = "Origin of the realtime SSE service (ADR-0013); empty until DRAW-06"
+variable "firestore_api_key" {
+  description = "Public API key of the Firestore web app, for the listeners (ADR-0015); empty until DRAW-03a"
   type        = string
   default     = ""
 
   validation {
-    condition     = var.realtime_url == "" || can(regex("^https://[A-Za-z0-9.-]+$", var.realtime_url))
-    error_message = "realtime_url must be an https origin without path."
+    condition     = var.firestore_api_key == "" || can(regex("^AIza[0-9A-Za-z_-]{35}$", var.firestore_api_key))
+    error_message = "firestore_api_key must be a Google API key."
   }
 }
 

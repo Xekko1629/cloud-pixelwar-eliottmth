@@ -100,7 +100,7 @@ message concurrent. Le baggage n'est ni extrait ni propagé.
 ```ts
 await obs.message('pixel-draw', pushBody.message.attributes ?? {}, async () => {
   await commitPixels(event); // opération métier de l'appelant
-  obs.pixels.processed(event.pixels.length, event.source);
+  obs.pixels.processed(1, event.source); // un pixel par événement (ADR-0014)
   obs.pixels.latency(event.occurred_at); // appeler après le commit réel
   await nextTopic.publishMessage({
     data: Buffer.from(JSON.stringify(nextEvent)),
