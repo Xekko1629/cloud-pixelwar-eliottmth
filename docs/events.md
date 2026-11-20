@@ -32,9 +32,7 @@ Exemple d'enveloppe (valeurs fictives, `payload` d'un `pixel-draw`) :
   "occurred_at": "2026-11-13T10:15:30.123Z",
   "source": "web",
   "actor": { "uid": "123456789012345678", "name": "exemple", "roles": [] },
-  "payload": {
-    "pixels": [{ "x": 12, "y": -40, "color": 5 }]
-  }
+  "payload": { "x": 12, "y": -40, "color": 5 }
 }
 ```
 
@@ -56,15 +54,17 @@ Les autres champs (`event_id`, `occurred_at`, `source`, `actor`, `payload`) ne v
 | Topic | Producteur(s) | Consommateur(s) (abonnement) | Ticket(s) |
 |---|---|---|---|
 | `discord-command` | `discord-proxy` (après réponse différée `type: 5`) | `command-worker` | BOT-03, BOT-04 |
-| `pixel-draw` | `web-proxy` (`POST /api/pixels`) ; `command-worker` pour `/draw` (`source = discord`) | `draw-worker` | DRAW-01, DRAW-02, BOT-04 |
-| `pixel-processed` | `draw-worker` | `discord-notifier` (filtré sur `source = discord`) ; consommateur de marquage de la vue éloignée | DRAW-02, BOT-05, DATA-05c |
-| `pixel-rejected` | `draw-worker` | `discord-notifier` | DRAW-02, BOT-05 |
+| `pixel-draw` | `web-proxy` (`POST /api/pixels`, un message par pixel de la requête) ; `command-worker` pour `/draw` (`source = discord`) | `draw-worker` | DRAW-01, DRAW-02, BOT-04 |
+| `pixel-processed` | `draw-worker`, un message par pixel | `discord-notifier` (filtré sur `source = discord`) ; consommateur de marquage de la vue éloignée | DRAW-02, BOT-05, DATA-05c |
+| `pixel-rejected` | `draw-worker`, un message par pixel | `discord-notifier` | DRAW-02, BOT-05 |
+
+Chaque message `pixel-draw` porte **un seul pixel** ([ADR-0014](adr/0014-un-evenement-par-pixel.md)) : un trait de brush devient une rafale d'événements unitaires, qui partagent le même `correlation_id`.
 | `render-requested` | `command-worker` (`/get`) | `render-worker` | BOT-04, BOT-06 |
 | `snapshot-requested` | `command-worker` (`/snapshot`) | `snapshot-worker` | BOT-04, BOT-07a |
 | `snapshot-ready` | Cloud Storage : notification `OBJECT_FINALIZE` du bucket `snapshots` (message natif, sans enveloppe, section 5) | `snapshot-notifier` | SRV-07, BOT-07b |
 | `overview-tick` (nom **à valider**) | Cloud Scheduler (message natif, section 6) | `overview-worker` | SRV-05, DATA-05c |
 
-Un pixel posé sur le web n'est pas notifié par `pixel-rejected` : le dernier rejet et sa raison sont reportés dans `users/{uid}`, que le navigateur reçoit par l'événement `user` du flux `realtime` (DRAW-04 ; ADR-0013). Le nom du champ (par exemple `last_rejection`) est une proposition. Le topic `pixel-rejected` ne sert donc qu'au `discord-notifier`.
+Un pixel posé sur le web n'est pas notifié par `pixel-rejected` : le dernier rejet et sa raison sont reportés dans `users/{uid}`, que le navigateur lit par `GET /api/state` au chargement et après chaque trait (DRAW-04 ; ADR-0015). Le nom du champ (par exemple `last_rejection`) est une proposition. Le topic `pixel-rejected` ne sert donc qu'au `discord-notifier`.
 
 Les DLQ sont décrites en section 7.
 
@@ -104,52 +104,56 @@ Les rôles Discord de l'auteur sont dans `actor.roles` (section 1), pas dans le 
 
 | Champ | Type | Obligatoire | Contrainte | Origine |
 |---|---|---|---|---|
-| `pixels` | array | oui | De 1 à 500 éléments | `DEFAULT_MAX_BATCH_PIXELS = 500` (`app/shared/src/grid/constants.ts`) ; ADR-0007 (« 500 par défaut, configurable ») |
-| `pixels[].x` | entier | oui | De -1 000 000 000 à 1 000 000 000 | ADR-0007 ; `COORDINATE_LIMIT` (`constants.ts`) |
-| `pixels[].y` | entier | oui | Idem `x` | Idem |
-| `pixels[].color` | entier | oui | De 1 à 16 : index dans la palette. `0` (non peint) est interdit. | ADR-0007 ; `assertColor` (`constants.ts`) |
+Un message = un pixel ([ADR-0014](adr/0014-un-evenement-par-pixel.md)).
+
+| Champ | Type | Obligatoire | Contrainte | Origine |
+|---|---|---|---|---|
+| `x` | entier | oui | De -1 000 000 000 à 1 000 000 000 | ADR-0007 ; `COORDINATE_LIMIT` (`constants.ts`) |
+| `y` | entier | oui | Idem `x` | Idem |
+| `color` | entier | oui | De 1 à 16 : index dans la palette. `0` (non peint) est interdit. | ADR-0007 ; `assertColor` (`constants.ts`) |
 
 Contraintes complémentaires :
 
-- Pas deux fois la même coordonnée dans un lot. Le code partagé la refuse (`app/shared/src/grid/batch.ts`, « Duplicate coordinate in draw batch »). Le niveau qui la refuse, proxy (400) ou worker, est **À valider**.
-- Le nombre de pixels n'est pas un champ : il se dérive du tableau validé, jamais d'un compteur fourni par le client (`docs/rate-limits.md`, section « Contrat validé »).
+- `POST /api/pixels` reçoit de 1 à 500 pixels par requête (`DEFAULT_MAX_BATCH_PIXELS`, `app/shared/src/grid/constants.ts`). Le `web-proxy` valide toute la requête, puis publie un message par pixel. Tous les messages d'une requête ont le même `correlation_id` et le même `occurred_at`, mais chacun son `event_id` (ADR-0014).
+- Une requête qui contient deux fois la même coordonnée est refusée par le proxy (400). Deux messages distincts peuvent en revanche viser la même coordonnée : le worker applique la règle last-write-wins (section 8.1).
 - Le proxy valide les bornes fixes et la palette, et répond 400 sinon (DRAW-01). Il ne lit pas Firestore.
 - Le `canvas_version` n'est pas dans le payload : proposition, le worker le lit dans `config/global` au traitement (ADR-0007). **À valider.**
 
 ```json
-{
-  "pixels": [
-    { "x": 12, "y": -40, "color": 5 },
-    { "x": 13, "y": -40, "color": 5 }
-  ]
-}
+{ "x": 12, "y": -40, "color": 5 }
 ```
 
 ### 3.3 `pixel-processed`
 
 | Champ | Type | Obligatoire | Contrainte | Origine |
 |---|---|---|---|---|
-| `pixel_count` | entier | oui | ≥ 1, égal au nombre de pixels du `pixel-draw` source | Proposition, à partir de `obs.pixels.processed(event.pixels.length, …)` (`docs/observability.md`) |
+Un message par pixel traité (ADR-0014).
+
+| Champ | Type | Obligatoire | Contrainte | Origine |
+|---|---|---|---|---|
+| `x`, `y`, `color` | entiers | oui | Ceux du `pixel-draw` source | ADR-0014 |
 | `canvas_version` | entier | oui | ≥ 1 | `assertCanvasVersion` (`constants.ts`) ; `ProcessedEventDocument` (ADR-0007) |
-| `regions` | array of string | oui | Au moins une région, format `rx_ry` | Format : `regionId` (`app/shared/src/grid/coordinates.ts`). Proposition : la liste est fournie pour le marquage de la vue éloignée. |
+| `region` | string | oui | Format `rx_ry` | Format : `regionId` (`app/shared/src/grid/coordinates.ts`). Proposition : fourni pour le marquage de la vue éloignée. |
 
 ```json
 {
-  "pixel_count": 2,
+  "x": 12,
+  "y": -40,
+  "color": 5,
   "canvas_version": 3,
-  "regions": ["0_-1"]
+  "region": "0_-1"
 }
 ```
 
-L'exemple correspond aux pixels `(12, -40)` et `(13, -40)` : `rx = floor(12 / 1024) = 0` et `ry = floor(-40 / 1024) = -1`, donc la région `0_-1` (`regionId(rx, ry)` renvoie `${rx}_${ry}`).
+L'exemple correspond au pixel `(12, -40)` : `rx = floor(12 / 1024) = 0` et `ry = floor(-40 / 1024) = -1`, donc la région `0_-1` (`regionId(rx, ry)` renvoie `${rx}_${ry}`).
 
 ### 3.4 `pixel-rejected`
 
 | Champ | Type | Obligatoire | Contrainte | Origine |
 |---|---|---|---|---|
 | `reason` | string | oui | `paused`, `rate_limit`, `invalid_pixel`, `unauthorized` ou `out_of_bounds` | `paused`, `rate_limit`, `invalid_pixel`, `unauthorized` : `docs/observability.md`. `out_of_bounds` : ADR-0007 et DRAW-02. Voir la section 9 sur `out_of_bounds`. |
-| `sub_reason` | string ou null | oui | Renseigné seulement si `reason = rate_limit` : `insufficient_quota`, `batch_exceeds_limit` ou `drawing_disabled`, sinon `null` | `docs/rate-limits.md`, tableau des refus métier. Proposition de structure. |
-| `pixel_count` | entier | oui | ≥ 1 | Idem `pixel-processed` |
+| `sub_reason` | string ou null | oui | Renseigné seulement si `reason = rate_limit` : `insufficient_quota` ou `drawing_disabled`, sinon `null`. `batch_exceeds_limit` ne s'applique plus à un pixel seul (ADR-0014). | `docs/rate-limits.md`, tableau des refus métier. Proposition de structure. |
+| `x`, `y` | entiers | oui | Ceux du `pixel-draw` source | ADR-0014 |
 | `retry_after_seconds` | entier ou null | oui | Secondes avant la minute suivante pour `insufficient_quota` ; `null` sinon | `docs/rate-limits.md`, tableau des refus métier |
 
 Le message ne contient jamais le détail d'une erreur technique ni d'une dépendance (`docs/observability.md`).
@@ -158,7 +162,8 @@ Le message ne contient jamais le détail d'une erreur technique ni d'une dépend
 {
   "reason": "rate_limit",
   "sub_reason": "insufficient_quota",
-  "pixel_count": 5,
+  "x": 12,
+  "y": -40,
   "retry_after_seconds": 18
 }
 ```
@@ -376,7 +381,7 @@ Décisions que les sources ne tranchent pas. Chacune est à valider avant SRV-05
 4. **Publication fiable du résultat après commit.** `docs/rate-limits.md` indique que ce point reste ouvert : le résultat stocké doit être republié si le commit a réussi mais que la publication a échoué.
 5. **Horizon de déduplication.** `docs/rate-limits.md` fixe un horizon de rejeu de 7 jours, ADR-0008 parle de 15 jours pour le bucket de sources. Les deux chiffres sont à aligner avec la rétention Pub/Sub (7 jours).
 6. **Motif `out_of_bounds`.** ADR-0007 et DRAW-02 l'utilisent comme motif de `pixel-rejected`, la liste des motifs de métrique (`docs/observability.md`) ne le contient pas. L'ajouter, ou le classer dans `invalid_pixel` ?
-7. **Coordonnée en double dans un lot** : refusée par le proxy (400) ou par le worker (`pixel-rejected`) ?
+7. **Tranché (ADR-0014)** : une coordonnée en double dans une même requête est refusée par le proxy (400). Le regroupement des écritures dans une instance n'est activé que si le mode de base reste sous 200 pixels par seconde et par instance.
 8. **`canvas_version`** : lu par le worker dans `config/global` (proposition) ou porté par le message ?
 9. **Régions marquées** pour la vue éloignée : collection, format, remise à zéro, et déclencheur de la régénération complète après `/admin clear` (DATA-05c).
 10. **Noms** : topic `overview-tick`, consommateur de marquage, et adoption de la convention de nommage des abonnements (section 7.1).

@@ -27,10 +27,8 @@ locals {
     "servicemanagement.googleapis.com",
     "servicecontrol.googleapis.com",
     "storage.googleapis.com",
-    # Frontend: Firebase Hosting (ADR-0006) and Firebase Auth (ADR-0005)
-    "firebase.googleapis.com",
-    "firebasehosting.googleapis.com",
-    "identitytoolkit.googleapis.com",
+    # No Firebase product (intermediate review): the frontend is a Cloud Run service
+    # (ADR-0011) and web sessions are JWTs signed with IAM Credentials (ADR-0012).
     # Observability
     "logging.googleapis.com",
     "monitoring.googleapis.com",

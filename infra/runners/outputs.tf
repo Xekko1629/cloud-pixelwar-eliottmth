@@ -1,4 +1,4 @@
-output "runner_label" {
-  description = "Label to use in runs-on to target the self-hosted runners"
-  value       = github_actions_variable.runner_label.value
+output "runner_labels" {
+  description = "runs-on label of each runner class (small, medium)"
+  value       = { for class, variable in github_actions_variable.runner_label : class => variable.value }
 }

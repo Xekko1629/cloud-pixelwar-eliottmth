@@ -24,10 +24,14 @@ Discord et web partagent la règle et le document `users/{uid}`.
 - Quota zéro = aucun dessin pour cet utilisateur tant que sa limite effective
   reste zéro. Un défaut global à zéro peut être relevé par un override ; ce
   n'est pas le drapeau de pause globale, que le worker doit vérifier séparément.
-- Chaque pixel du lot compte ; un dépassement refuse **tout le lot**, sans
-  consommation partielle. La taille maximale de lot/budgets de DATA-01 reste
-  un contrôle distinct : dériver `pixel_count` du tableau de pixels validé,
-  jamais d'un compteur déclaré par le client.
+- Un événement `pixel-draw` porte un seul pixel (ADR-0014) : le worker appelle
+  le calcul avec `pixel_count = 1`, une fois par événement, éventuellement
+  plusieurs fois dans la même transaction si les écritures sont regroupées.
+  Pour un trait plus long que le quota restant, les premiers pixels traités
+  passent et les suivants sont refusés. Le calcul accepte toujours un
+  `pixel_count` supérieur à 1 et refuse alors le lot entier, mais le pipeline de
+  dessin ne s'en sert plus. Ne jamais lire `pixel_count` dans un compteur
+  déclaré par le client.
 - La rafale de fin/début de minute est assumée : jusqu'à 20 pixels juste avant
   la frontière puis 20 juste après avec une limite de 20.
 
@@ -45,7 +49,7 @@ const decision = evaluateRateLimit({
   override: null,
   usage: null, // sinon window_start, used_pixels et updated_at lus en transaction
   now_ms: Date.now(), // dans le worker, à chaque tentative de transaction
-  pixel_count: 5, // longueur du lot validé
+  pixel_count: 1, // un pixel par événement (ADR-0014)
 });
 ```
 
@@ -63,8 +67,8 @@ après décision, `window_start_ms` et `reset_at_ms` :
 
 | Refus métier | `retry_after_seconds` | Indication pour la notification |
 | --- | --- | --- |
-| `insufficient_quota` | Secondes jusqu'à la prochaine minute, arrondies au supérieur | Lot de 5, restant 3/20 : quota insuffisant, réinitialisation dans 18 s |
-| `batch_exceeds_limit` | `null` | Lot de 25 pour limite de 20 : réduire le lot ou modifier la limite, attendre seul ne suffit pas |
+| `insufficient_quota` | Secondes jusqu'à la prochaine minute, arrondies au supérieur | Restant 0/20 : quota épuisé, réinitialisation dans 18 s |
+| `batch_exceeds_limit` | `null` | Seulement si `pixel_count` dépasse la limite : n'arrive plus dans le pipeline de dessin, où `pixel_count = 1` (ADR-0014) |
 | `drawing_disabled` | `null` | Quota effectif nul : pas de promesse de déblocage à la minute suivante |
 
 Le délai est une information calculée au traitement, pas une garantie que le

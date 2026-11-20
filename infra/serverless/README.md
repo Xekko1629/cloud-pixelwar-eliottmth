@@ -88,6 +88,23 @@ ciblé `--draw` est prêt localement, son exécution réelle, l'alerte DLQ et la
 restent à faire. Le worker de
 diagnostic n'est pas le futur worker métier.
 
+## Authentification web (auth-proxy)
+
+`auth-proxy.tf` déploie la fonction de connexion Discord et de session web
+([README](../../app/functions/auth-proxy/README.md), ADR-0012), activée par
+`enable_auth_proxy` (dev d'abord). Elle est exportée vers la gateway comme backend
+`auth` : `/auth/login`, `/auth/exchange` et `/api/session/refresh`.
+
+- Seule son identité d'exécution reçoit `roles/iam.serviceAccountTokenCreator`, sur
+  le seul compte `session-signer`. Ce binding demande au deployer le droit
+  `iam.serviceAccounts.setIamPolicy` sur ce compte (rôle `serviceAccountAdmin` de
+  SEC-01, #136).
+- Secrets `discord-application-id` et `discord-oauth-client-secret`, en versions
+  numériques explicites.
+- L'output `frontend_origin` donne l'URL déterministe du frontend : seule origine
+  CORS, et `<frontend_origin>/auth/callback` est la redirect URI à enregistrer dans
+  l'application Discord de l'environnement.
+
 ## Firestore
 
 `firestore.tf` crée la base `(default)` en mode Native dans la région du stack,
@@ -107,6 +124,31 @@ quota et le dernier rejet.
   5 minutes : attendre avant de réappliquer le stack.
 - Le TTL supprime les documents expirés en général sous 24 h ; les requêtes
   filtrent donc toujours sur `created_at` (ADR-0003).
+
+## Cloud Storage
+
+`storage.tf` crée deux buckets privés, `<projet>-snapshots` et
+`<projet>-overview`, avec accès uniforme (IAM seulement, pas d'ACL) et
+`public_access_prevention = "enforced"`. Ils ne contiennent que des images
+dérivées de Firestore : `force_destroy = true` permet au workflow `Destroy`
+de les supprimer avec leurs objets, en dev comme en prd. Ils ne remplacent pas
+le bucket de sources persistant d'`infra/bootstrap`.
+
+- `snapshots` : PNG de `/snapshot` (BOT-07a), partagés par URL signée (BOT-07b).
+  Une règle lifecycle supprime les objets après `snapshot_retention_days`
+  (7 jours par défaut, la durée maximale d'une URL signée V4).
+- `overview` : pyramide de la vue éloignée (DATA-05c). Aucune expiration, les
+  images actives sont réécrites par l'`overview-worker`.
+- Une notification `OBJECT_FINALIZE` du bucket `snapshots` publie dans le topic
+  `snapshot-ready`, au format `JSON_API_V1`, sans enveloppe métier
+  ([catalogue](../../docs/events.md), section 5). L'agent de service Cloud
+  Storage reçoit `roles/pubsub.publisher` sur ce seul topic.
+
+Aucun abonnement n'écoute encore `snapshot-ready` : l'abonnement push OIDC vers
+le `snapshot-notifier` est créé avec lui (SRV-05, BOT-07b). D'ici là, une
+notification publiée n'est conservée par aucun abonnement. Aucune identité ne
+reçoit encore de droit sur les buckets : chaque worker recevra son rôle objet sur
+le bucket qu'il utilise, pas un rôle projet.
 
 ## Secrets
 
