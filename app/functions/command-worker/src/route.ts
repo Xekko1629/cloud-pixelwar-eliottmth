@@ -28,9 +28,6 @@ export function routeCommand(input: IncomingCommand, permissions: Permissions): 
     case 'draw': return { ...envelope, type: 'pixel-draw', payload: { pixels: [{ ...command.options }], discord } };
     case 'get': return { ...envelope, type: 'render-requested', payload: { discord } };
     case 'snapshot': return { ...envelope, type: 'snapshot-requested', payload: { discord } };
-    case 'admin': return {
-      ...envelope, type: 'admin-requested', actor: { ...envelope.actor, roles: [...input.actor.roles] },
-      payload: { options: { ...command.options }, discord },
-    };
+    case 'admin': return { ...envelope, type: 'admin-requested', payload: { options: { ...command.options }, discord } };
   }
 }

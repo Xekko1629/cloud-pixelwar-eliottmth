@@ -25,7 +25,6 @@ interface Envelope {
 export type RoutedDiscordEvent = Envelope & (
   | { type: 'pixel-draw'; payload: { pixels: { x: number; y: number; color: number }[]; discord: DiscordContext } }
   | { type: 'render-requested' | 'snapshot-requested'; payload: { discord: DiscordContext } }
-  // Only admin-requested keeps the Discord roles: the admin-worker re-checks the allow-list (BOT-08).
-  | { type: 'admin-requested'; actor: { uid: string; name: string; roles: string[] }; payload: { options: AdminCommand; discord: DiscordContext } }
+  | { type: 'admin-requested'; payload: { options: AdminCommand; discord: DiscordContext } }
   | { type: 'command-rejected'; payload: { command: 'admin' | 'snapshot'; reason: 'unauthorized'; discord: DiscordContext } }
 );

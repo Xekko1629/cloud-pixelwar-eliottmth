@@ -18,15 +18,6 @@ describe('command routing', () => {
   it('publishes the same business identity on retries, not the Pub/Sub message ID', () => {
     expect(routeCommand(read(), noAdmins)).toEqual(routeCommand(read(), noAdmins));
   });
-  it('keeps the Discord roles in admin-requested only, for the admin-worker re-check', () => {
-    const admin = read('admin', { subcommand: 'pause' });
-    const routed = routeCommand(admin, { user_ids: [admin.actor.uid], role_ids: [] });
-    expect(routed.actor).toEqual({ uid: admin.actor.uid, name: admin.actor.name, roles: admin.actor.roles });
-    expect(admin.actor.roles.length).toBeGreaterThan(0);
-    for (const other of [routeCommand(read('get', {}), noAdmins), routeCommand(read('admin', { subcommand: 'pause' }), noAdmins)]) {
-      expect(other.actor).not.toHaveProperty('roles');
-    }
-  });
   it('routes get without an admin privilege', () => {
     expect(routeCommand(read('get', {}), noAdmins).type).toBe('render-requested');
   });

@@ -57,8 +57,6 @@ export const handleDiscordNotifier = createDiscordNotifierHandler({
   subscriptions: {
     'pixel-processed': process.env.DISCORD_PROCESSED_SUBSCRIPTION ?? '',
     'pixel-rejected': process.env.DISCORD_REJECTED_SUBSCRIPTION ?? '',
-    ...(process.env.DISCORD_COMMAND_REJECTED_SUBSCRIPTION
-      ? { 'command-rejected': process.env.DISCORD_COMMAND_REJECTED_SUBSCRIPTION } : {}),
   },
   update: createOriginalResponseUpdater(),
 });

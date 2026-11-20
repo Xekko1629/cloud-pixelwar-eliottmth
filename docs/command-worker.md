@@ -55,10 +55,9 @@ BOT-02, dans l'attente de clarification du sujet.
 
 Une configuration absente ou invalide rend la fonction indisponible (`503`).
 Deux listes explicitement vides sont valides : personne n'est administrateur.
-Un refus produit `command-rejected` avec `reason: unauthorized`, auquel le
-`discord-notifier` répond. Aucun effet admin n'est exécuté par ce routeur :
-`admin-requested` est appliqué par l'`admin-worker` (BOT-08), qui reçoit les rôles
-de l'auteur dans `actor.roles` et revérifie l'allow-list.
+Un refus produit `command-rejected` avec `reason: unauthorized` ; le futur
+notifier devra gérer ce contrat pour prévenir l'utilisateur. Aucun effet admin
+n'est exécuté par ce routeur : BOT-08 reste à implémenter.
 
 ## Doublons et acquittement
 

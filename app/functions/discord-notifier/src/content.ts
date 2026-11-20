@@ -8,12 +8,6 @@ const refusals: Record<RejectReason, string> = {
   batch_budget_exceeded: 'Ce lot dépasse les limites de traitement. Aucun pixel de cette demande n’a été dessiné.',
 };
 export function originalResponseContent(result: ResultSummary) {
-  if (result.type === 'command-rejected') {
-    return {
-      content: `La commande /${result.command} est réservée aux administrateurs. Aucune action n’a été effectuée.`,
-      allowed_mentions: { parse: [] as string[] }, embeds: [], components: [],
-    };
-  }
   return {
     content: result.type === 'pixel-processed'
       ? `Dessin enregistré. Pixels appliqués : ${result.applied_pixels} ; ignorés : ${result.ignored_pixels}.`

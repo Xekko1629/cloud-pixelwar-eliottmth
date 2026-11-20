@@ -19,14 +19,8 @@ Il complète le parcours applicatif suivant, sans modifier le proxy Q2 :
 
 Les contrats de résultat sont ceux de [DRAW-02](draw-worker.md), exposés par
 `@pixelwar/shared/events`. Leur revue ARCH-03 reste nécessaire avant raccordement
-cloud. Les résultats admin sont envoyés par l'`admin-worker` lui-même, les rendus
-et snapshots par leurs workers.
-
-Le notifier répond aussi aux refus `command-rejected` du `command-worker`
-(BOT-08) : `/admin` ou `/snapshot` demandés hors allow-list reçoivent un message
-fixe « réservée aux administrateurs », par le même `PATCH @original`. Ce troisième
-abonnement est facultatif ; sans lui, le notifier ne traite que les dessins.
-Le `PATCH` est fait par le client partagé `@pixelwar/shared/discord`.
+cloud. `command-rejected`, les résultats admin, rendus et snapshots ne font pas
+partie du périmètre de ce notifier de dessin.
 
 ## Validation des messages
 
@@ -123,7 +117,6 @@ pas les résultats d'autres consommateurs Pub/Sub.
 | `DISCORD_APPLICATION_ID` | Application attendue |
 | `DISCORD_PROCESSED_SUBSCRIPTION` | Nom complet de l'abonnement des succès |
 | `DISCORD_REJECTED_SUBSCRIPTION` | Nom complet distinct de l'abonnement des refus |
-| `DISCORD_COMMAND_REJECTED_SUBSCRIPTION` | Facultatif : nom complet distinct de l'abonnement `command-rejected` |
 
 L'absence ou l'invalidité de ces paramètres rend le handler indisponible (`503`).
 La fonction doit rester privée, avec push OIDC et invoker dédiés ; ces ressources

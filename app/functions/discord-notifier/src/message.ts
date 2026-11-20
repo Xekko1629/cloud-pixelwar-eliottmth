@@ -2,16 +2,13 @@ import { createHash } from 'node:crypto';
 import { canonicalEventId, DEFAULT_MAX_BATCH_PIXELS, parseOccurredAt, regionId } from '@pixelwar/shared/grid';
 
 export const MAX_PUSH_BYTES = 128 * 1024;
-export { TOKEN_LIFETIME_MS } from '@pixelwar/shared/discord';
+export const TOKEN_LIFETIME_MS = 15 * 60_000;
 export type ResultType = 'pixel-processed' | 'pixel-rejected';
 export type RejectReason = 'paused' | 'rate_limit' | 'out_of_bounds' | 'expired' | 'batch_budget_exceeded';
-// command-rejected (BOT-04 refusals of /admin and /snapshot) is optional: without it, the
-// notifier keeps answering draw results only.
-export interface Subscriptions { 'pixel-processed': string; 'pixel-rejected': string; 'command-rejected'?: string }
+export interface Subscriptions { 'pixel-processed': string; 'pixel-rejected': string }
 export type ResultSummary =
   | { type: 'pixel-processed'; applied_pixels: number; ignored_pixels: number }
-  | { type: 'pixel-rejected'; applied_pixels: number; ignored_pixels: number; reason: RejectReason }
-  | { type: 'command-rejected'; command: 'admin' | 'snapshot' };
+  | { type: 'pixel-rejected'; applied_pixels: number; ignored_pixels: number; reason: RejectReason };
 interface Identifiers { event_id: string; correlation_id: string; message_id: string; attributes: { correlation_id: string; traceparent: string } }
 export type DecodedNotice = Identifiers & { result: ResultSummary } & (
   | { source: 'web' }
@@ -30,13 +27,7 @@ export function snowflake(value: unknown): value is string {
 }
 export function validSubscriptions(value: Subscriptions | undefined): value is Subscriptions {
   const valid = (name: unknown) => typeof name === 'string' && /^projects\/[a-z][a-z0-9-]+\/subscriptions\/[a-zA-Z][a-zA-Z0-9._~+%-]{2,254}$/.test(name);
-  if (!value || !valid(value['pixel-processed']) || !valid(value['pixel-rejected'])) return false;
-  const names = [value['pixel-processed'], value['pixel-rejected']];
-  if (value['command-rejected'] !== undefined) {
-    if (!valid(value['command-rejected'])) return false;
-    names.push(value['command-rejected']);
-  }
-  return new Set(names).size === names.length;
+  return !!value && valid(value['pixel-processed']) && valid(value['pixel-rejected']) && value['pixel-processed'] !== value['pixel-rejected'];
 }
 function uuid(value: unknown): value is string {
   try { return typeof value === 'string' && canonicalEventId(value) === value; }
@@ -79,10 +70,6 @@ export function parseNoticePush(body: unknown, subscriptions: Subscriptions, app
   let event: unknown;
   try { event = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
   catch { throw new InvalidNotice('invalid_data'); }
-  if (record(event) && event.schema_version === 1 && event.type === 'command-rejected' && subscriptions['command-rejected'] !== undefined &&
-      body.subscription === subscriptions['command-rejected']) {
-    return parseCommandRejected(body as Push, event, applicationId);
-  }
   if (!record(event) || event.schema_version !== 1 || (event.type !== 'pixel-processed' && event.type !== 'pixel-rejected') ||
       body.subscription !== subscriptions[event.type] || !uuid(event.event_id) || !uuid(event.correlation_id) ||
       (event.source !== 'web' && event.source !== 'discord') || !record(event.actor) || !snowflake(event.actor.uid) ||
@@ -112,52 +99,27 @@ export function parseNoticePush(body: unknown, subscriptions: Subscriptions, app
     }
     summary = { type: event.type, applied_pixels: 0, ignored_pixels: 0, reason: result.reason as RejectReason };
   }
-  const identifiers = identifiersOf(body as Push, event);
-  const context = event.payload.discord;
-  if (event.source === 'web') {
-    if (context !== undefined) throw new InvalidNotice('invalid_notification');
-    return { ...identifiers, source: 'web', result: summary };
-  }
-  return { ...identifiers, source: 'discord', result: summary,
-    discord: discordTarget(context, applicationId, result.event_id as string, occurred) };
-}
-
-type Push = Record<string, unknown> & { message: Record<string, unknown> & { messageId: string } };
-
-function identifiersOf(body: Push, event: Record<string, unknown>): Identifiers {
   const attributes = body.message.attributes;
   if (!record(attributes) || Object.keys(attributes).sort().join(',') !== 'correlation_id,traceparent' ||
       attributes.correlation_id !== event.correlation_id || typeof attributes.traceparent !== 'string' ||
       !/^00-(?!0{32}-)[a-f0-9]{32}-(?!0{16}-)[a-f0-9]{16}-0[01]$/.test(attributes.traceparent)) {
     throw new InvalidNotice('invalid_attributes');
   }
-  return { event_id: event.event_id as string, correlation_id: event.correlation_id as string, message_id: body.message.messageId,
-    attributes: { correlation_id: event.correlation_id as string, traceparent: attributes.traceparent } };
-}
-
-/** The context must belong to this application and to the very interaction that produced the event. */
-function discordTarget(context: unknown, applicationId: string, sourceEventId: string, occurred: number) {
+  const identifiers = { event_id: event.event_id, correlation_id: event.correlation_id, message_id: body.message.messageId,
+    attributes: { correlation_id: event.correlation_id, traceparent: attributes.traceparent } };
+  const context = event.payload.discord;
+  if (event.source === 'web') {
+    if (context !== undefined) throw new InvalidNotice('invalid_notification');
+    return { ...identifiers, source: 'web', result: summary };
+  }
   if (!record(context) || context.application_id !== applicationId || !snowflake(context.application_id) ||
       !snowflake(context.interaction_id) || !snowflake(context.guild_id) || !snowflake(context.channel_id) ||
       typeof context.interaction_token !== 'string' || !/^[\x21-\x7e]{1,4096}$/.test(context.interaction_token) ||
       context.interaction_token === '.' || context.interaction_token === '..' ||
-      stableId(`pixelwar:discord-command:v1:${applicationId}`, context.interaction_id) !== sourceEventId ||
+      stableId(`pixelwar:discord-command:v1:${applicationId}`, context.interaction_id) !== result.event_id ||
       Number((BigInt(context.interaction_id) >> 22n) + 1420070400000n) !== occurred) {
     throw new InvalidNotice('invalid_notification');
   }
-  return { application_id: applicationId, interaction_token: context.interaction_token, created_at: occurred };
-}
-
-/** BOT-04 refusal of /admin or /snapshot: same envelope, IDs and occurrence time as the discord-command. */
-function parseCommandRejected(body: Push, event: Record<string, unknown>, applicationId: string): DecodedNotice {
-  const payload = event.payload;
-  if (event.source !== 'discord' || !uuid(event.event_id) || !uuid(event.correlation_id) || event.correlation_id !== event.event_id ||
-      !record(event.actor) || !snowflake(event.actor.uid) || typeof event.actor.name !== 'string' ||
-      !record(payload) || Object.keys(payload).sort().join(',') !== 'command,discord,reason' ||
-      (payload.command !== 'admin' && payload.command !== 'snapshot') || payload.reason !== 'unauthorized') {
-    throw new InvalidNotice('invalid_event');
-  }
-  const occurred = time(event.occurred_at);
-  return { ...identifiersOf(body, event), source: 'discord', result: { type: 'command-rejected', command: payload.command },
-    discord: discordTarget(payload.discord, applicationId, event.event_id as string, occurred) };
+  return { ...identifiers, source: 'discord', result: summary,
+    discord: { application_id: applicationId, interaction_token: context.interaction_token, created_at: occurred } };
 }
