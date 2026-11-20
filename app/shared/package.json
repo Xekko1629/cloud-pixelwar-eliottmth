@@ -6,7 +6,8 @@
     "./observability": "./src/observability/index.ts",
     "./observability/logger": "./src/observability/logger.ts",
     "./observability/google": "./src/observability/google.ts",
-    "./grid": "./src/grid/index.ts"
+    "./grid": "./src/grid/index.ts",
+    "./render": "./src/render/index.ts"
   },
   "dependencies": {
     "@opentelemetry/api": "1.10.0",
