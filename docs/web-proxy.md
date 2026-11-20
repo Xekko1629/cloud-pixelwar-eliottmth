@@ -7,9 +7,10 @@
 livraison est **locale, non déployée** : ni la fonction, ni le topic
 `pixel-draw`, ni le backend `api` de la gateway ne sont déclarés en Terraform.
 
-Le proxy valide la forme du lot, publie un message `pixel-draw` (catalogue des
-événements, [section 3.2](events.md#32-pixel-draw)) et répond `202`. Il attend la
-confirmation de Pub/Sub avant de répondre. Aucun traitement n'est lancé après la
+Le proxy valide toute la requête (1 à 500 pixels), puis publie **un message
+`pixel-draw` par pixel** ([ADR-0014](adr/0014-un-evenement-par-pixel.md), catalogue
+des événements, [section 3.2](events.md#32-pixel-draw)) et répond `202`. Il attend
+la confirmation de **toutes** les publications avant de répondre. Aucun traitement n'est lancé après la
 réponse.
 
 Il n'écrit pas Firestore et ne le lit pas. Le quota, la pause, la taille courante
@@ -62,29 +63,36 @@ message invalide, qui partirait en DLQ au lieu de répondre à l'utilisateur.
 
 | Situation | Réponse |
 | --- | --- |
-| Lot publié sur `pixel-draw` | `202 { "event_id", "correlation_id" }` |
+| Tous les pixels publiés sur `pixel-draw` | `202 { "correlation_id", "event_ids": [...] }`, un `event_id` par pixel, dans l'ordre de la requête |
 | Identité absente ou invalide | `401 unauthenticated` |
 | Lot refusé | `400` ou `413`, avec le code ci-dessus |
 | Mauvais chemin ou méthode | `404 not_found`, `405 method_not_allowed` |
 | Configuration incomplète | `503 unavailable` |
-| Échec ou délai dépassé de la publication | `503 publish_unavailable` |
+| Échec ou délai dépassé d'au moins une publication | `503 publish_unavailable` |
 
 Le `202` signifie « accepté pour traitement », pas « dessiné ». Le résultat
 arrive au navigateur par le flux temps réel : le delta si le dessin est appliqué,
 ou le dernier rejet dans `users/{uid}` (événement `user`, DRAW-04).
-L'`event_id` renvoyé permet au frontend de relier ce rejet à sa requête.
+Les `event_ids` renvoyés permettent au frontend de relier un rejet à son trait, et
+de regrouper les rejets d'un même trait en un seul message (WEB-05).
 
-Un `503 publish_unavailable` après un délai dépassé est **incertain** : Pub/Sub a
-pu accepter le message. Toutes les réponses portent `Cache-Control: no-store`.
+Un `503 publish_unavailable` est **partiel ou incertain** : certains pixels du trait
+ont pu être publiés et seront dessinés, et un délai dépassé ne prouve pas l'échec.
+Le proxy attend quand même la fin de toutes les publications avant de répondre. Toutes les réponses portent `Cache-Control: no-store`.
 
 ## Identifiants et renvois
 
-Chaque requête reçoit un `event_id` neuf (UUID v4), repris comme
-`correlation_id`. `occurred_at` est l'heure du proxy : l'horloge du navigateur
-n'est jamais utilisée, car elle départage les pixels concurrents (LWW).
+Chaque pixel reçoit un `event_id` neuf (UUID v4). Toute la requête partage un
+`correlation_id` neuf, qui relie les logs et la trace du trait de bout en bout, et
+un même `occurred_at`, l'heure du proxy : l'horloge du navigateur n'est jamais
+utilisée, car elle départage les pixels concurrents (LWW).
+
+Les messages sont publiés ensemble grâce au batching du client Pub/Sub (100
+messages ou 10 ms) : c'est un regroupement de transport, chaque message restant un
+événement distinct, acquitté, réessayé et envoyé en DLQ séparément.
 
 Conséquence assumée : une requête renvoyée par le navigateur, par exemple après
-une coupure réseau qui a perdu le `202`, est un **second dessin**. La grille ne
+une coupure réseau qui a perdu le `202`, est un **second trait**. La grille ne
 change pas visuellement (mêmes couleurs), mais le quota est compté deux fois et
 un second delta est diffusé. Le frontend ne doit donc pas renvoyer
 automatiquement une requête dont l'issue est incertaine.

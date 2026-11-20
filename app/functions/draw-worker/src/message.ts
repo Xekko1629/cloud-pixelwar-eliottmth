@@ -39,7 +39,8 @@ export function parseDrawPush(body: unknown, subscription: string, applicationId
   if (!record(event) || event.schema_version !== 1 || event.type !== 'pixel-draw' ||
       (event.source !== 'web' && event.source !== 'discord') || !record(event.actor) ||
       !snowflake(event.actor.uid) || typeof event.actor.name !== 'string' || typeof event.occurred_at !== 'string' ||
-      !record(event.payload) || !Array.isArray(event.payload.pixels) ||
+      // ADR-0014: one Pub/Sub event per pixel, from the web-proxy as from the command-worker.
+      !record(event.payload) || !Array.isArray(event.payload.pixels) || event.payload.pixels.length !== 1 ||
       typeof event.event_id !== 'string' || typeof event.correlation_id !== 'string') {
     throw new InvalidDrawMessage('invalid_event');
   }

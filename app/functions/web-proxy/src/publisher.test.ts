@@ -6,9 +6,9 @@ vi.mock('@google-cloud/pubsub', () => ({ PubSub: class {
   topic(...args: unknown[]) { mocks.topic(...args); return { publishMessage: mocks.publishMessage }; }
 } }));
 import { createDrawPublisher } from './publisher';
-import { webDrawEvent } from './request';
+import { webDrawEvents } from './request';
 
-const event = webDrawEvent([{ x: 1, y: 2, color: 3 }], { uid: '423456789012345678', name: 'Synthetic user' }, 0);
+const [event] = webDrawEvents([{ x: 1, y: 2, color: 3 }], { uid: '423456789012345678', name: 'Synthetic user' }, 0).events;
 const attributes = { correlation_id: event.correlation_id, traceparent: `00-${'1'.repeat(32)}-${'2'.repeat(16)}-01` };
 
 describe('pixel-draw publisher', () => {
@@ -20,7 +20,7 @@ describe('pixel-draw publisher', () => {
     await publish(event, attributes);
     expect(mocks.construct).toHaveBeenCalledTimes(1);
     expect(mocks.construct).toHaveBeenCalledWith({ projectId: 'demo-pixelwar-test' });
-    expect(mocks.topic).toHaveBeenCalledWith('pixel-draw', { batching: { maxMessages: 1 }, gaxOpts: { timeout: 5000, retry: null } });
+    expect(mocks.topic).toHaveBeenCalledWith('pixel-draw', { batching: { maxMessages: 100, maxMilliseconds: 10 }, gaxOpts: { timeout: 5000, retry: null } });
     mocks.publishMessage.mockRejectedValue(new Error('unavailable'));
     await expect(publish(event, attributes)).rejects.toThrow('unavailable');
   });

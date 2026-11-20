@@ -7,6 +7,8 @@ const ORIGIN = 'https://frontend-123456789.europe-west1.run.app';
 const USER = '423456789012345678';
 const NOW = Date.UTC(2026, 10, 20, 10, 0, 0, 123);
 const ID = '11111111-1111-4111-8111-111111111111';
+// Correlation first, then one event id per pixel.
+const sequence = () => { let next = 0; return () => `${ID.slice(0, -2)}${String(next++).padStart(2, '0')}`; };
 const userInfo = (claims: unknown = { sub: USER, name: 'Synthetic user' }) => Buffer.from(JSON.stringify(claims)).toString('base64url');
 
 function request(overrides: { path?: string; method?: string; headers?: Record<string, string | undefined>; body?: unknown } = {}) {
@@ -29,7 +31,7 @@ function response() {
 function setup(overrides = {}) {
   const publish = vi.fn().mockResolvedValue('message-id');
   const log = vi.fn();
-  const handler = createWebProxyHandler({ frontendOrigin: ORIGIN, publish, log, now: () => NOW, newId: () => ID, ...overrides });
+  const handler = createWebProxyHandler({ frontendOrigin: ORIGIN, publish, log, now: () => NOW, newId: sequence(), ...overrides });
   const invoke = async (req = request()) => {
     const res = response();
     await handler(req as unknown as Parameters<HttpFunction>[0], res as unknown as Parameters<HttpFunction>[1]);
@@ -46,30 +48,53 @@ describe('web-proxy', () => {
     const res = await invoke();
     expect(publish).toHaveBeenCalledTimes(1);
     const [event, attributes] = publish.mock.calls[0];
+    const CORRELATION = `${ID.slice(0, -2)}00`; const EVENT = `${ID.slice(0, -2)}01`;
     expect(event).toEqual({
-      schema_version: 1, type: 'pixel-draw', event_id: ID, correlation_id: ID, occurred_at: new Date(NOW).toISOString(),
+      schema_version: 1, type: 'pixel-draw', event_id: EVENT, correlation_id: CORRELATION, occurred_at: new Date(NOW).toISOString(),
       source: 'web', actor: { uid: USER, name: 'Synthetic user' }, payload: { pixels: [{ x: 12, y: -40, color: 5 }] },
     });
     expect(Object.keys(attributes).sort()).toEqual(['correlation_id', 'traceparent']);
-    expect(attributes.correlation_id).toBe(ID);
+    expect(attributes.correlation_id).toBe(CORRELATION);
     expect(attributes.traceparent).toMatch(/^00-[a-f0-9]{32}-[a-f0-9]{16}-0[01]$/);
     expect(res.status).toHaveBeenCalledWith(202);
-    expect(res.json).toHaveBeenCalledWith({ event_id: ID, correlation_id: ID });
+    expect(res.json).toHaveBeenCalledWith({ correlation_id: CORRELATION, event_ids: [EVENT] });
     expect(publish.mock.invocationCallOrder[0]).toBeLessThan(res.json.mock.invocationCallOrder[0]);
     expect(headers(res)).toMatchObject({ 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': ORIGIN, Vary: 'Origin' });
     expect(JSON.stringify(log.mock.calls)).not.toContain(USER);
   });
 
-  it('produces a message accepted by the real draw-worker parser', async () => {
-    const { invoke, publish } = setup({ newId: undefined });
-    await invoke(request({ body: { pixels: [{ x: -1e9, y: 1e9, color: 16 }, { x: 0, y: 0, color: 1 }] } }));
-    const [event, attributes] = publish.mock.calls[0];
+  it('publishes one message per pixel (ADR-0014), each accepted by the real draw-worker parser', async () => {
+    const { invoke, publish, log } = setup({ newId: undefined });
+    const pixels = [{ x: -1e9, y: 1e9, color: 16 }, { x: 0, y: 0, color: 1 }, { x: 1, y: 0, color: 2 }];
+    const res = await invoke(request({ body: { pixels } }));
+    expect(publish).toHaveBeenCalledTimes(3);
     const subscription = 'projects/demo-pixelwar-test/subscriptions/draw-worker';
-    const parsed = parseDrawPush({ subscription, message: {
+    const parsed = publish.mock.calls.map(([event, attributes]) => parseDrawPush({ subscription, message: {
       data: Buffer.from(JSON.stringify(event)).toString('base64'), attributes, messageId: '1',
-    } }, subscription);
-    expect(parsed.command).toMatchObject({ event_id: event.event_id, source: 'web', author: { uid: USER, name: 'Synthetic user' } });
-    expect(parsed.discord).toBeUndefined();
+    } }, subscription));
+    expect(parsed.map((item) => item.command.pixels)).toEqual(pixels.map((pixel) => [pixel]));
+    expect(new Set(parsed.map((item) => item.command.event_id)).size).toBe(3);
+    expect(new Set(parsed.map((item) => item.attributes.correlation_id)).size).toBe(1);
+    expect(new Set(parsed.map((item) => item.command.occurred_at)).size).toBe(1);
+    expect(parsed.every((item) => item.discord === undefined)).toBe(true);
+    const answer = res.json.mock.calls[0][0];
+    expect(answer.event_ids).toEqual(parsed.map((item) => item.command.event_id));
+    expect(answer.correlation_id).toBe(parsed[0].attributes.correlation_id);
+    // One log per stroke, not per pixel.
+    expect(log.mock.calls.filter(([, , fields]) => fields.event_type === 'web.proxy.published')).toHaveLength(1);
+  });
+
+  it('answers 503 when one pixel of the stroke fails, after waiting for every publication', async () => {
+    const settled: string[] = [];
+    const publish = vi.fn(async (event: { payload: { pixels: { x: number }[] } }) => {
+      await new Promise((resolve) => setTimeout(resolve, event.payload.pixels[0].x));
+      settled.push(String(event.payload.pixels[0].x));
+      if (event.payload.pixels[0].x === 1) throw new Error('synthetic failure');
+    });
+    const { invoke } = setup({ publish });
+    const res = await invoke(request({ body: { pixels: [{ x: 1, y: 0, color: 1 }, { x: 5, y: 0, color: 1 }] } }));
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(settled).toEqual(['1', '5']);
   });
 
   it('waits for the actual publication before answering', async () => {

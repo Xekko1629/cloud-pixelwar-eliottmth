@@ -2,7 +2,7 @@ import type { HttpFunction } from '@google-cloud/functions-framework';
 import { GATEWAY_USERINFO_HEADER, gatewayIdentity } from '@pixelwar/shared/gateway';
 import { createLogger } from '@pixelwar/shared/observability/logger';
 import { createFunctionTelemetry, type FunctionTelemetry } from '@pixelwar/shared/observability/function';
-import { InvalidDrawRequest, MAX_BODY_BYTES, parseDrawBody, webDrawEvent } from './request';
+import { InvalidDrawRequest, MAX_BODY_BYTES, parseDrawBody, webDrawEvents } from './request';
 import { createDrawPublisher, type PublishDraw } from './publisher';
 
 const ROUTE = '/api/pixels';
@@ -57,26 +57,30 @@ export function createWebProxyHandler(options: Options): HttpFunction {
     if (!Buffer.isBuffer(body) || body.length < 1 || body.length > MAX_BODY_BYTES) {
       refuse('invalid_body_size'); res.status(413).json({ error: 'invalid_body_size' }); return;
     }
-    let event;
-    try { event = webDrawEvent(parseDrawBody(body), identity, now(), options.newId); } catch (error) {
+    let stroke;
+    try { stroke = webDrawEvents(parseDrawBody(body), identity, now(), options.newId); } catch (error) {
       const reason = error instanceof InvalidDrawRequest ? error.reason : 'invalid_body';
       refuse(reason); res.status(400).json({ error: reason }); return;
     }
 
     try {
-      await telemetry.request(event.correlation_id, async (operation) => {
+      await telemetry.request(stroke.correlation_id, async (operation) => {
         operation.source('web');
         operation.outcome('error', 'publish');
-        await options.publish!(event, operation.attributes());
+        const attributes = operation.attributes();
+        // Wait for every publication, failed or not: no work may remain after the response.
+        const results = await Promise.allSettled(stroke.events.map((event) => options.publish!(event, attributes)));
+        if (results.some((result) => result.status === 'rejected')) throw new Error('Publication failed');
         operation.outcome('published');
-        operation.log('INFO', 'Web draw published.', 'web.proxy.published');
+        operation.log('INFO', 'Web stroke published.', 'web.proxy.published');
       }, 'web.pixels.draw');
     } catch {
-      // Never log the SDK Error: it may carry the message. A timeout leaves the outcome uncertain.
-      log('ERROR', 'Web draw publication failed; delivery may be uncertain.', { event_type: 'web.proxy.publish_failed' });
+      // Never log the SDK Error: it may carry the message. Some pixels may already be published,
+      // and a timeout leaves the outcome uncertain: they stay valid (ADR-0014).
+      log('ERROR', 'Web stroke publication failed; some pixels may be published.', { event_type: 'web.proxy.publish_failed' });
       res.status(503).json({ error: 'publish_unavailable' }); return;
     }
-    res.status(202).json({ event_id: event.event_id, correlation_id: event.correlation_id });
+    res.status(202).json({ correlation_id: stroke.correlation_id, event_ids: stroke.events.map((event) => event.event_id) });
   };
 }
 

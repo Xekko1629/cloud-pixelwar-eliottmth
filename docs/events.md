@@ -108,9 +108,11 @@ Le `command-worker` revalide le message de bout en bout : `event_id`, `correlati
 
 ### 3.2 `pixel-draw`
 
+Un message = un pixel ([ADR-0014](adr/0014-un-evenement-par-pixel.md), consigne de l'encadrant du 20/11) : `pixels` contient **exactement un** élément. Le tableau est conservé pour garder le contrat de DATA-02 ; un message avec 0 ou plusieurs pixels est invalide (`400`, puis DLQ). Un trait de brush devient une rafale d'événements unitaires.
+
 | Champ | Type | Obligatoire | Contrainte | Origine |
 |---|---|---|---|---|
-| `pixels` | array | oui | De 1 à 500 éléments | `DEFAULT_MAX_BATCH_PIXELS = 500` (`app/shared/src/grid/constants.ts`) ; ADR-0007 (« 500 par défaut, configurable ») |
+| `pixels` | array | oui | Exactement 1 élément (ADR-0014) | `DEFAULT_MAX_BATCH_PIXELS = 500` (`app/shared/src/grid/constants.ts`) ; ADR-0007 (« 500 par défaut, configurable ») |
 | `pixels[].x` | entier | oui | De -1 000 000 000 à 1 000 000 000 | ADR-0007 ; `COORDINATE_LIMIT` (`constants.ts`) |
 | `pixels[].y` | entier | oui | Idem `x` | Idem |
 | `pixels[].color` | entier | oui | De 1 à 16 : index dans la palette. `0` (non peint) est interdit. | ADR-0007 ; `assertColor` (`constants.ts`) |
@@ -119,13 +121,13 @@ Le `command-worker` revalide le message de bout en bout : `event_id`, `correlati
 Identifiants :
 
 - Pour `source = discord`, le `command-worker` reprend l'`event_id`, le `correlation_id` et l'`occurred_at` du `discord-command`. Un `discord-command` relivré produit donc le même `pixel-draw`, que DATA-02 déduplique par `event_id`. Le `draw-worker` vérifie que l'`event_id` correspond bien à `discord.interaction_id`, et que `occurred_at` est la date du snowflake.
-- Pour `source = web`, le `web-proxy` (DRAW-01) génère un `event_id` neuf (UUID v4) par requête, repris comme `correlation_id`, et fixe `occurred_at` à son heure. Une requête renvoyée par le navigateur est donc un second dessin, sans changement visuel mais comptée deux fois dans le quota (`docs/web-proxy.md`).
+- Pour `source = web`, le `web-proxy` (DRAW-01) reçoit de 1 à 500 pixels par requête et publie un message par pixel : un `event_id` neuf (UUID v4) par pixel, un `correlation_id` commun à toute la requête (le trait), et un `occurred_at` commun, à l'heure du proxy. Une requête renvoyée par le navigateur est donc un second trait, sans changement visuel mais comptée deux fois dans le quota (`docs/web-proxy.md`).
 - Le `pixel-draw` issu de `/draw` contient exactement un pixel.
 
 Contraintes complémentaires :
 
-- Pas deux fois la même coordonnée dans un lot. Le `web-proxy` la refuse avec `400 duplicate_pixel` ; le code partagé la refuse aussi (`app/shared/src/grid/batch.ts`), mais comme un message invalide.
-- Le nombre de pixels n'est pas un champ : il se dérive du tableau validé, jamais d'un compteur fourni par le client (`docs/rate-limits.md`, section « Contrat validé »).
+- Pas deux fois la même coordonnée dans une requête web : le `web-proxy` la refuse avec `400 duplicate_pixel`. Deux messages distincts peuvent en revanche viser la même coordonnée : la règle last-write-wins s'applique (section 8.1).
+- Le quota est évalué pixel par pixel (`pixel_count = 1`) : un trait plus long que le quota restant est accepté en partie, chaque pixel en trop recevant son propre `pixel-rejected` avec `rate_limit`. L'ordre de livraison n'étant pas garanti, les pixels acceptés ne sont pas forcément ceux du début du trait.
 - Le proxy valide les bornes fixes et la palette, et répond 400 sinon (DRAW-01). Il ne lit pas Firestore. Côté Discord, le `command-worker` fait la même validation. Le `draw-worker` laisse DATA-02 seul juge des coordonnées, de la palette et du lot : un pixel invalide qui arriverait malgré tout est un message invalide (`400`, puis DLQ), pas un rejet métier.
 - Le `canvas_version` n'est pas dans le payload : le worker le lit dans `config/global` au traitement, dans la transaction DATA-02 (ADR-0007 ; `docs/drawing-transactions.md`).
 

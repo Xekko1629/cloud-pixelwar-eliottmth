@@ -47,16 +47,23 @@ export function parseDrawBody(body: Buffer, maxPixels = DEFAULT_MAX_BATCH_PIXELS
   });
 }
 
+export interface WebStroke { correlation_id: string; events: WebDrawEvent[] }
+
 /**
- * A new event per request: an HTTP retry is a second draw (same colors, quota counted twice).
+ * ADR-0014: one pixel-draw event per pixel. Every event has its own event_id; the whole
+ * request (a brush stroke) shares one correlation_id and one occurred_at.
+ * New IDs per request: an HTTP retry is a second draw (same colors, quota counted twice).
  * The browser clock is never trusted: occurred_at is the proxy time (docs/web-proxy.md).
  */
-export function webDrawEvent(pixels: DrawPixel[], identity: GatewayIdentity, nowMs: number, newId: () => string = randomUUID): WebDrawEvent {
-  const eventId = newId();
+export function webDrawEvents(pixels: DrawPixel[], identity: GatewayIdentity, nowMs: number, newId: () => string = randomUUID): WebStroke {
+  const correlationId = newId();
+  const occurredAt = new Date(nowMs).toISOString();
+  const actor = { uid: identity.uid, name: Array.from(identity.name).slice(0, MAX_AUTHOR_NAME).join('') };
   return {
-    schema_version: 1, type: 'pixel-draw', event_id: eventId, correlation_id: eventId,
-    occurred_at: new Date(nowMs).toISOString(), source: 'web',
-    actor: { uid: identity.uid, name: Array.from(identity.name).slice(0, MAX_AUTHOR_NAME).join('') },
-    payload: { pixels },
+    correlation_id: correlationId,
+    events: pixels.map((pixel) => ({
+      schema_version: 1, type: 'pixel-draw', event_id: newId(), correlation_id: correlationId,
+      occurred_at: occurredAt, source: 'web', actor: { ...actor }, payload: { pixels: [{ ...pixel }] },
+    })),
   };
 }

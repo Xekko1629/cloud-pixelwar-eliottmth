@@ -31,7 +31,8 @@ describe('web-proxy through the real Functions Framework', () => {
     const result = await send(' { "pixels" : [ { "x" : 1, "y" : -2, "color" : 3 } ] } ');
     expect(result.status).toBe(202);
     const answer = await result.json();
-    expect(answer.correlation_id).toBe(answer.event_id);
+    expect(answer.event_ids).toHaveLength(1);
+    expect(answer.event_ids[0]).not.toBe(answer.correlation_id);
     expect(result.headers.get('access-control-allow-origin')).toBe(ORIGIN);
     expect(publish).toHaveBeenCalledTimes(1);
     expect(publish.mock.calls[0][0].payload).toEqual({ pixels: [{ x: 1, y: -2, color: 3 }] });
