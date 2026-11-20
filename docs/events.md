@@ -119,12 +119,12 @@ Le `command-worker` revalide le message de bout en bout : `event_id`, `correlati
 Identifiants :
 
 - Pour `source = discord`, le `command-worker` reprend l'`event_id`, le `correlation_id` et l'`occurred_at` du `discord-command`. Un `discord-command` relivré produit donc le même `pixel-draw`, que DATA-02 déduplique par `event_id`. Le `draw-worker` vérifie que l'`event_id` correspond bien à `discord.interaction_id`, et que `occurred_at` est la date du snowflake.
-- Pour `source = web`, le `web-proxy` (DRAW-01) génère l'`event_id` (UUID) et le `correlation_id`. Une requête rejouée par le navigateur doit porter le même `event_id` pour être dédupliquée : le mécanisme est à définir dans DRAW-01.
+- Pour `source = web`, le `web-proxy` (DRAW-01) génère un `event_id` neuf (UUID v4) par requête, repris comme `correlation_id`, et fixe `occurred_at` à son heure. Une requête renvoyée par le navigateur est donc un second dessin, sans changement visuel mais comptée deux fois dans le quota (`docs/web-proxy.md`).
 - Le `pixel-draw` issu de `/draw` contient exactement un pixel.
 
 Contraintes complémentaires :
 
-- Pas deux fois la même coordonnée dans un lot. Le code partagé la refuse (`app/shared/src/grid/batch.ts`, « Duplicate coordinate in draw batch »). Le niveau qui la refuse, proxy (400) ou worker, est **À valider**.
+- Pas deux fois la même coordonnée dans un lot. Le `web-proxy` la refuse avec `400 duplicate_pixel` ; le code partagé la refuse aussi (`app/shared/src/grid/batch.ts`), mais comme un message invalide.
 - Le nombre de pixels n'est pas un champ : il se dérive du tableau validé, jamais d'un compteur fourni par le client (`docs/rate-limits.md`, section « Contrat validé »).
 - Le proxy valide les bornes fixes et la palette, et répond 400 sinon (DRAW-01). Il ne lit pas Firestore. Côté Discord, le `command-worker` fait la même validation. Le `draw-worker` laisse DATA-02 seul juge des coordonnées, de la palette et du lot : un pixel invalide qui arriverait malgré tout est un message invalide (`400`, puis DLQ), pas un rejet métier.
 - Le `canvas_version` n'est pas dans le payload : le worker le lit dans `config/global` au traitement, dans la transaction DATA-02 (ADR-0007 ; `docs/drawing-transactions.md`).
@@ -433,7 +433,7 @@ Décisions que les sources ne tranchent pas. Chacune est à valider avant SRV-05
 4. **Publication fiable du résultat après commit.** `docs/rate-limits.md` indique que ce point reste ouvert : le résultat stocké doit être republié si le commit a réussi mais que la publication a échoué.
 5. **Horizon de déduplication.** `docs/rate-limits.md` fixe un horizon de rejeu de 7 jours, ADR-0008 parle de 15 jours pour le bucket de sources. Les deux chiffres sont à aligner avec la rétention Pub/Sub (7 jours).
 6. ~~**Motif `out_of_bounds`.**~~ Tranché par DATA-02 : motif de `pixel-rejected` à part entière (section 3.3). La liste des motifs de métrique de `docs/observability.md` reste à aligner.
-7. **Coordonnée en double dans un lot** : refusée par le proxy (400) ou par le worker (`pixel-rejected`) ?
+7. ~~**Coordonnée en double dans un lot.**~~ Tranché par DRAW-01 : refusée par le proxy (`400`, section 3.2).
 8. ~~**`canvas_version`.**~~ Tranché par DATA-02 : lu dans `config/global` pendant la transaction (section 3.2).
 9. **Régions marquées** pour la vue éloignée : collection, format, remise à zéro, et déclencheur de la régénération complète après `/admin clear` (DATA-05c).
 10. **Noms** : topic `overview-tick`, consommateur de marquage, et adoption de la convention de nommage des abonnements (section 7.1).

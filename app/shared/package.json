@@ -9,7 +9,8 @@
     "./observability/google": "./src/observability/google.ts",
     "./grid": "./src/grid/index.ts",
     "./events": "./src/events/index.ts",
-    "./drawing": "./src/drawing/index.ts"
+    "./drawing": "./src/drawing/index.ts",
+    "./gateway": "./src/gateway/index.ts"
   },
   "dependencies": {
     "@google-cloud/firestore": "9.4.0",
