@@ -203,6 +203,27 @@ mémoire pour obtenir un token d'installation GitHub de courte durée avec
 `actions/create-github-app-token`. Cela ne donne pas aux fonctions applicatives
 accès au secret.
 
+## Contrôle « rien de public » (SEC-01)
+
+Après chaque déploiement d'un environnement, `_no-public.yml` lance
+`scripts/check-no-public.sh` avec l'identité de lecture (`<env>-plan`). Le job
+échoue si :
+
+- un service Cloud Run, fonctions gen2 comprises, accorde un rôle à `allUsers` ou
+  `allAuthenticatedUsers`. Seul `frontend` est autorisé (ADR-0011) ; la liste se
+  règle avec `PUBLIC_RUN_SERVICES` ;
+- un bucket accorde un rôle à `allUsers` ou `allAuthenticatedUsers` ;
+- un bucket n'a pas `public_access_prevention = enforced`. Seuls les buckets de
+  staging gérés par Cloud Functions (`gcf-v2-sources-*`, `gcf-v2-uploads-*`),
+  hors Terraform, peuvent hériter de ce réglage.
+
+Une erreur de lecture fait aussi échouer le job. En dev, un échec bloque la
+release vers prd. Pour vérifier à la main :
+
+```sh
+scripts/check-no-public.sh cloud-pixelwar-dev
+```
+
 ## Vérification, concurrence et diagnostic
 
 - Chaque apply/destroy est sérialisé par environnement **et stack**, sans

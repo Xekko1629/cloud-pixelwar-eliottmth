@@ -44,3 +44,7 @@ jobs:
       - name: Gateway migration guard regression tests
         if: matrix.stack == 'gateway'
         run: python3 ../../scripts/tests/test_gateway_migration.py
+
+      - name: No-public check regression tests (SEC-01)
+        if: matrix.stack == 'iam'
+        run: python3 ../../scripts/tests/test_no_public.py
