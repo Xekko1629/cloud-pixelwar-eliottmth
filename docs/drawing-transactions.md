@@ -78,11 +78,11 @@ Il ne s'agit pas d'une garantie de livraison « exactement une fois ».
 - Budgets par défaut : 450 documents écrits et estimation de 8 Mio par transaction.
   L'estimation n'est pas une mesure exacte du protobuf envoyé à Firestore.
 
-`app/firestore.indexes.json` déclare les politiques TTL sur `expire_at` pour
-`processed_events` et `deltas`, ainsi que les exemptions d'index des données
-binaires et du résultat. Écrire le champ ne suffit pas : la politique doit être
-déployée séparément par une identité autorisée, avec la configuration Firestore
-de SRV-06. Aucun déploiement de ces politiques n'est impliqué par les tests locaux.
+`infra/serverless/firestore.tf` (SRV-06) déclare les politiques TTL sur
+`expire_at` pour `processed_events` et `deltas`, ainsi que les exemptions d'index
+des données binaires, de `request_digest` et du résultat. Écrire le champ ne
+suffit pas : la politique doit être appliquée par une identité autorisée avec le
+stack serverless. Aucun déploiement de ces politiques n'est impliqué par les tests locaux.
 Le nettoyage TTL est asynchrone et n'est pas validé par l'émulateur.
 
 ## Tests locaux

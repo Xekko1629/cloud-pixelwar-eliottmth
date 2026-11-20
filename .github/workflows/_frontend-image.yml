@@ -1,0 +1,104 @@
+name: Frontend image
+
+# Builds the frontend image once per commit as an OCI archive (ADR-0011), tests the
+# running container, and uploads the archive. Each environment then pushes these same
+# bytes (skopeo --preserve-digests in _apply.yml): dev and prd run the same digest.
+# GitHub-hosted runner: the ARC runners have no Docker daemon. No cloud credential here.
+
+on:
+  workflow_call:
+    outputs:
+      digest:
+        description: Manifest digest of the image (sha256:...), identical in every registry
+        value: ${{ jobs.build.outputs.digest }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      digest: ${{ steps.digest.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Reproducible timestamps: rebuilding the same commit gives the same layers.
+      - name: Build the OCI archive
+        run: |
+          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
+          docker buildx build \
+            --platform linux/amd64 \
+            --provenance=false --sbom=false \
+            --output "type=oci,dest=frontend.tar,rewrite-timestamp=true" \
+            -f app/frontend/Dockerfile app
+
+      # Single-platform archive without attestations: index.json lists the image manifest.
+      - name: Read the manifest digest
+        id: digest
+        run: |
+          digest="$(tar -xOf frontend.tar index.json | jq -r '.manifests | if length == 1 then .[0].digest else error("expected one manifest") end')"
+          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]] || { echo "::error::Unexpected digest '$digest'"; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "Frontend image digest: \`$digest\`" >> "$GITHUB_STEP_SUMMARY"
+
+      # Run the image as Cloud Run does (non-root, port 8080) and check its contract.
+      - name: Test the container
+        run: |
+          docker buildx build --platform linux/amd64 --load -t pixelwar-frontend:test -f app/frontend/Dockerfile app
+
+          docker run -d --name frontend -p 8080:8080 --user 101 \
+            -e APP_ENV=dev -e GATEWAY_URL=https://pixelwar-test.ew.gateway.dev \
+            -e DISCORD_CLIENT_ID=1234567890123456789 pixelwar-frontend:test
+          for _ in $(seq 1 30); do curl -fs -o /dev/null http://127.0.0.1:8080/ && break; sleep 1; done
+
+          set -x
+          config="$(curl -fsS http://127.0.0.1:8080/config.js)"
+          grep -q '"environment":"dev"' <<<"$config"
+          grep -q '"gatewayUrl":"https://pixelwar-test.ew.gateway.dev"' <<<"$config"
+          grep -q '"realtimeUrl":""' <<<"$config"
+          curl -fsSI http://127.0.0.1:8080/config.js | grep -qi '^cache-control: no-store'
+
+          # SPA fallback and security headers
+          curl -fsS http://127.0.0.1:8080/auth/callback | grep -q '<div id="root">'
+          headers="$(curl -fsSI http://127.0.0.1:8080/)"
+          grep -qi "^content-security-policy: .*connect-src 'self' https://pixelwar-test.ew.gateway.dev" <<<"$headers"
+          grep -qi '^cache-control: no-cache' <<<"$headers"
+          grep -qi '^x-content-type-options: nosniff' <<<"$headers"
+          if grep -qi '^server: nginx/' <<<"$headers"; then echo "::error::nginx version disclosed"; exit 1; fi
+
+          # Hashed assets are cached; a missing asset is a 404, not index.html
+          asset="$(curl -fsS http://127.0.0.1:8080/ | grep -o '/assets/[^"]*\.js' | head -1)"
+          curl -fsSI "http://127.0.0.1:8080$asset" | grep -qi '^cache-control: public, max-age=31536000, immutable'
+          [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/assets/missing.js)" = 404 ]
+          docker rm -f frontend
+
+          # An invalid or injectable configuration must stop the container (non-zero exit),
+          # not start nginx: a container still running after 20 s fails the test.
+          expect_refused() {
+            id="$(docker run -d --user 101 "$@" pixelwar-frontend:test)"
+            code="$(timeout 20 docker wait "$id" || echo running)"
+            docker logs "$id" 2>&1 | tail -3
+            docker rm -f "$id" > /dev/null
+            if [ "$code" = running ] || [ "$code" = 0 ]; then
+              echo "::error::The container accepted: $*"; exit 1
+            fi
+          }
+          expect_refused -e APP_ENV=dev -e "GATEWAY_URL=https://x.dev'; alert(1)"
+          expect_refused -e APP_ENV=dev -e GATEWAY_URL=http://pixelwar.example.com
+          expect_refused -e APP_ENV=staging
+          expect_refused -e APP_ENV=dev -e DISCORD_CLIENT_ID=abc
+
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs frontend 2>&1 || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-image
+          path: frontend.tar
+          if-no-files-found: error
+          retention-days: 7

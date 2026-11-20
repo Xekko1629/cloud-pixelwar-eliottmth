@@ -37,11 +37,16 @@ locals {
     path => [for operation in local.operations : operation if operation.path == path]
   }
 
+  session_issuer   = "${var.session_signer_account_id}@${var.project_id}.iam.gserviceaccount.com"
+  session_audience = coalesce(var.session_audience, var.project_id)
+
   openapi = templatefile("${path.module}/openapi.yaml.tftpl", {
     title = var.api_id
     paths = local.paths
-    # Firebase ID tokens of this project (ADR-0005): the Firebase project ID is the GCP project ID.
-    firebase_project_id = var.project_id
+    # Session JWTs of this environment (ADR-0012): signed by the session signer service
+    # account through IAM Credentials signJwt, so Google holds and rotates the keys.
+    session_issuer   = local.session_issuer
+    session_audience = local.session_audience
   })
 }
 

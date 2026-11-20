@@ -1,7 +1,7 @@
 locals {
-  # Route catalogue of the single public entry point (subject §3.1, ADR-0005).
+  # Route catalogue of the single public entry point (subject §3.1, ADR-0012).
   # A route is published once its backend is listed in local.gateway_backends.
-  # auth defaults to "firebase" (ID token validated by the gateway, ADR-0005): a public
+  # auth defaults to "session" (session JWT validated by the gateway, ADR-0012): a public
   # route must say auth = "none". cors = true adds the OPTIONS preflight route.
   gateway_routes = [
     {
@@ -30,7 +30,7 @@ locals {
       method       = "post"
       backend      = "auth"
       operation_id = "authExchange"
-      summary      = "Exchange the Discord code for a Firebase custom token"
+      summary      = "Exchange the Discord code for a session JWT"
       auth         = "none"
       cors         = true
     },
@@ -44,7 +44,7 @@ locals {
     },
     {
       # Temporary end-to-end check of the C05 checklist (SRV-09, #39): called through
-      # the gateway with authentication, hence the default Firebase auth.
+      # the gateway with authentication, hence the default session auth.
       path         = "/hello"
       method       = "get"
       backend      = "hello"

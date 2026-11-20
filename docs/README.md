@@ -9,6 +9,7 @@
 - [Création, alimentation et rotation des secrets](../infra/iam/SECRETS.md)
 - [Déploiement du stack serverless](../infra/serverless/README.md)
 - [Gateway, contrat des backends et migration des states](../infra/gateway/README.md)
+- [Frontend : image, configuration et service Cloud Run](../infra/frontend/README.md)
 
 ## Développement et intégration
 
@@ -24,6 +25,7 @@
 - [Écriture transactionnelle et idempotence — DATA-02](drawing-transactions.md)
 - [Draw worker : consommation, dessin et publication des résultats](draw-worker.md)
 - [Notifier Discord : réponse au dessin, doublons et expiration](discord-notifier.md)
+- [Catalogue des événements Pub/Sub](events.md)
 - [Instrumentation et validation de l'observabilité](observability.md)
 
 ## Architecture et modules

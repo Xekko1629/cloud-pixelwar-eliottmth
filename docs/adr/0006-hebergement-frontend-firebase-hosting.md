@@ -1,6 +1,6 @@
 # ADR-0006 · Hébergement du frontend : Firebase Hosting
 
-- **Statut** : Accepté
+- **Statut** : Remplacé par [ADR-0011](0011-frontend-image-cloud-run.md)
 - **Date** : 2026-10-23
 - **Tickets** : ARCH-01 (#26). Utilisé par WEB-01, SEC-01, SRV-02.
 - **Références** : Sujet §3.4, §2.2 · C06 §4.1 · C07 §3.1, §5

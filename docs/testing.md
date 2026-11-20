@@ -51,8 +51,10 @@ fictif `demo-pixelwar-test` et les endpoints loopback sont contrôlés avant la
 construction des clients SDK pour éviter de cibler GCP. Chaque test utilise des
 IDs uniques et nettoie ses ressources. Les règles Firestore locales refusent les
 accès clients : les SDK serveur d'intégration passent par l'accès administrateur
-de l'émulateur. Ce fichier n'est pas une implémentation des règles de production
-et ne doit pas être déployé avec `firebase deploy`.
+de l'émulateur. La production n'a pas de règles : aucun client ne parle à Firestore
+(ADR-0013) et l'accès passe uniquement par IAM. Ce fichier ne doit pas être
+déployé avec `firebase deploy`. Les index et TTL de production sont dans
+`infra/serverless/firestore.tf` ; l'émulateur ne les applique pas.
 
 ## Ajouter des tests
 
