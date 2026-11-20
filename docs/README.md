@@ -23,6 +23,7 @@
 - [Command worker : routage, autorisation et relivraisons](command-worker.md)
 - [Contrat du calcul des quotas utilisateur](rate-limits.md)
 - [Écriture transactionnelle et idempotence — DATA-02](drawing-transactions.md)
+- [Draw worker : consommation, dessin et publication des résultats](draw-worker.md)
 - [Catalogue des événements Pub/Sub](events.md)
 - [Instrumentation et validation de l'observabilité](observability.md)
 
