@@ -1,0 +1,10 @@
+{
+  "name": "@pixelwar/function-auth-proxy",
+  "private": true,
+  "type": "module",
+  "pixelwar": { "entryPoint": "handleAuthProxy" },
+  "dependencies": {
+    "@google-cloud/functions-framework": "5.0.5",
+    "@pixelwar/shared": "*"
+  }
+}

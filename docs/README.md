@@ -30,6 +30,7 @@
 ## Architecture et modules
 
 - [Architecture et frontières de sécurité](architecture.md)
+- [Identités et rôles IAM](iam.md)
 - [Décisions d'architecture et règles de rédaction](adr/README.md)
 - [Module Cloud Run function](../infra/serverless/modules/function/README.md)
 - [Module API Gateway](../infra/serverless/modules/api-gateway/README.md)

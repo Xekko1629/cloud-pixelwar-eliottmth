@@ -35,7 +35,8 @@ génère `/config.js` :
 | --- | --- | --- |
 | `APP_ENV` | `environment` | `dev` ou `prd` |
 | `GATEWAY_URL` | output `gateway_url` du stack `gateway` | origine https, ou vide |
-| `REALTIME_URL` | variable `realtime_url` (DRAW-06) | origine https, ou vide |
+| `FIRESTORE_PROJECT_ID` | `project_id` | id de projet GCP |
+| `FIRESTORE_API_KEY` | variable `firestore_api_key` (DRAW-03a, ADR-0015) | clé d'API Google, ou vide |
 | `DISCORD_CLIENT_ID` | variable `discord_client_id` (WEB-02b) | snowflake Discord, ou vide |
 
 Une valeur invalide arrête le conteneur : la révision Cloud Run ne démarre pas, au
@@ -45,11 +46,12 @@ aucun secret ne passe par ce stack.
 ## Sécurité
 
 - Compte de service `frontend` **sans aucun rôle**.
-- `roles/run.invoker` pour `allUsers` sur ce service uniquement : c'est l'une des
-  deux exceptions publiques acceptées (avec `realtime`, ADR-0013), listées par
-  SEC-01. Le service ne relaie aucune API : tous les appels passent par la gateway.
-- En-têtes : `Content-Security-Policy` limitée à la gateway, au flux temps réel et
-  aux avatars Discord, `Strict-Transport-Security`, `X-Content-Type-Options`,
+- `roles/run.invoker` pour `allUsers` sur ce service uniquement : c'est la seule
+  exception publique acceptée (ADR-0011, ADR-0015), listée par SEC-01. Le service
+  ne relaie aucune API : tous les appels passent par la gateway, sauf les
+  listeners Firestore en lecture seule (ADR-0015).
+- En-têtes : `Content-Security-Policy` limitée à la gateway, à Firestore
+  (`https://firestore.googleapis.com`) et aux avatars Discord, `Strict-Transport-Security`, `X-Content-Type-Options`,
   `Referrer-Policy`, version de nginx masquée.
 
 ## Vérification
@@ -62,8 +64,8 @@ curl -s "$(terraform -chdir=infra/frontend output -raw frontend_url)/config.js"
 ```
 
 En local, `npm run dev --workspace=@pixelwar/frontend` (dans `app/`) sert l'application
-avec un `/config.js` construit depuis `GATEWAY_URL`, `REALTIME_URL` et
-`DISCORD_CLIENT_ID` du shell.
+avec un `/config.js` construit depuis `GATEWAY_URL`, `FIRESTORE_PROJECT_ID`,
+`FIRESTORE_API_KEY` et `DISCORD_CLIENT_ID` du shell.
 
 ## Destroy
 
