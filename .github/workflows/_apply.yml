@@ -79,6 +79,31 @@ jobs:
           client-id: ${{ steps.github_app.outputs.client_id }}
           private-key: ${{ steps.github_app.outputs.private_key }}
 
+      # infra/frontend deploys the image built once for this commit (_frontend-image.yml):
+      # the same OCI archive is pushed to each environment with its digest preserved.
+      - uses: actions/download-artifact@v4
+        if: inputs.stack == 'frontend'
+        with:
+          name: frontend-image
+          path: ${{ runner.temp }}/frontend-image
+
+      - name: Push the frontend image
+        if: inputs.stack == 'frontend'
+        working-directory: ${{ runner.temp }}/frontend-image
+        run: |
+          registry="europe-west1-docker.pkg.dev"
+          repository="$registry/$GOOGLE_CLOUD_PROJECT/pixelwar/frontend"
+          digest="$(tar -xOf frontend.tar index.json | jq -r '.manifests[0].digest')"
+          command -v skopeo > /dev/null || { sudo apt-get update -q && sudo apt-get install -y -q skopeo; }
+          gcloud auth print-access-token | skopeo login --username oauth2accesstoken --password-stdin "$registry"
+          skopeo copy --preserve-digests "oci-archive:frontend.tar" "docker://$repository:$GITHUB_SHA"
+          pushed="$(skopeo inspect --format '{{.Digest}}' "docker://$repository:$GITHUB_SHA")"
+          if [ "$pushed" != "$digest" ]; then
+            echo "::error::Pushed digest $pushed differs from the built $digest"; exit 1
+          fi
+          echo "TF_VAR_image=$repository@$digest" >> "$GITHUB_ENV"
+          echo "Frontend image: \`$repository@$digest\`" >> "$GITHUB_STEP_SUMMARY"
+
       # infra/serverless zips app/dist/functions/<name> (modules/function-source, ADR-0009).
       - uses: actions/setup-node@v4
         if: inputs.stack == 'serverless'

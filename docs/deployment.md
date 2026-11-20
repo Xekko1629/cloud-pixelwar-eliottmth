@@ -39,6 +39,7 @@ identifier la permission et la ressource concernées.
 | `bootstrap` | Sources des fonctions, registre interne et identité de build | CI | `iam` | Non |
 | `serverless` | Archives, fonctions et intégrations déclarées | CI | `foundation`, `bootstrap`, versions de secrets utilisées | Oui |
 | `gateway` | API, configurations, Gateway et IAM d'invocation des proxies | CI | Contrat d'outputs d'un apply `serverless` réussi | Oui, avant `serverless` |
+| `frontend` | Service Cloud Run du frontend, son identité et son accès public | CI | `bootstrap` (dépôt d'images), state `gateway` | Oui, avant `gateway` |
 | `runners` | External Secrets, ARC et routage des jobs | CI, prd | Cluster foundation, identités et secret GitHub App | Oui, prd |
 
 Avant toute commande, contrôler les `<env>.tfvars` et `backends/<env>.hcl` de
@@ -176,8 +177,8 @@ mode d'adoption des secrets à la place de l'opérateur.
 ### 6. Déployer dev par la CI
 
 Vérifier la CI et les plans de la version choisie, puis faire valider l'opération.
-Le lancement manuel applique `foundation` et `bootstrap` en dev, puis `serverless`
-et enfin `gateway`, dans des states séparés.
+Le lancement manuel applique `foundation` et `bootstrap` en dev, puis `serverless`,
+`gateway` et enfin `frontend`, dans des states séparés.
 Il peut créer du réseau ou un cluster selon les variables : ce n'est pas une
 commande de déploiement d'une seule fonction.
 
@@ -274,8 +275,8 @@ Le workflow `Destroy` est manuel, avec environnement et confirmation saisie :
    commandes concernés avant de supprimer leurs backends.
 2. Dans **Actions → Destroy → Run workflow**, sélectionner la version relue,
    `dev` ou `prd`, puis saisir exactement le même nom dans `confirm`.
-3. Après validation explicite, lancer et vérifier les suppressions : `gateway`
-   avant `serverless`, `runners` (prd) en parallèle, puis `foundation`.
+3. Après validation explicite, lancer et vérifier les suppressions : `frontend`,
+   puis `gateway` avant `serverless`, `runners` (prd) en parallèle, puis `foundation`.
 4. Contrôler les restes effectifs : fonctions, clusters, disques, IP, équilibreurs,
    objets et ressources externes. Ne pas considérer un run vert comme un bilan
    automatique d'absence de coût.

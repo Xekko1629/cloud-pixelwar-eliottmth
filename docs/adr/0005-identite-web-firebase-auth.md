@@ -1,6 +1,6 @@
 # ADR-0005 · Identité web : OAuth2 Discord côté serveur, puis custom token Firebase
 
-- **Statut** : Accepté
+- **Statut** : Remplacé par [ADR-0012](0012-identite-web-jwt-session.md)
 - **Date** : 2026-10-23
 - **Tickets** : ARCH-01 (#26). Utilisé par SRV-04c, SRV-06, DRAW-01, WEB-02a, WEB-02b, DATA-03.
 - **Références** : Sujet §3.4 · C05 §3, §6 · C07 §3.2

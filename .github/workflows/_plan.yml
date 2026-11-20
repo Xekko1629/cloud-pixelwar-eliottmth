@@ -42,6 +42,22 @@ jobs:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.DEPLOYER_SA }}
 
+      # infra/frontend plans the image built for this commit by _frontend-image.yml.
+      # The planner never pushes: the digest is read from the archive, the image is only
+      # pushed by the apply.
+      - uses: actions/download-artifact@v4
+        if: inputs.stack == 'frontend'
+        with:
+          name: frontend-image
+          path: ${{ runner.temp }}/frontend-image
+
+      - name: Frontend image digest
+        if: inputs.stack == 'frontend'
+        working-directory: ${{ runner.temp }}/frontend-image
+        run: |
+          digest="$(tar -xOf frontend.tar index.json | jq -r '.manifests[0].digest')"
+          echo "TF_VAR_image=europe-west1-docker.pkg.dev/$GOOGLE_CLOUD_PROJECT/pixelwar/frontend@$digest" >> "$GITHUB_ENV"
+
       # infra/serverless zips app/dist/functions/<name> (modules/function-source, ADR-0009).
       - uses: actions/setup-node@v4
         if: inputs.stack == 'serverless'

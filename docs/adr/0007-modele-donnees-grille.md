@@ -62,7 +62,7 @@ La grille est infinie par défaut, mais un admin peut la borner, puis la rendre 
   - **couleurs** : un champ `Bytes` de 4 096 octets (un par pixel) et `updated_at`. C'est ce que charge le canvas. Une tuile absente est une tuile vide : le frontend n'a rien à télécharger ;
   - **métadonnées** : une map `pixels` indexée par la position locale `0..4095`, chaque entrée contenant `uid` (id Discord sous forme de chaîne), `name` (pseudo au moment de la modification), `at` (`occurred_at` en Timestamp Firestore) et `eid` (UUID d'événement sur 16 octets, pour départager deux événements de même horodatage). Elles ne sont chargées que lorsqu'on inspecte un pixel (WEB-04). Le champ `pixels` est exclu de l'indexation (exemption d'index), sinon chaque pixel compterait dans la limite de 40 000 entrées d'index et alourdirait chaque écriture.
 - Les deux documents portent le même identifiant `v{canvas_version}_{tx}_{ty}`, ainsi que `canvas_version`, `tx`, `ty`, `region` et `updated_at`. Le préfixe de version permet d'effacer toute la grille en temps constant, sans tout supprimer d'un coup (DATA-04). Sur une grille infinie, c'est la seule façon raisonnable d'effacer.
-- Le format binaire des deltas est décrit dans ADR-0003 ; les index composites et les exemptions de champs sont déclarés dans `app/firestore.indexes.json`.
+- Le format binaire des deltas est décrit dans ADR-0003 ; les index composites et les exemptions de champs sont déclarés dans `infra/serverless/firestore.tf` (déplacés depuis `app/firestore.indexes.json` par SRV-06).
 
 Pourquoi 64 :
 

@@ -1,6 +1,7 @@
 name: Deploy
 
-# Tag v*: foundation + bootstrap, then functions, then Gateway, dev before prd.
+# Tag v*: foundation + bootstrap, then functions, then Gateway, then frontend, dev before prd.
+# The frontend image is built once (frontend-image) and the same digest is deployed to both.
 # Runners prd only depend on foundation. Manual runs deploy dev only.
 # bootstrap (release artefacts) is applied here but never destroyed; iam and access are applied by hand.
 # Applies stay on GitHub-hosted runners, independent of the infrastructure being changed.
@@ -37,6 +38,9 @@ jobs:
     uses: ./.github/workflows/_test.yml
     with:
       runner: ${{ inputs.runner }}
+
+  frontend-image:
+    uses: ./.github/workflows/_frontend-image.yml
 
   apply-dev:
     needs: [fmt, lint, validate, test]
@@ -82,8 +86,19 @@ jobs:
       stack: gateway
       runner: ubuntu-latest
 
+  apply-frontend-dev:
+    needs: [apply-gateway-dev, frontend-image]
+    uses: ./.github/workflows/_apply.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: dev
+      stack: frontend
+      runner: ubuntu-latest
+
   apply-prd:
-    needs: apply-gateway-dev
+    needs: apply-frontend-dev
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/_apply.yml
     permissions:
@@ -95,7 +110,7 @@ jobs:
       runner: ubuntu-latest
 
   apply-bootstrap-prd:
-    needs: apply-gateway-dev
+    needs: apply-frontend-dev
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/_apply.yml
     permissions:
@@ -138,4 +153,15 @@ jobs:
     with:
       environment: prd
       stack: gateway
+      runner: ubuntu-latest
+
+  apply-frontend-prd:
+    needs: [apply-gateway-prd, frontend-image]
+    uses: ./.github/workflows/_apply.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: prd
+      stack: frontend
       runner: ubuntu-latest

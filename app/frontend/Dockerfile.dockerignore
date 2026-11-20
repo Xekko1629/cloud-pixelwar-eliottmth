@@ -1,0 +1,14 @@
+# Build context is app/: send the workspace manifests and the frontend sources only.
+**/node_modules
+**/dist
+**/coverage
+**/test-results
+**/.env
+**/.env.*
+**/*.test.ts
+**/*.test.tsx
+functions/*/src
+tools
+testing
+frontend/Dockerfile
+frontend/Dockerfile.dockerignore
