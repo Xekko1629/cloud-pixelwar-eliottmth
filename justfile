@@ -58,6 +58,11 @@ fmt:
 lint:
     tflint --recursive --chdir=infra --config="{{justfile_directory()}}/.tflint.hcl"
 
+# Régénère le diagramme d'architecture (Graphviz + `pip install diagrams` : voir docs/architecture.md)
+# Avec --check : vérifie seulement qu'il correspond au code Terraform, comme la CI
+diagram *args:
+    {{ if os_family() == "windows" { "python" } else { "python3" } }} docs/architecture/diagram.py {{args}}
+
 # Cherche des secrets dans les fichiers indexés
 leaks:
     gitleaks git --pre-commit --staged --redact --no-banner

@@ -52,6 +52,7 @@ jobs:
 
           docker run -d --name frontend -p 8080:8080 --user 101 \
             -e APP_ENV=dev -e GATEWAY_URL=https://pixelwar-test.ew.gateway.dev \
+            -e FIRESTORE_PROJECT_ID=pixelwar-test-dev \
             -e DISCORD_CLIENT_ID=1234567890123456789 pixelwar-frontend:test
           for _ in $(seq 1 30); do curl -fs -o /dev/null http://127.0.0.1:8080/ && break; sleep 1; done
 
@@ -59,13 +60,14 @@ jobs:
           config="$(curl -fsS http://127.0.0.1:8080/config.js)"
           grep -q '"environment":"dev"' <<<"$config"
           grep -q '"gatewayUrl":"https://pixelwar-test.ew.gateway.dev"' <<<"$config"
-          grep -q '"realtimeUrl":""' <<<"$config"
+          grep -q '"firestoreProjectId":"pixelwar-test-dev"' <<<"$config"
+          grep -q '"firestoreApiKey":""' <<<"$config"
           curl -fsSI http://127.0.0.1:8080/config.js | grep -qi '^cache-control: no-store'
 
           # SPA fallback and security headers
           curl -fsS http://127.0.0.1:8080/auth/callback | grep -q '<div id="root">'
           headers="$(curl -fsSI http://127.0.0.1:8080/)"
-          grep -qi "^content-security-policy: .*connect-src 'self' https://pixelwar-test.ew.gateway.dev" <<<"$headers"
+          grep -qi "^content-security-policy: .*connect-src 'self' https://pixelwar-test.ew.gateway.dev https://firestore.googleapis.com;" <<<"$headers"
           grep -qi '^cache-control: no-cache' <<<"$headers"
           grep -qi '^x-content-type-options: nosniff' <<<"$headers"
           if grep -qi '^server: nginx/' <<<"$headers"; then echo "::error::nginx version disclosed"; exit 1; fi

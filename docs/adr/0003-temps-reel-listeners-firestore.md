@@ -1,6 +1,6 @@
 # ADR-0003 · Temps réel : listeners Firestore sur des deltas par région
 
-- **Statut** : Côté écriture accepté ; côté lecture (listeners dans le navigateur) remplacé par [ADR-0013](0013-lectures-temps-reel-sans-firebase.md)
+- **Statut** : Côté écriture accepté, avec un delta par transaction et par région au lieu d'un delta par lot ([ADR-0014](0014-un-evenement-par-pixel.md), proposé) ; côté lecture (listeners dans le navigateur) remplacé par [ADR-0013](0013-lectures-temps-reel-sans-firebase.md), puis repris sans Firebase Auth, avec des règles en lecture seule, par [ADR-0015](0015-temps-reel-listeners-firestore-navigateur.md), proposé
 - **Date** : 2026-10-23
 - **Tickets** : ARCH-01 (#26). Utilisé par DATA-01, DRAW-02, DRAW-03a, DRAW-03b, DRAW-04, WEB-03c, WEB-03d.
 - **Références** : Sujet §3.4 · C06 §4.4, §7 · C07 §3.3
