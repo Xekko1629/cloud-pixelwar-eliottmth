@@ -7,6 +7,38 @@ Les décisions détaillées sont dans [les ADR](adr/README.md) ; les modules et
 workflows versionnés déterminent les ressources déclarées pour une installation.
 Ce document décrit les responsabilités et contrats, pas un inventaire GCP.
 
+## Diagramme
+
+![Application serverless](architecture/pixelwar-application.png)
+
+![Socle, CI/CD et runners](architecture/pixelwar-plateforme.png)
+
+Le diagramme est écrit en code (`docs/architecture/diagram.py`, librairie
+`diagrams` et icônes officielles GCP). Chaque composant y est relié aux adresses
+Terraform qui l'implémentent, et son trait est déduit du code :
+
+- **trait plein** : toutes ses ressources sont déclarées dans Terraform ;
+- **pointillé gris, « prévu »** : au moins une ressource n'existe pas encore ;
+- **sans ressource** : élément externe ou service managé (Discord, GitHub,
+  navigateur, Cloud Logging/Monitoring/Trace).
+
+Contrôles :
+
+- la CI des PR (job `architecture diagram`) échoue si un composant déclaré dans
+  Terraform (fonction, topic, bucket, service Cloud Run, cluster, release Helm…)
+  n'est pas dessiné, ou si `architecture.json` n'est plus à jour ;
+- chaque release (tag `v*`) génère les images du code publié, jointes au run
+  Deploy en artefact ; aucun commit automatique.
+
+Mettre à jour : modifier `COMPONENTS` et `FLOWS` dans `diagram.py`, lancer
+`just diagram` puis commiter les PNG et `architecture.json`. Prérequis :
+[Graphviz](https://graphviz.org/download/) et `pip install diagrams==0.25.1`.
+`just diagram --check` ne demande que Python.
+
+« Déclaré dans Terraform » ne prouve pas qu'une ressource est appliquée dans un
+environnement : avant la soutenance, comparer aussi avec `terraform state list`
+de chaque stack en prd (DOC-02).
+
 ## Composants et frontières
 
 | Composant | Responsabilité | Frontière |
