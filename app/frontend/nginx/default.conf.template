@@ -1,5 +1,5 @@
 # Rendered at container start by the nginx image (envsubst on /etc/nginx/templates).
-# Only APP_ENV, GATEWAY_URL, REALTIME_URL and DISCORD_CLIENT_ID are substituted
+# Only APP_ENV, GATEWAY_URL, FIRESTORE_PROJECT_ID, FIRESTORE_API_KEY and DISCORD_CLIENT_ID are substituted
 # (NGINX_ENVSUBST_FILTER in the Dockerfile); nginx variables such as $uri stay untouched.
 # The values are checked first by /docker-entrypoint.d/05-check-config.envsh.
 #
@@ -19,7 +19,7 @@ server {
         default_type application/javascript;
         add_header Cache-Control "no-store" always;
         add_header X-Content-Type-Options "nosniff" always;
-        return 200 'window.__PIXELWAR_CONFIG__ = {"environment":"${APP_ENV}","gatewayUrl":"${GATEWAY_URL}","realtimeUrl":"${REALTIME_URL}","discordClientId":"${DISCORD_CLIENT_ID}"};\n';
+        return 200 'window.__PIXELWAR_CONFIG__ = {"environment":"${APP_ENV}","gatewayUrl":"${GATEWAY_URL}","firestoreProjectId":"${FIRESTORE_PROJECT_ID}","firestoreApiKey":"${FIRESTORE_API_KEY}","discordClientId":"${DISCORD_CLIENT_ID}"};\n';
     }
 
     # Hashed file names: cached for a year, never revalidated.
@@ -32,7 +32,7 @@ server {
     # Single-page application: every other route, /auth/callback included, gets index.html.
     location / {
         add_header Cache-Control "no-cache" always;
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://cdn.discordapp.com; connect-src 'self' ${GATEWAY_URL} ${REALTIME_URL}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://cdn.discordapp.com; connect-src 'self' ${GATEWAY_URL} https://firestore.googleapis.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" always;
         add_header Strict-Transport-Security "max-age=31536000" always;
         add_header X-Content-Type-Options "nosniff" always;
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;

@@ -12,7 +12,8 @@ function localConfig(): Plugin {
         const config = {
           environment: 'local',
           gatewayUrl: process.env.GATEWAY_URL ?? '',
-          realtimeUrl: process.env.REALTIME_URL ?? '',
+          firestoreProjectId: process.env.FIRESTORE_PROJECT_ID ?? '',
+          firestoreApiKey: process.env.FIRESTORE_API_KEY ?? '',
           discordClientId: process.env.DISCORD_CLIENT_ID ?? '',
         };
         response.setHeader('Content-Type', 'application/javascript');

@@ -76,8 +76,36 @@ variable "discord_application_id_version" {
   }
 }
 
+variable "snapshot_retention_days" {
+  description = "Age in days after which /snapshot images are deleted; a V4 signed URL lives 7 days at most"
+  type        = number
+  default     = 7
+
+  validation {
+    condition     = var.snapshot_retention_days >= 1 && var.snapshot_retention_days <= 30 && floor(var.snapshot_retention_days) == var.snapshot_retention_days
+    error_message = "Keep snapshots between 1 and 30 whole days."
+  }
+}
+
 variable "firestore_deletion_protection" {
   description = "Refuse the deletion of the Firestore database (destroy then fails); false keeps destroy fully automatic"
   type        = bool
   default     = false
+}
+
+variable "enable_auth_proxy" {
+  description = "Deploy the auth-proxy (Discord login and session JWTs) and publish its routes on the gateway"
+  type        = bool
+  default     = false
+}
+
+variable "discord_oauth_client_secret_version" {
+  description = "Explicit numeric Secret Manager version of discord-oauth-client-secret for the auth-proxy"
+  type        = string
+  default     = "1"
+
+  validation {
+    condition     = can(regex("^[1-9][0-9]*$", var.discord_oauth_client_secret_version))
+    error_message = "Select an explicit numeric secret version, not latest."
+  }
 }

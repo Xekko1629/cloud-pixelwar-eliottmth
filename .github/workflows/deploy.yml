@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       runner:
-        description: Runner label (empty = RUNNER_LABEL variable, then ubuntu-latest)
+        description: Runner label (empty = RUNNER_MEDIUM variable, then ubuntu-latest)
         type: string
         default: ""
 
@@ -97,8 +97,19 @@ jobs:
       stack: frontend
       runner: ubuntu-latest
 
-  apply-prd:
+  # SEC-01: nothing public once dev is deployed (frontend excepted)
+  no-public-dev:
     needs: apply-frontend-dev
+    uses: ./.github/workflows/_no-public.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: dev
+
+  apply-prd:
+    # A public resource in dev blocks the release to prd
+    needs: [apply-frontend-dev, no-public-dev]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/_apply.yml
     permissions:
@@ -110,7 +121,8 @@ jobs:
       runner: ubuntu-latest
 
   apply-bootstrap-prd:
-    needs: apply-frontend-dev
+    # A public resource in dev blocks the release to prd
+    needs: [apply-frontend-dev, no-public-dev]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/_apply.yml
     permissions:
@@ -165,3 +177,34 @@ jobs:
       environment: prd
       stack: frontend
       runner: ubuntu-latest
+
+  no-public-prd:
+    needs: [apply-frontend-prd, apply-runners-prd]
+    uses: ./.github/workflows/_no-public.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: prd
+
+  # Architecture diagram of the released code, kept with the run (no commit, no write permission).
+  diagram:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Render the diagram
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q graphviz
+          pip install --quiet diagrams==0.25.1
+          python docs/architecture/diagram.py --check
+          python docs/architecture/diagram.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: architecture-${{ github.ref_name }}
+          path: |
+            docs/architecture/*.png
+            docs/architecture/architecture.json

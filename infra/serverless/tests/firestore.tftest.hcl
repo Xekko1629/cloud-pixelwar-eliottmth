@@ -84,10 +84,10 @@ run "ttl_and_index_exemptions" {
 
   assert {
     condition = (
-      length(google_firestore_field.main) == 5 &&
+      length(google_firestore_field.main) == 7 &&
       alltrue([for field in google_firestore_field.main : length(field.index_config) == 1 && length(field.index_config[0].indexes) == 0])
     )
-    error_message = "Binary, map and TTL fields are excluded from single-field indexing."
+    error_message = "Binary, map, TTL and deduplication fields are excluded from single-field indexing."
   }
 }
 

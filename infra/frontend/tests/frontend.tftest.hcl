@@ -2,6 +2,9 @@ mock_provider "google" {
   mock_resource "google_cloud_run_v2_service" {
     defaults = { uri = "https://frontend-abc-ew.a.run.app" }
   }
+  mock_data "google_project" {
+    defaults = { number = "123456789012" }
+  }
 }
 
 variables {
@@ -33,8 +36,11 @@ run "service_from_image_digest" {
   }
 
   assert {
-    condition     = output.discord_redirect_uri == "https://frontend-abc-ew.a.run.app/auth/callback"
-    error_message = "Expose the Discord redirect URI of this environment."
+    condition = (
+      output.frontend_url == "https://frontend-123456789012.europe-west1.run.app" &&
+      output.discord_redirect_uri == "https://frontend-123456789012.europe-west1.run.app/auth/callback"
+    )
+    error_message = "Expose the deterministic URL, the origin the auth-proxy allows and redirects to."
   }
 }
 
@@ -49,10 +55,11 @@ run "runtime_configuration" {
     condition = {
       for env in google_cloud_run_v2_service.frontend[0].template[0].containers[0].env : env.name => env.value
       } == {
-      APP_ENV           = "dev"
-      GATEWAY_URL       = "https://pixelwar-abc.ew.gateway.dev"
-      REALTIME_URL      = ""
-      DISCORD_CLIENT_ID = "1234567890123456789"
+      APP_ENV              = "dev"
+      GATEWAY_URL          = "https://pixelwar-abc.ew.gateway.dev"
+      FIRESTORE_PROJECT_ID = "pixelwar-test"
+      FIRESTORE_API_KEY    = ""
+      DISCORD_CLIENT_ID    = "1234567890123456789"
     }
     error_message = "The container gets the public configuration of its environment, and nothing else."
   }
@@ -118,12 +125,12 @@ run "reject_image_of_another_project" {
   expect_failures = [google_cloud_run_v2_service.frontend]
 }
 
-run "reject_realtime_url_with_path" {
+run "reject_malformed_firestore_api_key" {
   command = plan
 
   variables {
-    realtime_url = "https://realtime.example.run.app/stream"
+    firestore_api_key = "AIza-not-a-key\"; alert(1)"
   }
 
-  expect_failures = [var.realtime_url]
+  expect_failures = [var.firestore_api_key]
 }

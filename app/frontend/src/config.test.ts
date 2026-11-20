@@ -1,24 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import { loadConfig, parseConfig } from './config';
 
+const API_KEY = `AIza${'A1_-'.repeat(8)}xyz`;
+
 describe('parseConfig', () => {
   it('keeps a valid deployed configuration', () => {
     expect(parseConfig({
       environment: 'prd',
       gatewayUrl: 'https://pixelwar-abc.ew.gateway.dev/',
-      realtimeUrl: 'https://realtime-xyz-ew.a.run.app',
+      firestoreProjectId: 'team-cloudnative-prd',
+      firestoreApiKey: API_KEY,
       discordClientId: '1234567890123456789',
     })).toEqual({
       environment: 'prd',
       gatewayUrl: 'https://pixelwar-abc.ew.gateway.dev',
-      realtimeUrl: 'https://realtime-xyz-ew.a.run.app',
+      firestore: { projectId: 'team-cloudnative-prd', apiKey: API_KEY },
       discordClientId: '1234567890123456789',
     });
   });
 
   it('treats empty values as not yet deployed', () => {
-    expect(parseConfig({ environment: 'dev', gatewayUrl: '', realtimeUrl: '', discordClientId: '' })).toEqual({
-      environment: 'dev', gatewayUrl: null, realtimeUrl: null, discordClientId: null,
+    expect(parseConfig({
+      environment: 'dev', gatewayUrl: '', firestoreProjectId: '', firestoreApiKey: '', discordClientId: '',
+    })).toEqual({
+      environment: 'dev', gatewayUrl: null, firestore: null, discordClientId: null,
     });
   });
 
@@ -34,9 +39,17 @@ describe('parseConfig', () => {
     expect(parseConfig({ discordClientId: 123456 }).discordClientId).toBeNull();
   });
 
+  it('needs both a valid project id and a valid API key for Firestore', () => {
+    expect(parseConfig({ firestoreProjectId: 'team-cloudnative-dev' }).firestore).toBeNull();
+    expect(parseConfig({ firestoreApiKey: API_KEY }).firestore).toBeNull();
+    expect(parseConfig({ firestoreProjectId: 'Bad_Project', firestoreApiKey: API_KEY }).firestore).toBeNull();
+    expect(parseConfig({ firestoreProjectId: 'team-cloudnative-dev', firestoreApiKey: 'AIza-too-short' }).firestore)
+      .toBeNull();
+  });
+
   it('falls back to a local configuration without /config.js', () => {
     expect(parseConfig(undefined)).toEqual({
-      environment: 'local', gatewayUrl: null, realtimeUrl: null, discordClientId: null,
+      environment: 'local', gatewayUrl: null, firestore: null, discordClientId: null,
     });
     expect(parseConfig({ environment: 'staging' }).environment).toBe('local');
   });
