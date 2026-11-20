@@ -29,6 +29,9 @@ locals {
     deltas_pixels            = { collection = "deltas", field = "pixels", ttl = false }
     deltas_expire_at         = { collection = "deltas", field = "expire_at", ttl = true }
     processed_events_expires = { collection = "processed_events", field = "expire_at", ttl = true }
+    # Deduplication records (DATA-02): the digest and the kept result are read by ID only.
+    processed_events_digest = { collection = "processed_events", field = "request_digest", ttl = false }
+    processed_events_result = { collection = "processed_events", field = "result", ttl = false }
   }
 }
 
