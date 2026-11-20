@@ -4,3 +4,7 @@ developer_emails = [
   "eliott603@gmail.com",
   "zekyro.exe@gmail.com",
 ]
+team_editors = [
+  "benjamin.melinette@gmail.com",
+  "zekyro.exe@gmail.com",
+]

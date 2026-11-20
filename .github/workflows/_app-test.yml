@@ -47,6 +47,10 @@ jobs:
       - name: Firestore and PubSub integration tests
         run: npm run test:integration
 
+      # Same build as the serverless plans and applies (ADR-0009).
+      - name: Build the functions
+        run: npm run build:functions
+
       - name: Publish coverage in run summary
         if: always()
         run: node testing/coverage-summary.mjs

@@ -16,7 +16,7 @@ Closes #
 - [ ] Branche `feature/*` ou `fix/*` partie de `prod`, commits signés (*Verified*) au format Conventional Commits
 - [ ] CI verte, relue par au moins un autre membre
 - [ ] Logique métier couverte par des tests unitaires lancés en CI
-- [ ] Ressources cloud créées par Terraform ou Helm et déployées par la pipeline (sauf stacks `bootstrap` et `access`)
+- [ ] Ressources cloud décrites en Terraform/Helm et déployées par la pipeline ; seuls les stacks `iam` et `access` s'appliquent manuellement
 - [ ] Un service account par fonction ou service, avec seulement les rôles nécessaires
 - [ ] Observabilité : logs JSON avec `correlation_id`, métriques visibles, alerte si le composant est critique
 - [ ] Aucun secret dans le dépôt, les `tfvars` ou le state Terraform

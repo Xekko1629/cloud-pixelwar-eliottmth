@@ -1,24 +1,11 @@
-resource "google_project_service" "serverless" {
-  for_each = toset([
-    "artifactregistry.googleapis.com",
-    "run.googleapis.com",
-    "secretmanager.googleapis.com",
-    "logging.googleapis.com",
-    "monitoring.googleapis.com",
-    "cloudtrace.googleapis.com",
-    "telemetry.googleapis.com",
-  ])
-
-  project            = var.project_id
-  service            = each.value
-  disable_on_destroy = false
-}
+# Persistent release artefacts (ADR-0008), applied by the CI before serverless and never
+# destroyed. The APIs are enabled by infra/iam, which must be applied first.
 
 resource "google_artifact_registry_repository" "containers" {
   project       = var.project_id
   location      = var.region
   repository_id = "pixelwar"
-  description   = "Container images that survive serverless stack destruction"
+  description   = "Images built internally by Cloud Build for Cloud Run functions"
   format        = "DOCKER"
   labels = {
     environment = var.environment
@@ -49,5 +36,4 @@ resource "google_artifact_registry_repository" "containers" {
     prevent_destroy = true
   }
 
-  depends_on = [google_project_service.serverless]
 }

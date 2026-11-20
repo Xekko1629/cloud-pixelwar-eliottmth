@@ -3,23 +3,11 @@ locals {
   plan_environment   = "${var.environment}-plan"
 }
 
-resource "google_project_service" "ci" {
-  for_each = toset([
-    "cloudresourcemanager.googleapis.com",
-    "iam.googleapis.com",
-    "iamcredentials.googleapis.com",
-    "sts.googleapis.com",
-  ])
-
-  service            = each.value
-  disable_on_destroy = false
-}
-
 resource "google_iam_workload_identity_pool" "github" {
   workload_identity_pool_id = "github"
   display_name              = "GitHub Actions"
 
-  depends_on = [google_project_service.ci]
+  depends_on = [google_project_service.apis]
 }
 
 resource "google_iam_workload_identity_pool_provider" "github" {
@@ -44,7 +32,7 @@ resource "google_service_account" "deployer" {
   account_id   = "github-terraform"
   display_name = "GitHub Actions Terraform deployer"
 
-  depends_on = [google_project_service.ci]
+  depends_on = [google_project_service.apis]
 }
 
 resource "google_service_account_iam_member" "deployer_wif" {
@@ -65,7 +53,7 @@ resource "google_service_account" "planner" {
   account_id   = "github-planner"
   display_name = "GitHub Actions Terraform planner"
 
-  depends_on = [google_project_service.ci]
+  depends_on = [google_project_service.apis]
 }
 
 resource "google_service_account_iam_member" "planner_wif" {

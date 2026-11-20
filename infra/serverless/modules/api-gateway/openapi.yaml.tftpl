@@ -1,0 +1,47 @@
+# OpenAPI 2.0 (Swagger): the only version API Gateway accepts.
+# Rendered by Terraform (main.tf): one operation per route whose backend is deployed.
+swagger: "2.0"
+info:
+  title: ${jsonencode(title)}
+  description: Single public entry point of the pixel canvas (subject section 3.1)
+  version: "1.0.0"
+schemes:
+  - https
+produces:
+  - application/json
+# Session JWT (ADR-0012), checked by the gateway: signature against the public keys of
+# the session signer service account, issuer, audience and expiry.
+# A route opts in with "security: - session: []".
+securityDefinitions:
+  session:
+    authorizationUrl: ""
+    flow: "implicit"
+    type: "oauth2"
+    x-google-issuer: ${jsonencode(session_issuer)}
+    x-google-jwks_uri: ${jsonencode("https://www.googleapis.com/robot/v1/metadata/x509/${session_issuer}")}
+    x-google-audiences: ${jsonencode(session_audience)}
+paths:
+%{ for path, operations in paths ~}
+  ${jsonencode(path)}:
+%{ for operation in operations ~}
+    ${operation.method}:
+      operationId: ${jsonencode(operation.operation_id)}
+      summary: ${jsonencode(operation.summary)}
+%{ if operation.auth == "session" ~}
+      # Rejected with 401 by the gateway without a valid token; the claims reach the
+      # backend in X-Apigateway-Api-Userinfo (base64url).
+      security:
+        - session: []
+%{ endif ~}
+      # The gateway signs a Google ID token as its own service account
+      # (audience = the function URL), so the private proxy accepts the call.
+      x-google-backend:
+        address: ${jsonencode(operation.address)}
+        jwt_audience: ${jsonencode(operation.address)}
+        path_translation: APPEND_PATH_TO_ADDRESS
+        deadline: ${operation.deadline_seconds}
+      responses:
+        default:
+          description: Response returned by the backend proxy
+%{ endfor ~}
+%{ endfor ~}

@@ -14,4 +14,8 @@ terraform {
 provider "google" {
   project = var.project_id
   region  = "europe-west1"
+
+  # Applied locally with user credentials: the Cloud Billing API needs a quota project.
+  billing_project       = var.project_id
+  user_project_override = true
 }

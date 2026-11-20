@@ -1,6 +1,6 @@
 # ADR-0003 · Temps réel : listeners Firestore sur des deltas par région
 
-- **Statut** : Accepté
+- **Statut** : Côté écriture accepté ; côté lecture (listeners dans le navigateur) remplacé par [ADR-0013](0013-lectures-temps-reel-sans-firebase.md)
 - **Date** : 2026-10-23
 - **Tickets** : ARCH-01 (#26). Utilisé par DATA-01, DRAW-02, DRAW-03a, DRAW-03b, DRAW-04, WEB-03c, WEB-03d.
 - **Références** : Sujet §3.4 · C06 §4.4, §7 · C07 §3.3
@@ -22,7 +22,7 @@ Le navigateur s'abonne avec des **listeners Firestore** (`onSnapshot`) à une co
 - Pour chaque lot traité, il écrit **un document de delta par région touchée**, une région faisant 1024×1024 pixels (ADR-0007).
 - Contenu d'un delta : `encoding_version: 1`, `canvas_version`, `region`, `event_id` de l'événement source, `created_at` (horodatage serveur), `expire_at` (TTL court, par exemple 1 h) et `pixels`, un champ `Bytes` compact.
 - Format de `pixels` : 5 octets par pixel, concaténés dans l'ordre du lot. `x` et `y` sont les coordonnées **locales à la région** (`0..1023`) en uint16 little-endian ; la couleur est un uint8 de `1` à `16`. Un lot accepté fait au plus 500 pixels, soit 2 500 octets. Le codec partagé valide la longueur, les bornes, les doublons et la version du format.
-- Le champ `pixels`, comme les métadonnées de tuile, est **exclu de l'indexation**. Les index composites `(canvas_version, region, created_at)` et `(canvas_version, created_at)` sont déclarés dans `app/firestore.indexes.json`, référencé par `app/firebase.json`.
+- Le champ `pixels`, comme les métadonnées de tuile, est **exclu de l'indexation**. Les index composites `(canvas_version, region, created_at)` et `(canvas_version, created_at)` sont déclarés dans `infra/serverless/firestore.tf` (déplacés depuis `app/firestore.indexes.json` par SRV-06).
 - Il écrit le delta **dans la même transaction que les tuiles** qu'il modifie, avec le même horodatage serveur. Un client ne peut donc pas recevoir un delta sans que la tuile correspondante soit à jour, ni l'inverse.
 
 ### Côté lecture : le navigateur
@@ -64,9 +64,3 @@ Les listeners se reconnectent et se resynchronisent seuls. Si la coupure a duré
 - `created_at` augmente sans cesse et il est indexé : la documentation Firestore indique alors un maximum d'environ 500 écritures par seconde sur la collection. Un delta regroupant un lot entier, c'est largement suffisant pour la démo, mais il faut le vérifier pendant le test de charge (OBS-05a).
 - Le TTL de Firestore supprime les documents expirés en général dans les 24 h, et ils restent visibles dans les requêtes jusqu'à leur suppression. Les requêtes filtrent donc toujours sur `created_at` : le TTL ne sert qu'à nettoyer le stockage.
 - Le navigateur lit Firestore directement, sans passer par la gateway : ce point est justifié à part, dans l'ADR-0004.
-
-## En soutenance
-
-- « API Gateway ne permet les WebSockets qu'en Preview, et pas en Terraform. On s'appuie donc sur les listeners Firestore, que le support C07 cite justement comme canal temps réel. »
-- « Le worker écrit la tuile et le delta dans la même transaction. Le client n'applique un delta que s'il est plus récent que la tuile chargée : l'affichage ne régresse jamais. »
-- « Il n'y a pas de polling : c'est Firestore qui pousse les changements. »

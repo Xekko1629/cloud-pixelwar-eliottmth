@@ -29,6 +29,7 @@ node_modules/
 dist/
 build/
 coverage/
+test-results/
 *.tsbuildinfo
 npm-debug.log*
 
@@ -36,8 +37,12 @@ npm-debug.log*
 .firebase/
 firebase-debug.log*
 firestore-debug.log*
+pubsub-debug.log*
 ui-debug.log*
 
 # OS / editor
 .DS_Store
 Thumbs.db
+
+# Function archives zipped by infra/serverless (modules/function-source)
+.build/

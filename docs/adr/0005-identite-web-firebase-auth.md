@@ -1,6 +1,6 @@
 # ADR-0005 · Identité web : OAuth2 Discord côté serveur, puis custom token Firebase
 
-- **Statut** : Accepté
+- **Statut** : Remplacé par [ADR-0012](0012-identite-web-jwt-session.md)
 - **Date** : 2026-10-23
 - **Tickets** : ARCH-01 (#26). Utilisé par SRV-04c, SRV-06, DRAW-01, WEB-02a, WEB-02b, DATA-03.
 - **Références** : Sujet §3.4 · C05 §3, §6 · C07 §3.2
@@ -61,9 +61,3 @@ Un pixel posé depuis Discord et un pixel posé depuis le web ont le même auteu
 - Dev et prd sont deux projets Firebase distincts : un token de dev est refusé en prd, puisque l'audience est le project id.
 - Le `refresh token` de Firebase reste dans le navigateur (géré par le SDK). Ce n'est pas un token Discord : on respecte bien la règle du sujet.
 - Tests à écrire (WEB-02a) : `state` absent, expiré ou modifié refusé ; le token Discord n'apparaît ni dans les logs, ni dans la réponse.
-
-## En soutenance
-
-- « On ne garde jamais le token Discord : l'`auth-proxy` s'en sert une seule fois pour lire l'id de l'utilisateur, puis émet un custom token Firebase. »
-- « Le même ID token Firebase est vérifié par API Gateway pour écrire, et par les règles Firestore pour lire. »
-- « L'uid Firebase est l'id Discord : le quota et l'auteur d'un pixel sont les mêmes depuis Discord et depuis le web. »

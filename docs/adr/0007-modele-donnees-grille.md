@@ -57,12 +57,12 @@ La grille est infinie par défaut, mais un admin peut la borner, puis la rendre 
 
 ### Tuiles de 64×64
 
-- La grille est découpée en tuiles de 64×64 pixels, indexées par `(tx, ty) = (⌊x/64⌋, ⌊y/64⌋)`. La division arrondit **vers le bas**, y compris pour les coordonnées négatives : le pixel `x = -1` est dans la tuile `tx = -1`, au rang local 63. Cette fonction est écrite une seule fois dans le paquet partagé (ADR-0001), et testée sur les valeurs négatives.
+- La grille est découpée en tuiles de 64×64 pixels, indexées par `(tx, ty) = (⌊x/64⌋, ⌊y/64⌋)`. La division arrondit **vers le bas**, y compris pour les coordonnées négatives : le pixel `x = -1` est dans la tuile `tx = -1`, au rang local 63. Cette fonction est écrite une seule fois dans le paquet partagé (ADR-0008), et testée sur les valeurs négatives.
 - Chaque tuile a **deux documents**, pour que le canvas ne charge que ce dont il a besoin :
   - **couleurs** : un champ `Bytes` de 4 096 octets (un par pixel) et `updated_at`. C'est ce que charge le canvas. Une tuile absente est une tuile vide : le frontend n'a rien à télécharger ;
   - **métadonnées** : une map `pixels` indexée par la position locale `0..4095`, chaque entrée contenant `uid` (id Discord sous forme de chaîne), `name` (pseudo au moment de la modification), `at` (`occurred_at` en Timestamp Firestore) et `eid` (UUID d'événement sur 16 octets, pour départager deux événements de même horodatage). Elles ne sont chargées que lorsqu'on inspecte un pixel (WEB-04). Le champ `pixels` est exclu de l'indexation (exemption d'index), sinon chaque pixel compterait dans la limite de 40 000 entrées d'index et alourdirait chaque écriture.
 - Les deux documents portent le même identifiant `v{canvas_version}_{tx}_{ty}`, ainsi que `canvas_version`, `tx`, `ty`, `region` et `updated_at`. Le préfixe de version permet d'effacer toute la grille en temps constant, sans tout supprimer d'un coup (DATA-04). Sur une grille infinie, c'est la seule façon raisonnable d'effacer.
-- Le format binaire des deltas est décrit dans ADR-0003 ; les index composites et les exemptions de champs sont déclarés dans `app/firestore.indexes.json`.
+- Le format binaire des deltas est décrit dans ADR-0003 ; les index composites et les exemptions de champs sont déclarés dans `infra/serverless/firestore.tf` (déplacés depuis `app/firestore.indexes.json` par SRV-06).
 
 Pourquoi 64 :
 
@@ -125,7 +125,7 @@ Voir [le contrat et les limites d'intégration DATA-03](../rate-limits.md).
 
 ### Écriture
 
-- Un lot accepté est plafonné à **500 pixels** par défaut, valeur configurable. Un trait plus long est redécoupé côté client ; un lot qui dépasse les budgets de tuiles, de documents ou d'octets est refusé explicitement, pas appliqué partiellement. Le budget transactionnel exact reste à mesurer avec DATA-02.
+- Un lot accepté est plafonné à **500 pixels** par défaut, valeur configurable. Un trait plus long est redécoupé côté client ; un lot qui dépasse les budgets de tuiles, de documents ou d'octets est refusé explicitement, pas appliqué partiellement. Le dimensionnement du budget transactionnel exige une mesure sur la représentation réellement écrite.
 - Le `draw-worker` groupe les pixels d'un lot **par tuile** : une écriture pour le document de couleurs et une pour celui des métadonnées de chaque tuile touchée, dans une transaction qui écrit aussi **un delta par région** (ADR-0003). Un lot touchant `T` tuiles et `R` régions écrit donc `2T + R` documents, avant les documents annexes (déduplication, quota, `bounds`) ; le code partagé expose ce calcul et un budget configurable.
 - La concurrence maximale du worker est plafonnée (DRAW-02), pour rester sous le débit qu'un document de tuile supporte.
 - `bounds` n'est réécrit que si le lot sort du rectangle actuel, ce qui devient vite rare. Ce document ne devient donc pas un point chaud en écriture.
@@ -161,10 +161,3 @@ Voir [le contrat et les limites d'intégration DATA-03](../rate-limits.md).
 - Une tuile très sollicitée (beaucoup de pixels au même endroit pendant le test de charge) peut provoquer des conflits de transaction. À mesurer pendant OBS-05a, et à atténuer en plafonnant la concurrence du worker.
 - `/admin size` ne fait pas partie des commandes imposées par le sujet (§3.2), qui demande d'implémenter « exactly these ». On la présente comme une commande en plus, qui ne modifie aucune des commandes obligatoires. À signaler à l'encadrant, en même temps que la question de l'ADR-0004.
 - Changer la taille des tuiles ou des régions après coup impose de migrer toutes les données. Ces valeurs sont donc fixées ici, et ne changeront que par un nouvel ADR.
-
-## En soutenance
-
-- « La grille est infinie : on ne stocke que les tuiles de 64×64 où quelque chose a été peint, donc le coût suit le dessin, pas la taille. »
-- « Un admin peut la borner avec `/admin size`, sans redéployer. Le `draw-worker` applique la taille, comme la pause, et le frontend affiche le bord en temps réel. »
-- « On sépare les couleurs, 4 Kio par tuile et chargées par le canvas, des métadonnées, chargées seulement à l'inspection. 64, parce que les métadonnées doivent tenir sous la limite de 1 Mio d'un document Firestore. »
-- « Pour dézoomer, on affiche une pyramide d'images basse résolution, comme une carte. `/get` et `/snapshot` rendent la zone peinte, pas l'infini. »

@@ -42,22 +42,102 @@ jobs:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.DEPLOYER_SA }}
 
+      # infra/frontend plans the image built for this commit by _frontend-image.yml.
+      # The planner never pushes: the digest is read from the archive, the image is only
+      # pushed by the apply.
+      - uses: actions/download-artifact@v4
+        if: inputs.stack == 'frontend'
+        with:
+          name: frontend-image
+          path: ${{ runner.temp }}/frontend-image
+
+      - name: Frontend image digest
+        if: inputs.stack == 'frontend'
+        working-directory: ${{ runner.temp }}/frontend-image
+        run: |
+          digest="$(tar -xOf frontend.tar index.json | jq -r '.manifests[0].digest')"
+          echo "TF_VAR_image=europe-west1-docker.pkg.dev/$GOOGLE_CLOUD_PROJECT/pixelwar/frontend@$digest" >> "$GITHUB_ENV"
+
+      # infra/serverless zips app/dist/functions/<name> (modules/function-source, ADR-0009).
+      - uses: actions/setup-node@v4
+        if: inputs.stack == 'serverless'
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Build the functions
+        if: inputs.stack == 'serverless'
+        working-directory: app
+        run: |
+          npm ci
+          npm run build:functions
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
 
+      # Plans use the last applied serverless contract, not future/unknown endpoints.
+      # During the first migration it is absent: report a deferred Gateway plan,
+      # never substitute guessed backend URLs or silently treat it as empty.
+      - name: Check Gateway contract availability
+        if: inputs.stack == 'gateway'
+        id: contract
+        shell: bash
+        run: |
+          if terraform -chdir=../serverless init -no-color -input=false -backend-config="backends/${{ inputs.environment }}.hcl" > source-init.txt 2>&1; then
+            terraform -chdir=../serverless output -json > source-outputs.json
+            if jq -e 'has("gateway_contract")' source-outputs.json > /dev/null; then
+              echo "ready=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "ready=false" >> "$GITHUB_OUTPUT"
+              echo "::notice::Gateway plan deferred until serverless publishes gateway_contract. Static validation and tests still run."
+            fi
+          elif grep -q "object doesn't exist" source-init.txt; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Gateway plan deferred: serverless has not been applied yet."
+          else
+            cat source-init.txt
+            exit 1
+          fi
+
+      # A stack never applied has no remote state: init would create it, which the read-only
+      # planner cannot. Only in that case, plan against an empty local state instead.
       - name: Init
-        run: terraform init -backend-config="backends/${{ inputs.environment }}.hcl"
+        if: inputs.stack != 'gateway' || steps.contract.outputs.ready == 'true'
+        id: init
+        run: |
+          if terraform init -no-color -backend-config="backends/${{ inputs.environment }}.hcl" 2>&1 | tee init.txt; then
+            echo "fresh=false" >> "$GITHUB_OUTPUT"
+          elif grep -q "object doesn't exist" init.txt; then
+            echo "::notice::No remote state yet for ${{ inputs.stack }} (${{ inputs.environment }}): planning against an empty state"
+            printf 'terraform {\n  backend "local" {}\n}\n' > ci_backend_override.tf
+            terraform init -no-color -reconfigure
+            echo "fresh=true" >> "$GITHUB_OUTPUT"
+          else
+            exit 1
+          fi
 
       # No lock: the planner can only read the state bucket
       - name: Plan
+        if: inputs.stack != 'gateway' || steps.contract.outputs.ready == 'true'
         run: terraform plan -no-color -lock=false -var-file="${{ inputs.environment }}.tfvars" | tee plan.txt
 
+      - name: Report deferred Gateway plan
+        if: inputs.stack == 'gateway' && steps.contract.outputs.ready != 'true'
+        run: |
+          echo '## Gateway plan deferred' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Apply serverless successfully to publish gateway_contract, then plan gateway. No live Gateway plan has been validated in this run.' >> "$GITHUB_STEP_SUMMARY"
+
       - name: Publish plan to run summary
+        if: inputs.stack != 'gateway' || steps.contract.outputs.ready == 'true'
         run: |
           {
             echo "## Plan \`${{ inputs.stack }}\` → \`${{ inputs.environment }}\`"
+            if [ "${{ steps.init.outputs.fresh }}" = "true" ]; then
+              echo "> No remote state yet: this is the plan of the first apply, against an empty state."
+            fi
             echo '```'
             cat plan.txt
             echo '```'

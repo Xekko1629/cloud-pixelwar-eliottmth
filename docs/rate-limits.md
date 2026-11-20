@@ -1,17 +1,13 @@
-# DATA-03 — Calcul des quotas utilisateur (première partie)
+# Calcul des quotas utilisateur
 
-## Périmètre livré
+## Objet et responsabilités
 
 `app/shared/src/grid/rate-limit.ts`, exporté par `@pixelwar/shared/grid`, calcule
 une décision **pure**, sans réseau, SDK Firestore, écriture ni réservation de
-quota. Le worker Discord/web utilisera la même règle et le même document
-`users/{uid}` ; il n'existe pas encore d'intégration dans un worker.
+quota. L'appelant persiste la décision dans la transaction de dessin. Les flux
+Discord et web partagent la règle et le document `users/{uid}`.
 
-Cette partie ne clôture pas DATA-03 : la transaction Firestore, la concurrence,
-la déduplication persistante, les commandes admin et les réponses Discord sont
-encore à intégrer/tester avec DATA-02 et les tickets de workers.
-
-## Contrat validé
+## Contrat
 
 - Fenêtres fixes alignées sur chaque minute UTC, début inclus, fin exclue.
   Ex. `[12:34:00, 12:35:00[`. Pas de remise à zéro planifiée : une fenêtre passée
@@ -36,7 +32,7 @@ encore à intégrer/tester avec DATA-02 et les tickets de workers.
   la frontière puis 20 juste après avec une limite de 20.
 
 Une configuration absente ou invalide provoque `RateLimitDataError`, même si un
-override est valide. Pas de repli silencieux sur 20. Le worker devra laisser
+override est valide. Pas de repli silencieux sur 20. Le worker doit laisser
 réessayer avec backoff/DLQ et alerter ; ce n'est pas un rejet métier définitif.
 
 ## API et résultat
@@ -65,7 +61,7 @@ après décision, `window_start_ms` et `reset_at_ms` :
   Elles ne deviennent effectives qu'après le commit atomique du dessin.
 - `allowed: false` : aucun `next_usage`, aucune consommation du lot.
 
-| Refus métier | `retry_after_seconds` | Indication pour le futur notifier |
+| Refus métier | `retry_after_seconds` | Indication pour la notification |
 | --- | --- | --- |
 | `insufficient_quota` | Secondes jusqu'à la prochaine minute, arrondies au supérieur | Lot de 5, restant 3/20 : quota insuffisant, réinitialisation dans 18 s |
 | `batch_exceeds_limit` | `null` | Lot de 25 pour limite de 20 : réduire le lot ou modifier la limite, attendre seul ne suffit pas |
@@ -73,8 +69,8 @@ après décision, `window_start_ms` et `reset_at_ms` :
 
 Le délai est une information calculée au traitement, pas une garantie que le
 quota sera disponible à réception du message Discord ou après une modification
-admin. Le rendu du message n'est pas implémenté ici. Ces sous-raisons relèvent
-du motif métier/observabilité `rate_limit` lors du futur mapping d'événements.
+admin. Le rendu du message relève de l'appelant. Ces sous-raisons correspondent
+au motif métier/observabilité `rate_limit` dans le mapping d'événements.
 
 `RateLimitDataError.code` distingue `invalid_configuration`, `invalid_usage`,
 `invalid_clock` et `invalid_pixel_count`. Ne pas convertir automatiquement ces
@@ -84,7 +80,7 @@ usage daté dans le futur : échec prudent, pas de reset qui recréerait du quot
 exige une minute exacte, sans nanoseconde. L'heure worker est un entier en ms
 depuis 1970 et la fenêtre, y compris sa fin, doit tenir dans la plage Firestore.
 
-## Intégration DATA-02 — obligatoire avant mise en service
+## Contrat transactionnel de l'appelant
 
 Dans **la même transaction serveur** :
 
@@ -110,29 +106,29 @@ frontend pour l'autorisation. Sérialiser les modifications concurrentes via
 compteur ou changer son `window_start` lors d'un override admin.
 
 La conservation des résultats de déduplication doit couvrir l'horizon autorisé
-de rejeu Pub/Sub/DLQ (7 jours prévus), avec une marge à fixer dans DATA-02.
-Ne pas réutiliser le TTL court des deltas pour ces documents. La publication
-fiable du résultat après commit reste un point d'architecture ouvert : aucun
-appel Discord/Pub/Sub dans une callback susceptible d'être réexécutée.
+de rejeu Pub/Sub/DLQ, avec une marge définie par la politique de rétention.
+Ne pas réutiliser le TTL court des deltas pour ces documents. La publication du
+résultat doit gérer une interruption après commit et un rejeu ; elle n'est pas
+effectuée par le calcul pur. Aucun appel Discord/Pub/Sub dans une callback de
+transaction susceptible d'être réexécutée.
 
 ## Initialisation et migration
 
-Avant de brancher le worker, initialiser le champ `default_limit_per_minute`
+Avant d'utiliser le quota en production, initialiser le champ `default_limit_per_minute`
 à 20 dans `config/global`, via une opération admin autorisée qui **préserve**
 les champs pause/version/taille existants. Une simple mise à jour ciblée ou un
 merge convient ; ne pas remplacer le document complet par ce seul champ.
-Aucune écriture GCP n'est effectuée par ce changement de code.
+Vérifier le projet ciblé, les droits admin et la valeur relue après l'opération.
 
 ## Vérification
 
 Depuis `app/`, Node 24 : `npm run typecheck`, `npm run test:coverage` et
 `npm run test:integration`. Tests unitaires DATA-03 : frontières UTC, compteurs,
 brush, override/défaut modifiés, quota zéro, lot trop grand, données invalides,
-arithmétique sûre, propositions immuables. Pas encore de test de concurrence
-Firestore ou de rejeu métier persistant DATA-03 ; les tests d'intégration du
-socle ne prouvent pas ces propriétés.
+arithmétique sûre et propositions immuables. La pureté du calcul ne démontre pas
+l'atomicité de son intégration : vérifier concurrence et rejeu avec la transaction
+de l'appelant et le stockage réellement utilisés.
 
-Sources officielles consultées le 6 novembre 2026, après le premier calcul pur
-pour préciser son contrat d'intégration :
+## Références
 - [Transactions Firestore : atomicité, lectures et retries](https://firebase.google.com/docs/firestore/manage-data/transactions)
 - [Contention et isolation des transactions serveur](https://firebase.google.com/docs/firestore/transaction-data-contention)

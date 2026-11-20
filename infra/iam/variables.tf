@@ -43,6 +43,12 @@ variable "planner_roles" {
   ]
 }
 
+variable "enable_discord_verify_iam" {
+  description = "Dev-only opt-in: grant CI policy management, actAs and read access on the existing diagnostic invoker, after serverless phase 1"
+  type        = bool
+  default     = false
+}
+
 variable "deploy_reviewers" {
   description = "GitHub usernames whose approval is required before a deploy to this environment"
   type        = list(string)
@@ -67,17 +73,6 @@ variable "enable_runners" {
   default     = false
 }
 
-variable "enable_dev_secret_access" {
-  description = "Bootstrap the isolated, approved dev secret-access workflow (admin applies iam once)."
-  type        = bool
-  default     = false
-
-  validation {
-    condition     = !var.enable_dev_secret_access || (var.environment == "dev" && var.project_id == "cloud-pixelwar-dev")
-    error_message = "Secret-access automation is restricted to cloud-pixelwar-dev."
-  }
-}
-
 variable "billing_account" {
   description = "Billing account ID the budget is attached to"
   type        = string
@@ -99,4 +94,15 @@ variable "budget_alert_thresholds" {
   description = "Spent ratios of the budget that trigger an email alert"
   type        = list(number)
   default     = [0.5, 0.9, 1.0]
+}
+
+variable "state_bucket" {
+  description = "Remote state bucket of this environment, created by hand then imported"
+  type        = string
+}
+
+variable "import_application_secrets" {
+  description = "Adopt the application secrets that infra/serverless created before they moved here"
+  type        = bool
+  default     = false
 }

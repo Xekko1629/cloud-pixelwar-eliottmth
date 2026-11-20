@@ -1,138 +1,89 @@
-# Accès humains — lecture Discord dev
+# Accès humains GCP
 
-Extension limitée du chantier ACC-01 (#8), à coordonner avec son responsable :
-ceci ne termine pas les rôles généraux de l'équipe ni les accès de l'instructeur
-et de facturation prévus par ce ticket.
+## Objet et périmètre
 
-## Périmètre validé
+`infra/access` gère les attributions humaines des projets et la lecture de
+certains secrets dev. Il possède un state distinct et ne fait partie d'aucun
+workflow d'apply/destroy. L'opérateur doit disposer des droits de gestion IAM
+sur les ressources concernées ; aucune personne particulière n'est requise par
+le code.
 
-Six attributions **additives** `google_secret_manager_secret_iam_member` :
-
-| Comptes Google | Secrets dans `cloud-pixelwar-dev` |
+| Environnement | Backend |
 | --- | --- |
-| `benjamin.melinette@gmail.com` | `discord-bot-token`, `discord-application-id` |
-| `eliott603@gmail.com` | mêmes deux secrets |
-| `zekyro.exe@gmail.com` | mêmes deux secrets |
+| dev | `backends/dev.hcl`, bucket `cloud-pixelwar-eliottmth-dev-tfstate`, préfixe `access` |
+| prd | `backends/prd.hcl`, bucket `cloud-pixelwar-eliottmth-prod-tfstate`, préfixe `access` |
 
-Rôle : `roles/secretmanager.secretAccessor`. Les emails sont normalisés en
-minuscules pour éviter les doublons de ressources Terraform.
+## Configuration et droits gérés
 
-Pas de nouveau droit sur prd, OAuth, l'allow-list ou les autres secrets. Pas de
-permission d'ajout de version, création de ressource ou gestion IAM accordée aux
-développeurs par ce stack. Il ne supprime pas les droits existants/hérités hors
-de ses propres attributions. La lecture autorise le contenu de **toutes les
-versions** des deux secrets, pas seulement `latest`.
+Les comptes sont configurés dans les `<env>.tfvars` ; ne pas maintenir une seconde
+liste de membres dans ce guide.
 
-Aucune version/valeur n'est lue par Terraform. La réplication et les conteneurs
-restent gérés par SRV-03 ; ce stack ne gère que les membres IAM.
+- `team_editors` et `instructor_email` : `roles/editor` sur le projet.
+- Instructeur : `roles/billing.viewer` sur le compte de facturation, géré par prd.
+- `developer_emails` : `roles/secretmanager.secretAccessor` sur
+  `discord-bot-token` et `discord-application-id` **en dev seulement**.
 
-## States et séparation des pouvoirs
+Les attributions sont additives : elles ne remplacent pas la policy entière.
+La suppression d'un membre de la configuration peut supprimer son attribution
+gérée ; lire le plan même si le droit avait été accordé manuellement auparavant.
+Les droits hérités ou gérés par un autre mécanisme ne sont pas retirés par ce stack.
 
-- `infra/iam`, state existant `iam` : initialise l'automatisation persistante.
-- `infra/access`, préfixe `access`, bucket **dédié**
-  `cloud-pixelwar-eliottmth-dev-access-tfstate` : contient les six attributions.
-- Ni `iam` ni `access` ne sont appelés par le workflow de destruction.
-- Deux nouvelles identités, sans clé GCP persistante :
-  - `github-dev-access-plan` : `getIamPolicy` uniquement sur les deux secrets ;
-  - `github-dev-access-apply` : `getIamPolicy` + `setIamPolicy` sur ces secrets.
-- Les deux ont `storage.objectAdmin` sur **le seul bucket access**, pour
-  initialiser le backend, lire le state et gérer les verrous. Le plan est donc
-  en lecture seule pour l'IAM des secrets, **pas pour ce backend isolé**.
-  Aucun accès aux autres states n'est ajouté par cette configuration.
+Le droit secretAccessor concerne toutes les versions des deux secrets. Il ne
+concerne pas les secrets OAuth/admin ni prd. D'autres attributions, notamment
+`editor`, peuvent donner des droits supplémentaires : ne pas déduire le moindre
+privilège global de la seule lecture ciblée des secrets.
 
-L'identité apply n'a pas directement `versions.access`, mais **gérer une policy
-IAM est un privilège sensible** : elle pourrait accorder cette lecture. La
-protection repose donc aussi sur le workflow fixe, la branche et la revue admin.
-Il ne faut pas présenter cette identité comme incapable d'obtenir une valeur.
+Ce stack ne lit aucune valeur et ne crée pas les conteneurs Secret Manager,
+qui relèvent de `infra/iam`. Les identités de CI et leurs droits sont également
+gérés par `iam`, pas par ce stack.
 
-WIF utilise un pool dédié et vérifie le nom et l'ID numérique du dépôt, l'ID
-numérique du propriétaire Xekko, `refs/heads/prod`, l'événement manuel, le chemin
-exact `access-dev.yml` et l'environnement plan/apply. Les attributions au compte
-de service séparent ensuite les environnements `access-dev-plan` et `access-dev`.
-Le pool WIF et les droits du deployer historique ne sont pas élargis.
+## Installation initiale et application
 
-## Initialisation unique par Xekko — aucun auto-bootstrap
+Suivre d'abord le [bootstrap de l'environnement](../../docs/deployment.md) :
+projet/facturation, bucket de state, authentification ADC et application de
+`infra/iam`. Ce dernier active notamment Cloud Billing, Resource Manager et
+Secret Manager.
 
-Le workflow ne peut pas créer son propre compte ni ses protections. Après revue
-et merge, Xekko doit appliquer **une fois** le stack IAM dev modifié, avec ses
-identités Google/Terraform et GitHub autorisées. Les deux secrets dev et le
-backend IAM existant doivent déjà être présents. Ne pas réutiliser un token bot
-Discord comme token GitHub.
-
-Exemple depuis `infra/iam`, sans traçage shell (`set -x`) :
+Depuis `infra/access`, définir `ENV=dev` ou `ENV=prd`. Remplacer le chemin du
+plan par un emplacement accessible hors du dépôt : il contient des données
+d'identité.
 
 ```sh
-terraform init -reconfigure -backend-config=backends/dev.hcl
-GITHUB_TOKEN="$(gh auth token)" terraform plan -var-file=dev.tfvars -out=dev-access-bootstrap.tfplan
+terraform init -reconfigure -backend-config="backends/$ENV.hcl"
+terraform plan -var-file="$ENV.tfvars" -out=/chemin/hors-du-depot/access.tfplan
+terraform apply /chemin/hors-du-depot/access.tfplan
 ```
 
-Relire **tout le plan IAM**, pas seulement les ajouts : nouveau bucket privé,
-deux comptes, deux rôles limités, WIF et deux environnements GitHub. Aucun rôle
-de lecture des valeurs au niveau projet, aucun nouveau droit prd et aucune
-suppression inattendue. Après accord explicite, Xekko peut appliquer ce plan :
+Lire et approuver le plan avant l'apply. Ne pas supposer un nombre fixe d'ajouts
+ni l'absence d'import : cela dépend de l'état réel. Un backend existant ou une
+ressource gérée par un autre state exige une vérification préalable.
 
-```sh
-GITHUB_TOKEN="$(gh auth token)" terraform apply dev-access-bootstrap.tfplan
-```
+Pour une application guidée sur backends existants, utiliser
+`scripts/apply-manual.sh <env> access` depuis la racine ou `just manual <env> access`.
+La commande présente le plan et demande confirmation.
 
-Ce n'est pas exécuté par l'assistant, une PR ou le workflow habituel Deploy.
-`enable_dev_secret_access = true` n'est activé que dans `infra/iam/dev.tfvars` ;
-le défaut est false et toute activation en prd est refusée.
+## Vérification et mise à jour
 
-Vérifier ensuite dans GitHub :
-- `access-dev-plan` : branche `prod` uniquement, variables `WIF_PROVIDER` et
-  `ACCESS_SA` du compte plan, pas de revue requise pour produire le plan ;
-- `access-dev` : branche `prod` uniquement, **Xekko1629 seul reviewer**,
-  contournement des protections par les administrateurs désactivé, variables
-  WIF et compte apply distinct ;
-- Xekko peut approuver son propre déclenchement (`prevent_self_review = false`)
-  car il est l'unique admin désigné. Ce n'est pas une règle à deux approbateurs.
+Vérifier la policy projet et les policies des secrets, puis tester avec les
+identités concernées les accès autorisés et les refus attendus, sans afficher
+de valeurs de secrets dans les logs.
 
-Si les protections ne sont pas disponibles ou ne sont pas réellement appliquées,
-**arrêter** : ne pas remplacer l'environnement par le dev non protégé.
+Pour ajouter/retirer un membre : modifier les variables, PR et review, puis
+appliquer manuellement la version intégrée. Une correction suit le même parcours ;
+ne pas rétablir un ancien membre sans vérifier qu'il est toujours autorisé.
 
-## Utilisation du bouton après initialisation
+## Suppression et migration
 
-1. GitHub Actions → **Dev Discord secret access** → **Run workflow**.
-2. Choisir la branche **`prod`** et confirmer **`cloud-pixelwar-dev`**.
-3. Le job plan calcule le plan sur le commit exact du run et le publie dans son
-   résumé. À la première exécution, attendre **6 ajouts, 0 changement, 0 destroy**.
-4. Xekko relit le résumé et approuve l'environnement **`access-dev`**.
-5. Le job apply vérifie le SHA-256 puis applique **le fichier plan sauvegardé**,
-   sans recalculer un nouveau plan après approbation.
+La destruction des workloads ne cible pas ce stack et conserve donc ses
+attributions. Le retrait d'accès doit être une modification IAM explicite et
+relue, sans retirer le dernier accès d'administration.
 
-Un seul run à la fois ; verrous Terraform conservés. L'artefact ne reste qu'un
-jour : s'il expire ou si le state change, relancer et refaire valider le plan.
-Le plan expose des métadonnées IAM et les emails, pas les valeurs des secrets ;
-il doit néanmoins être traité comme un artefact d'administration sensible.
+Pour migrer un state, identifier les ressources effectivement gérées, conserver
+une sauvegarde et vérifier l'état cible avant un import ou un déplacement.
+Ne jamais supprimer un ancien objet de state sur la seule hypothèse qu'il est
+vide, ni gérer la même attribution depuis deux states.
 
-Après propagation IAM, chaque développeur peut relancer le bloc BOT-02 qui lit
-le token dans une variable de sous-processus puis enregistre les commandes dev.
-Ne pas afficher le token pour tester son accès, ni le copier dans Git/le chat.
-Le bouton **n'enregistre pas** lui-même les commandes Discord.
-
-## Modifications et reconstruction
-
-Ajouter/retirer un email dans `dev.tfvars` → PR, CI, revue, merge, nouveau plan
-et approbation. La suppression d'un membre géré retire seulement son attribution
-sur ces deux secrets, pas ses éventuels droits hérités ou accordés ailleurs.
-
-Un destroy de `serverless` supprime les secrets **et leurs policies IAM** :
-conserver le state access n'empêche pas cette suppression. Après recréation des
-secrets, Xekko doit réappliquer le bootstrap IAM pour restaurer les permissions
-des identités d'automatisation, puis relancer le workflow access. Les valeurs
-des secrets restent à réinjecter séparément depuis une source sûre.
-
-Le bucket est privé, versionné, `force_destroy = false` et protégé par
-`prevent_destroy`. Les anciennes générations archivées sont nettoyées seulement
-si elles ont plus de 30 jours et au moins 20 générations plus récentes. Cela
-ajoute un petit coût GCS à l'usage, pas du compute permanent ni un plafond de
-facturation. `prevent_destroy` protège l'opération Terraform, pas contre tous
-les actes possibles d'un administrateur GCP.
-
-## Vérifications locales sans GCP
-
-Depuis `infra/access` puis `infra/iam` :
+## Vérification locale
 
 ```sh
 terraform init -backend=false -input=false -lockfile=readonly
@@ -140,7 +91,6 @@ terraform validate
 terraform test
 ```
 
-Les tests utilisent des providers simulés. Ils ne prouvent pas les droits réels,
-la propagation IAM, les protections GitHub actives ni le succès du premier run.
-La CI valide/teste access, mais n'exécute aucun plan distant ou apply de ce stack
-sur une PR. Le cycle Deploy/Destroy des applications reste inchangé.
+Les providers simulés vérifient la configuration, pas les droits réels ni leur
+propagation. Les résultats d'application et de test d'accès sont conservés dans
+les tickets ou rapports, pas comme un inventaire permanent dans ce guide.

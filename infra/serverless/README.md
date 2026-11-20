@@ -1,66 +1,166 @@
-# Stack serverless — SRV-01
+# Stack serverless
 
-Choix retenu : **Cloud Run services**, avec images conteneur promues par digest entre dev et prd, conformément à [ADR-0001](../../docs/adr/0001-compute-cloud-run-typescript.md).
+## Objet et dépendances
 
-Le module distingue les proxies (`service_type = "proxy"`, ingress public avec IAM) des workers (`service_type = "worker"` par défaut, ingress interne et identité d'invocation Pub/Sub dédiée), conformément aux ADR-0001 et ADR-0002.
+Ce stack déclare les Cloud Run functions et leurs intégrations applicatives.
+Le module `function` utilise `google_cloudfunctions2_function` ; Google construit
+l'image à partir de sources dans GCS. Le compute est défini par ADR-0008 et le
+mécanisme de sources par ADR-0009.
 
-Ce squelette ne déploie encore aucun service : les modules seront instanciés lorsque les images des proxies et workers seront disponibles. Le [module service](modules/service/README.md) est prêt à être utilisé.
+| Ressource/prérequis | Responsable |
+| --- | --- |
+| APIs, identités de CI, state et conteneurs de secrets | `infra/iam`, manuel |
+| Accès humains | `infra/access`, manuel |
+| Bucket de sources, registre d'images internes et identité de build | `infra/bootstrap`, CI |
+| Réseau et cluster conditionnel | `infra/foundation`, CI |
+| Sources, fonctions et IAM runtime/invocation des workers | Ce stack, CI |
+| Gateway, catalogue HTTP et invocation des proxies | `infra/gateway`, CI après ce stack |
 
-## Secrets applicatifs — SRV-03
+Pour une installation vide, suivre le [guide de déploiement](../../docs/deployment.md)
+avant le premier init GCS. Chaque environnement utilise ses propres
+`<env>.tfvars`, `backends/<env>.hcl` et secrets.
 
-`secrets.tf` déclare les conteneurs Secret Manager dans chaque projet, sans
-valeurs ni versions gérées par Terraform. Voir [SECRETS.md](SECRETS.md) pour le
-catalogue, l'alimentation hors Git, les accès par service et la rotation.
-Un destroy supprime les secrets et leurs versions : les valeurs devront être
-réinjectées lors d'une reconstruction, elles ne sont pas sauvegardées dans le state.
+## Sources et fonctions
 
-## Organisation des states
+Le [build applicatif](../../docs/functions.md) écrit les dossiers sous
+`app/dist/functions`. Le module `function-source` les zippe et les téléverse sous
+`functions/<nom>/<sha256>.zip`, puis fournit bucket, objet, SHA-256 et génération
+GCS au [module function](modules/function/README.md).
 
-| Stack | Préfixe GCS | Rôle |
-| --- | --- | --- |
-| `infra/iam` (existant) | `iam` | Identités de CI et Workload Identity |
-| `infra/bootstrap` (SRV-01) | `bootstrap` | APIs serverless et Artifact Registry persistants |
-| `infra/serverless` | `serverless` | Services applicatifs et leurs identités |
+Les environnements construisent séparément depuis le commit choisi. Il n'y a
+pas de promotion par copie d'une archive unique ni de lockfile dans le bundle
+livré à Cloud Build. Le lockfile du dépôt verrouille le build CI ; les dépendances
+transitives du runtime sont résolues par Google à partir du manifeste généré.
 
-Les buckets de state sont ceux déjà utilisés par foundation. Ce ticket ne les recrée pas et ne migre aucune ressource IAM. Coordonner ce découpage avec BOOT-05, qui décrit un bootstrap plus large que ce qui est actuellement présent sur prod.
+Le bucket de sources est privé, versionné et conservé par le bootstrap. Le
+registre reçoit les images internes, pas un artefact fourni par l'équipe.
+Vérifier les politiques de rétention et de nettoyage dans `infra/bootstrap` et
+les besoins de reprise avant leur modification.
 
-Appliquer le bootstrap avant de publier les premières images. Son registry est protégé par `prevent_destroy` et ne dépend pas du state serverless. La cleanup policy garde les 10 versions les plus récentes par image et cible les autres versions de plus de 7 jours. Elle est initialement en **dry run** : vérifier les résultats et la conservation des releases encore utilisées avant d'activer les suppressions effectives. Une version ancienne toujours déployée doit rester disponible pour un destroy/re-apply ou un rollback.
+## API Gateway et invocation
 
-## Vérifications locales sans accès GCP
+`gateway-backends.tf` exporte `gateway_contract`, avec les noms, URI et types des
+proxies réellement instanciés. Le catalogue de routes et la Gateway sont gérés
+dans le [stack Gateway](../gateway/README.md), avec un state indépendant pour
+isoler son `create_before_destroy` de celui des fonctions (ADR-0010). Une route
+n'est publiée que si sa clé de backend est exportée. Sans backend, le stack
+Gateway ne crée pas de Gateway et son output `gateway_url` est nul.
 
-Depuis chacun des répertoires `infra/bootstrap` et `infra/serverless` :
+- Proxies : `service_type="proxy"`, ingress `ALLOW_ALL`, mais invocation IAM
+  obligatoire. Le module Gateway accorde `roles/run.invoker` à son identité sur
+  les seuls proxies routés, pas sur les workers.
+- Workers : ingress interne et identité dédiée d'invocation Pub/Sub, distincte
+  du runtime. Les abonnements utilisent le push OIDC, sans `event_trigger`.
+- Routes API : Firebase par défaut ; routes de connexion et Discord publiques
+  à la Gateway, avec validation dans le handler concerné.
+- CORS : `cors=true` ajoute un `OPTIONS` public ; le backend doit fournir les
+  en-têtes de réponse CORS.
+
+Voir le [contrat du module Gateway](modules/api-gateway/README.md). La
+[sonde Discord dev](../../docs/discord-hello.md) est activée par
+`enable_discord_hello`, n'est jamais instanciée en prd et publie seulement le
+callback `/discord/interactions` lorsqu'elle est activée.
+
+### Dispositif Discord de diagnostic (dev)
+
+`discord-proxy.tf` et `discord-command.tf` préparent le proxy, le topic, le worker
+privé de vérification, le push OIDC, les retries et la DLQ avec son abonnement
+d'inspection. Les deux abonnements conservent les messages non acquittés 7 jours,
+sans conserver les acquittés et sans expiration pour inactivité.
+
+- `enable_discord_pipeline=true` crée le dispositif en dev seulement.
+- `enable_discord_delivery=true` active ensuite le push et ses droits, après
+  l'initialisation IAM ciblée du deployer et du planner.
+- `use_discord_proxy=true` choisit séparément le proxy comme backend exporté.
+- `dev.tfvars` active la création, sans livraison, et **garde le routage sur hello**.
+- Ces trois flags n'ont aucun effet en prd ; leurs valeurs par défaut sont `false`.
+
+Cette configuration n'est pas appliquée. `infra/iam/discord-verify.tf` prépare
+les droits CI sur le seul nouvel invoker : opt-in dev après création du compte,
+apply IAM autorisé séparément avant activation de la livraison. Voir
+[les phases et prérequis](../../docs/discord-proxy.md).
+Le nom d'abonnement est partagé via une valeur locale pour éviter un cycle
+entre la fonction et l'abonnement.
+
+Revenir vers hello change seulement `use_discord_proxy`, pas les activations du
+pipeline et de la livraison. Les désactiver planifierait des suppressions. Le CLI
+ciblé `--draw` est prêt localement, son exécution réelle, l'alerte DLQ et la validation dev
+restent à faire. Le worker de
+diagnostic n'est pas le futur worker métier.
+
+## Firestore
+
+`firestore.tf` crée la base `(default)` en mode Native dans la région du stack,
+ses index composites (flux de deltas par région et global, tuiles d'une région),
+les exemptions d'indexation des champs binaires et maps (`colors`, `pixels`) et
+les politiques TTL sur `expire_at` des collections `deltas` et
+`processed_events`. Les documents `users/{uid}` n'expirent pas : ils portent le
+quota et le dernier rejet.
+
+- Aucune règle de sécurité : aucun client ne parle à Firestore (ADR-0013).
+  Chaque fonction reçoit sur son compte d'exécution `roles/datastore.user`
+  (écriture) ou `roles/datastore.viewer` (lecture), jamais un rôle projet large.
+- `destroy` supprime la base (`deletion_policy = "DELETE"`). Avec
+  `firestore_deletion_protection = true`, GCP refuse la suppression et le destroy
+  échoue au lieu de perdre la grille.
+- Après une suppression, l'ID `(default)` n'est réutilisable qu'après environ
+  5 minutes : attendre avant de réappliquer le stack.
+- Le TTL supprime les documents expirés en général sous 24 h ; les requêtes
+  filtrent donc toujours sur `created_at` (ADR-0003).
+
+## Secrets
+
+Les conteneurs et valeurs vivent dans Secret Manager ; ce stack donne à chaque
+runtime `secretAccessor` sur les seuls secrets référencés dans le module
+`function`. Utiliser une version numérique activée, jamais une valeur de secret
+dans Terraform. Voir [alimentation et rotation](../iam/SECRETS.md).
+
+## Vérification locale et plan
+
+Depuis la racine du dépôt, construire les sources avant un plan qui les archive :
 
 ```sh
+cd app
+npm ci
+npm run build:functions
+cd ../infra/serverless
 terraform init -backend=false
 terraform validate
+terraform test
 ```
 
-Le module peut aussi être validé depuis `infra/serverless/modules/service` avec les mêmes commandes. Depuis ce répertoire,
-`terraform test` exécute les tests du module avec un provider simulé, sans créer de ressource GCP.
-
-## Initialisation par environnement
-
-Exemple depuis le répertoire du stack concerné, avec une identité GCP autorisée :
+Les tests racine simulent les providers. Les tests de chaque module sont lancés
+séparément par la CI ; Terraform ne les découvre pas automatiquement depuis la
+racine. Pour un plan distant, réinitialiser ensuite le backend sélectionné :
 
 ```sh
 terraform init -reconfigure -backend-config=backends/dev.hcl
 terraform plan -var-file=dev.tfvars
 ```
 
-Remplacer `dev` par `prd` pour la production. Ces commandes ne font pas d'apply. Le bootstrap est persistant et s'applique séparément comme le stack IAM.
+Remplacer ensemble les références dev par prd pour viser prd. Un plan distant
+lit GCP et le state : ce n'est pas un test sans accès cloud.
 
-La CI de PR détecte désormais `bootstrap`, `serverless` et le module `service` pour le formatage, la validation et les tests sans backend. Le module est testé séparément : Terraform ne découvre pas automatiquement ses tests depuis la racine.
+## Déploiement, vérification et retrait
 
-SRV-03 intègre désormais ce stack au déploiement : exécution manuelle →
-`foundation` puis `serverless` en dev ; tag `v*` → même séquence en dev, puis en
-prd, puis `runners` en prd. Un merge/push sur la branche `prod` seul ne déclenche
-pas d'apply. Les contrôles de release incluent aussi `bootstrap`, `serverless`
-et le module `service`. Le bootstrap persistant doit déjà avoir été appliqué
-séparément dans chaque projet pour activer les APIs ; il n'est pas auto-déployé.
+Utiliser [Deploy](../../docs/deployment.md#6-déployer-dev-par-la-ci), pas un
+déploiement `gcloud functions deploy` parallèle à Terraform. Un lancement manuel
+vise dev ; un tag `v*` déclenche aussi prd. Lire les plans et valider la portée
+avant le déclenchement.
 
-Le destroy manuel supprime `serverless` (secrets et toutes leurs versions), puis
-`runners` en prd, puis `foundation`. `iam` et `bootstrap` sont conservés.
-Les plans distants de PR restent limités à `foundation` ; le plan serverless est
-calculé dans le job d'apply avant application. Faire relire un plan serverless
-séparé avant le premier déclenchement, voir [SECRETS.md](SECRETS.md).
-Le build/push des images et la promotion applicative par digest restent dans SRV-02.
+Pour l'essai Discord, l'accord de préparation ne vaut pas accord de déploiement.
+Le workflow actuel ne s'arrête pas entre plan/apply et bascule Gateway : ne pas
+le lancer avant validation du mécanisme de revues séparées décrit dans le guide
+proxy. Aucun workflow de déploiement n'est modifié pour cet essai.
+
+Après application, vérifier les outputs, URLs, génération de source, identité
+runtime et policies d'invocation. Tester un appel autorisé et un refus anonyme,
+puis l'intégration concernée : callback Discord, JWT Firebase ou push Pub/Sub.
+Les tests simulés ne prouvent ni ces permissions réelles ni le délai de réponse.
+
+`Destroy` supprime d'abord Gateway puis les ressources de ce stack, mais conserve `iam`, `access` et
+`bootstrap`. Les archives gérées dans ce state sont supprimées comme objets
+courants ; les versions/rétentions du bucket peuvent conserver des données et
+des coûts. Consulter [suppression et reprise](../../docs/deployment.md#suppression)
+avant tout nettoyage complet ; ne pas supprimer des generations ou states sans
+examiner leurs usages et sauvegardes.

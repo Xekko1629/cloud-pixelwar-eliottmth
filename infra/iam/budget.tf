@@ -1,10 +1,5 @@
 # Budget alerts on this project, emailed to the admins and users of the billing account (the 3 team members)
 
-resource "google_project_service" "billingbudgets" {
-  service            = "billingbudgets.googleapis.com"
-  disable_on_destroy = false
-}
-
 data "google_project" "current" {}
 
 resource "google_billing_budget" "project" {
@@ -32,5 +27,5 @@ resource "google_billing_budget" "project" {
     }
   }
 
-  depends_on = [google_project_service.billingbudgets]
+  depends_on = [google_project_service.apis]
 }
