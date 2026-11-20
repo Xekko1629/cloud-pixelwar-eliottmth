@@ -22,20 +22,22 @@ body {
 }
 
 .app {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
 }
 
 .app__header {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 12px;
+  gap: 4px 12px;
+  padding: 10px 16px;
 }
 
 .app__header h1 {
   margin: 0;
-  font-size: 28px;
+  font-size: 22px;
 }
 
 .app__environment {
@@ -48,5 +50,41 @@ body {
 }
 
 .app__status {
+  margin: 0;
   color: var(--muted);
+  font-size: 13px;
+}
+
+.pixel-canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.pixel-canvas__surface {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Pointer events drive pan and pinch: no browser scroll or page zoom on the grid. */
+  touch-action: none;
+  cursor: crosshair;
+  background: #fff;
+}
+
+.pixel-canvas__surface:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.pixel-canvas__status {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgb(28 28 26 / 0.75);
+  color: #fff;
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
