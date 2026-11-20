@@ -78,13 +78,14 @@ run "ttl_and_index_exemptions" {
     condition = toset([for key, field in google_firestore_field.main : key if length(field.ttl_config) == 1]) == toset([
       "deltas_expire_at",
       "processed_events_expires",
+      "admin_events_expires",
     ])
-    error_message = "Only deltas and deduplication records expire; users/{uid} keeps the quota and last rejection."
+    error_message = "Only deltas and deduplication records (draws and admin commands) expire; users/{uid} keeps the quota and last rejection."
   }
 
   assert {
     condition = (
-      length(google_firestore_field.main) == 7 &&
+      length(google_firestore_field.main) == 8 &&
       alltrue([for field in google_firestore_field.main : length(field.index_config) == 1 && length(field.index_config[0].indexes) == 0])
     )
     error_message = "Binary, map, TTL and deduplication fields are excluded from single-field indexing."
