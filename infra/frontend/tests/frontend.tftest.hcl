@@ -2,6 +2,9 @@ mock_provider "google" {
   mock_resource "google_cloud_run_v2_service" {
     defaults = { uri = "https://frontend-abc-ew.a.run.app" }
   }
+  mock_data "google_project" {
+    defaults = { number = "123456789012" }
+  }
 }
 
 variables {
@@ -33,8 +36,11 @@ run "service_from_image_digest" {
   }
 
   assert {
-    condition     = output.discord_redirect_uri == "https://frontend-abc-ew.a.run.app/auth/callback"
-    error_message = "Expose the Discord redirect URI of this environment."
+    condition = (
+      output.frontend_url == "https://frontend-123456789012.europe-west1.run.app" &&
+      output.discord_redirect_uri == "https://frontend-123456789012.europe-west1.run.app/auth/callback"
+    )
+    error_message = "Expose the deterministic URL, the origin the auth-proxy allows and redirects to."
   }
 }
 

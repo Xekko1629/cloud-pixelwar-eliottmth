@@ -81,3 +81,20 @@ variable "firestore_deletion_protection" {
   type        = bool
   default     = false
 }
+
+variable "enable_auth_proxy" {
+  description = "Deploy the auth-proxy (Discord login and session JWTs) and publish its routes on the gateway"
+  type        = bool
+  default     = false
+}
+
+variable "discord_oauth_client_secret_version" {
+  description = "Explicit numeric Secret Manager version of discord-oauth-client-secret for the auth-proxy"
+  type        = string
+  default     = "1"
+
+  validation {
+    condition     = can(regex("^[1-9][0-9]*$", var.discord_oauth_client_secret_version))
+    error_message = "Select an explicit numeric secret version, not latest."
+  }
+}

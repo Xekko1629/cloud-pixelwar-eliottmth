@@ -88,6 +88,23 @@ ciblé `--draw` est prêt localement, son exécution réelle, l'alerte DLQ et la
 restent à faire. Le worker de
 diagnostic n'est pas le futur worker métier.
 
+## Authentification web (auth-proxy)
+
+`auth-proxy.tf` déploie la fonction de connexion Discord et de session web
+([README](../../app/functions/auth-proxy/README.md), ADR-0012), activée par
+`enable_auth_proxy` (dev d'abord). Elle est exportée vers la gateway comme backend
+`auth` : `/auth/login`, `/auth/exchange` et `/api/session/refresh`.
+
+- Seule son identité d'exécution reçoit `roles/iam.serviceAccountTokenCreator`, sur
+  le seul compte `session-signer`. Ce binding demande au deployer le droit
+  `iam.serviceAccounts.setIamPolicy` sur ce compte (rôle `serviceAccountAdmin` de
+  SEC-01, #136).
+- Secrets `discord-application-id` et `discord-oauth-client-secret`, en versions
+  numériques explicites.
+- L'output `frontend_origin` donne l'URL déterministe du frontend : seule origine
+  CORS, et `<frontend_origin>/auth/callback` est la redirect URI à enregistrer dans
+  l'application Discord de l'environnement.
+
 ## Firestore
 
 `firestore.tf` crée la base `(default)` en mode Native dans la région du stack,
