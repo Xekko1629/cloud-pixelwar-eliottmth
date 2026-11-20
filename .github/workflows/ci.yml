@@ -187,10 +187,23 @@ jobs:
   application:
     uses: ./.github/workflows/_app-test.yml
 
+  # Every component declared in Terraform is drawn, and the committed diagram is up to date
+  # (docs/architecture/diagram.py). Standard library only: no Graphviz, no write permission.
+  diagram:
+    name: architecture diagram
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Diagram matches the Terraform code
+        run: python docs/architecture/diagram.py --check
+
   # Always reported, even when every other job is skipped: use it as the required status check
   result:
     name: CI result
-    needs: [changes, fmt, lint, validate, test, plan, plan-serverless, plan-bootstrap, plan-gateway, frontend-image, plan-frontend, application]
+    needs: [changes, fmt, lint, validate, test, plan, plan-serverless, plan-bootstrap, plan-gateway, frontend-image, plan-frontend, application, diagram]
     if: always()
     runs-on: ubuntu-latest
     steps:
