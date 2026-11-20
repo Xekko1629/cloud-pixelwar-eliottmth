@@ -33,7 +33,7 @@ La grille est infinie par défaut, mais un admin peut la borner, puis la rendre 
   - Sans option : la grille redevient infinie.
   - Avec `width` et `height` : la grille devient le rectangle allant de `(0, 0)` à `(width - 1, height - 1)`.
   - Chaque côté va de 10 000 (le minimum du sujet, §3.3) à 10⁹ (la borne de validation ci-dessus).
-- **Stockage** : `config/global.size`, qui vaut `null` (infinie) ou `{ width, height }`. Le `command-worker` l'écrit, comme il écrit l'état de pause.
+- **Stockage** : `config/global.size`, qui vaut `null` (infinie) ou `{ width, height }`. L'`admin-worker` (BOT-08) l'écrit, comme l'état de pause ; le `command-worker` ne fait que router la commande.
 - **Qui vérifie quoi** :
   - les proxies valident seulement les bornes fixes (±10⁹ et la palette). Ils ne lisent pas Firestore, et restent donc légers ;
   - le `draw-worker` lit `config/global.size`, comme la pause, et rejette les pixels hors de la grille avec le motif `out_of_bounds` (`pixel-rejected`) ;

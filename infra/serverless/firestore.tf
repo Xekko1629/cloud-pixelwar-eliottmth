@@ -32,6 +32,8 @@ locals {
     # Deduplication records (DATA-02): the digest and the kept result are read by ID only.
     processed_events_digest = { collection = "processed_events", field = "request_digest", ttl = false }
     processed_events_result = { collection = "processed_events", field = "result", ttl = false }
+    # Deduplication records of /admin (BOT-08): same 15-day retention as processed_events.
+    admin_events_expires = { collection = "admin_events", field = "expire_at", ttl = true }
   }
 }
 
