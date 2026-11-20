@@ -1,0 +1,31 @@
+name: No public resource
+
+# SEC-01: after a deployment, no Cloud Run service (except frontend, ADR-0011) and no bucket
+# may be public, and every bucket enforces public access prevention. Read only (planner identity).
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: Target environment (dev or prd)
+        type: string
+        required: true
+
+jobs:
+  check:
+    name: no public resource (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    # "<env>-plan" holds the read-only planner identity, without approval rules
+    environment: ${{ inputs.environment }}-plan
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOYER_SA }}
+
+      - name: Check that nothing is public
+        run: bash scripts/check-no-public.sh "$GOOGLE_CLOUD_PROJECT"
