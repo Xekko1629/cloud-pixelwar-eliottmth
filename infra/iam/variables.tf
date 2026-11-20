@@ -73,6 +73,9 @@ variable "deployer_grantable_roles" {
     "roles/datastore.viewer",
     # GKE nodes (infra/foundation)
     "roles/artifactregistry.reader",
+    # function-builder reads the sources Cloud Functions stages in its own bucket
+    # (infra/bootstrap, project grant restricted by a condition to those objects)
+    "roles/storage.objectViewer",
   ]
 }
 

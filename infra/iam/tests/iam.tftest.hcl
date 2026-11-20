@@ -141,6 +141,15 @@ run "deployer_least_privilege" {
   }
 
   assert {
+    # Project grants of the CI stacks: function runtimes, GKE nodes, function-builder (bootstrap)
+    condition = alltrue([
+      for role in ["roles/logging.logWriter", "roles/monitoring.metricWriter", "roles/cloudtrace.agent", "roles/artifactregistry.reader", "roles/storage.objectViewer"] :
+      strcontains(google_project_iam_member.deployer_project_iam.condition[0].expression, role)
+    ])
+    error_message = "The deployer may grant every project role the bootstrap, foundation and serverless stacks bind."
+  }
+
+  assert {
     condition     = !contains([for binding in google_project_iam_member.deployer : binding.role], "roles/container.admin")
     error_message = "Without a cluster (dev), the deployer gets no GKE role."
   }

@@ -43,6 +43,8 @@ resource "google_project_iam_custom_role" "planner_resource_iam_read" {
     "storage.buckets.getIamPolicy",
     "pubsub.topics.getIamPolicy",
     "pubsub.subscriptions.getIamPolicy",
+    # Bindings on service accounts, e.g. tokenCreator on session-signer (WEB-02a)
+    "iam.serviceAccounts.getIamPolicy",
   ]
 
   depends_on = [google_project_service.apis]
