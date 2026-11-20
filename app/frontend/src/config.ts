@@ -5,10 +5,17 @@ export interface FrontendConfig {
   environment: 'dev' | 'prd' | 'local';
   // Base URL of API Gateway, without trailing slash; null until a proxy is published.
   gatewayUrl: string | null;
-  // Server-Sent Events service of the deltas (ADR-0013); null until it is deployed.
-  realtimeUrl: string | null;
+  // Public web configuration of the Firestore listeners (ADR-0015); null until DRAW-03a.
+  firestore: FirestoreConfig | null;
   // Discord OAuth2 client id (public); null until WEB-02b.
   discordClientId: string | null;
+}
+
+// Read-only access to `deltas` and `config/global`, enforced by the Security Rules: the
+// API key only identifies the project, it grants nothing by itself.
+export interface FirestoreConfig {
+  projectId: string;
+  apiKey: string;
 }
 
 declare global {
@@ -37,6 +44,13 @@ function snowflake(value: unknown): string | null {
   return typeof value === 'string' && /^[1-9][0-9]{0,19}$/.test(value) ? value : null;
 }
 
+// Both values are needed; one without the other cannot open a listener.
+function firestore(projectId: unknown, apiKey: unknown): FirestoreConfig | null {
+  if (typeof projectId !== 'string' || !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(projectId)) return null;
+  if (typeof apiKey !== 'string' || !/^AIza[0-9A-Za-z_-]{35}$/.test(apiKey)) return null;
+  return { projectId, apiKey };
+}
+
 /** Validates the raw object of /config.js. Invalid or missing fields fall back to null. */
 export function parseConfig(raw: unknown): FrontendConfig {
   const source = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
@@ -46,7 +60,7 @@ export function parseConfig(raw: unknown): FrontendConfig {
   return {
     environment,
     gatewayUrl: httpsUrl(source.gatewayUrl),
-    realtimeUrl: httpsUrl(source.realtimeUrl),
+    firestore: firestore(source.firestoreProjectId, source.firestoreApiKey),
     discordClientId: snowflake(source.discordClientId),
   };
 }

@@ -12,7 +12,7 @@ on:
         type: string
         default: foundation
       runner:
-        description: Runner label (empty = RUNNER_LABEL variable, then ubuntu-latest)
+        description: Runner label (empty = RUNNER_SMALL variable, then ubuntu-latest)
         type: string
         default: ""
 
@@ -24,7 +24,7 @@ env:
 jobs:
   plan:
     name: plan ${{ inputs.stack }} (${{ inputs.environment }})
-    runs-on: ${{ inputs.runner || vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner || vars.RUNNER_SMALL || 'ubuntu-latest' }}
     # "<env>-plan" holds the read-only planner identity, without approval rules
     environment: ${{ inputs.environment }}-plan
     permissions:

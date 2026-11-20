@@ -11,7 +11,15 @@ locals {
   gateway_url = try(data.terraform_remote_state.gateway.outputs.gateway_url, null)
 
   image_repository = "${var.region}-docker.pkg.dev/${var.project_id}/pixelwar/frontend"
-  deployed         = var.image != null
+  # Deterministic Cloud Run URL (https://<service>-<project number>.<region>.run.app). The
+  # auth-proxy computes the same one for CORS and the Discord redirect URI: users must use this
+  # origin, since the OAuth state is kept in the sessionStorage of the origin.
+  frontend_url = "https://frontend-${data.google_project.current.number}.${var.region}.run.app"
+  deployed     = var.image != null
+}
+
+data "google_project" "current" {
+  project_id = var.project_id
 }
 
 data "terraform_remote_state" "gateway" {
@@ -77,9 +85,14 @@ resource "google_cloud_run_v2_service" "frontend" {
         name  = "GATEWAY_URL"
         value = local.gateway_url == null ? "" : local.gateway_url
       }
+      # Firestore listeners in the browser, read-only by the Security Rules (ADR-0015).
       env {
-        name  = "REALTIME_URL"
-        value = var.realtime_url
+        name  = "FIRESTORE_PROJECT_ID"
+        value = var.project_id
+      }
+      env {
+        name  = "FIRESTORE_API_KEY"
+        value = var.firestore_api_key
       }
       env {
         name  = "DISCORD_CLIENT_ID"
@@ -96,8 +109,8 @@ resource "google_cloud_run_v2_service" "frontend" {
   }
 }
 
-# The only public service of the project with realtime (ADR-0011, ADR-0013): static files
-# only, no API. SEC-01 lists this binding as an accepted exception.
+# The only public service of the project (ADR-0011, ADR-0015): static files only, no API.
+# SEC-01 lists this binding as the accepted exception.
 resource "google_cloud_run_v2_service_iam_member" "public" {
   count = local.deployed ? 1 : 0
 
@@ -109,13 +122,13 @@ resource "google_cloud_run_v2_service_iam_member" "public" {
 }
 
 output "frontend_url" {
-  description = "Public HTTPS URL of the frontend; null when no image is deployed"
-  value       = one(google_cloud_run_v2_service.frontend[*].uri)
+  description = "Public HTTPS URL of the frontend (deterministic form); null when no image is deployed"
+  value       = local.deployed ? local.frontend_url : null
 }
 
 output "discord_redirect_uri" {
-  description = "Redirect URI to register in the Discord application of this environment (WEB-02)"
-  value       = local.deployed ? "${google_cloud_run_v2_service.frontend[0].uri}/auth/callback" : null
+  description = "Redirect URI to register in the Discord application of this environment (known before the first deploy)"
+  value       = "${local.frontend_url}/auth/callback"
 }
 
 output "image_repository" {

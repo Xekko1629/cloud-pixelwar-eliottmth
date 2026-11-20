@@ -58,9 +58,9 @@ Les autres champs (`event_id`, `occurred_at`, `source`, `actor`, `payload`) ne v
 | Topic | Producteur(s) | Consommateur(s) (abonnement) | Ticket(s) |
 |---|---|---|---|
 | `discord-command` | `discord-proxy` (après réponse différée `type: 5`) | `command-worker` | BOT-03, BOT-04 |
-| `pixel-draw` | `web-proxy` (`POST /api/pixels`) ; `command-worker` pour `/draw` (`source = discord`) | `draw-worker` | DRAW-01, DRAW-02, BOT-04 |
-| `pixel-processed` | `draw-worker` | `discord-notifier` (acquitte sans action les résultats `source = web`) ; consommateur de marquage de la vue éloignée | DRAW-02, BOT-05, DATA-05c |
-| `pixel-rejected` | `draw-worker` | `discord-notifier` | DRAW-02, BOT-05 |
+| `pixel-draw` | `web-proxy` (`POST /api/pixels`, un message par pixel de la requête, [ADR-0014](adr/0014-un-evenement-par-pixel.md)) ; `command-worker` pour `/draw` (`source = discord`) | `draw-worker` | DRAW-01, DRAW-02, BOT-04 |
+| `pixel-processed` | `draw-worker`, un message par `pixel-draw` | `discord-notifier` (acquitte sans action les résultats `source = web`) ; consommateur de marquage de la vue éloignée | DRAW-02, BOT-05, DATA-05c |
+| `pixel-rejected` | `draw-worker`, un message par `pixel-draw` | `discord-notifier` | DRAW-02, BOT-05 |
 | `command-rejected` | `command-worker` (`/admin` ou `/snapshot` non autorisé) | À venir : réponse Discord du refus (nom du consommateur **à valider**) | BOT-04 |
 | `admin-requested` | `command-worker` (`/admin`, après autorisation) | À venir : `admin-worker` (nom **à valider**) | BOT-04, BOT-08 |
 | `render-requested` | `command-worker` (`/get`) | `render-worker` | BOT-04, BOT-06 |
@@ -68,7 +68,7 @@ Les autres champs (`event_id`, `occurred_at`, `source`, `actor`, `payload`) ne v
 | `snapshot-ready` | Cloud Storage : notification `OBJECT_FINALIZE` du bucket `snapshots` (message natif, sans enveloppe, section 5) | `snapshot-notifier` | SRV-07, BOT-07b |
 | `overview-tick` (nom **à valider**) | Cloud Scheduler (message natif, section 6) | `overview-worker` | SRV-05, DATA-05c |
 
-Un pixel posé sur le web n'est pas notifié par `pixel-rejected` : le dernier rejet et sa raison sont reportés dans `users/{uid}`, que le navigateur reçoit par l'événement `user` du flux `realtime` (DRAW-04 ; ADR-0013). Le nom du champ (par exemple `last_rejection`) est une proposition. Le topic `pixel-rejected` ne sert donc qu'au `discord-notifier`.
+Un pixel posé sur le web n'est pas notifié par `pixel-rejected` : le dernier rejet et sa raison sont reportés dans `users/{uid}`, que le navigateur lit par `GET /api/state` au chargement et après chaque trait (DRAW-04 ; ADR-0015). Le nom du champ (par exemple `last_rejection`) est une proposition. Le topic `pixel-rejected` ne sert donc qu'au `discord-notifier`.
 
 Les DLQ sont décrites en section 7.
 
@@ -133,10 +133,7 @@ Contraintes complémentaires :
 
 ```json
 {
-  "pixels": [
-    { "x": 12, "y": -40, "color": 5 },
-    { "x": 13, "y": -40, "color": 5 }
-  ]
+  "pixels": [{ "x": 12, "y": -40, "color": 5 }]
 }
 ```
 
@@ -196,15 +193,15 @@ Motifs de rejet (`reason`) :
     "uid": "123456789012345678",
     "canvas_version": 3,
     "type": "pixel-processed",
-    "requested_pixels": 2,
-    "applied_pixels": 2,
+    "requested_pixels": 1,
+    "applied_pixels": 1,
     "ignored_pixels": 0,
     "regions": ["0_-1"]
   }
 }
 ```
 
-L'exemple correspond aux pixels `(12, -40)` et `(13, -40)` : `rx = floor(12 / 1024) = 0` et `ry = floor(-40 / 1024) = -1`, donc la région `0_-1` (`regionId(rx, ry)` renvoie `${rx}_${ry}`).
+L'exemple correspond au pixel `(12, -40)` : `rx = floor(12 / 1024) = 0` et `ry = floor(-40 / 1024) = -1`, donc la région `0_-1` (`regionId(rx, ry)` renvoie `${rx}_${ry}`).
 
 Le message ne contient jamais le détail d'une erreur technique ni d'une dépendance (`docs/observability.md`).
 
@@ -435,7 +432,7 @@ Décisions que les sources ne tranchent pas. Chacune est à valider avant SRV-05
 4. **Publication fiable du résultat après commit.** `docs/rate-limits.md` indique que ce point reste ouvert : le résultat stocké doit être republié si le commit a réussi mais que la publication a échoué.
 5. **Horizon de déduplication.** `docs/rate-limits.md` fixe un horizon de rejeu de 7 jours, ADR-0008 parle de 15 jours pour le bucket de sources. Les deux chiffres sont à aligner avec la rétention Pub/Sub (7 jours).
 6. ~~**Motif `out_of_bounds`.**~~ Tranché par DATA-02 : motif de `pixel-rejected` à part entière (section 3.3). La liste des motifs de métrique de `docs/observability.md` reste à aligner.
-7. ~~**Coordonnée en double dans un lot.**~~ Tranché par DRAW-01 : refusée par le proxy (`400`, section 3.2).
+7. ~~**Coordonnée en double dans un lot.**~~ Tranché par DRAW-01 et ADR-0014 : refusée par le proxy (`400`, section 3.2). Le regroupement des écritures dans une instance n'est activé que si le mode de base reste sous 200 pixels par seconde et par instance.
 8. ~~**`canvas_version`.**~~ Tranché par DATA-02 : lu dans `config/global` pendant la transaction (section 3.2).
 9. **Régions marquées** pour la vue éloignée : collection, format, remise à zéro, et déclencheur de la régénération complète après `/admin clear` (DATA-05c).
 10. **Noms** : topic `overview-tick`, consommateur de marquage, et adoption de la convention de nommage des abonnements (section 7.1).
