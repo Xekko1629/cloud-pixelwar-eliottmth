@@ -8,15 +8,17 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "types": ["node"],
-    "lib": ["ES2023", "DOM"]
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx"
   },
   "include": [
     "shared/**/*.ts",
     "functions/**/*.ts",
     "tools/**/*.ts",
     "frontend/**/*.ts",
+    "frontend/**/*.tsx",
     "testing/**/*.ts",
     "vitest*.ts"
   ],
-  "exclude": ["node_modules", "coverage"]
+  "exclude": ["node_modules", "coverage", "frontend/dist"]
 }

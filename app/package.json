@@ -12,7 +12,8 @@
     "test:coverage": "vitest run --config vitest.config.ts --coverage",
     "emulators": "firebase emulators:start --project demo-pixelwar-test --only firestore,pubsub",
     "test:integration": "firebase emulators:exec --project demo-pixelwar-test --only firestore,pubsub 'vitest run --config vitest.integration.config.ts'",
-    "build:functions": "tsx tools/build-functions/src/cli.ts"
+    "build:functions": "tsx tools/build-functions/src/cli.ts",
+    "build:frontend": "npm run build --workspace=@pixelwar/frontend"
   },
   "devDependencies": {
     "@opentelemetry/api": "1.10.0",

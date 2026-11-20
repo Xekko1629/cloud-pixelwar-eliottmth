@@ -88,6 +88,26 @@ ciblé `--draw` est prêt localement, son exécution réelle, l'alerte DLQ et la
 restent à faire. Le worker de
 diagnostic n'est pas le futur worker métier.
 
+## Firestore
+
+`firestore.tf` crée la base `(default)` en mode Native dans la région du stack,
+ses index composites (flux de deltas par région et global, tuiles d'une région),
+les exemptions d'indexation des champs binaires et maps (`colors`, `pixels`) et
+les politiques TTL sur `expire_at` des collections `deltas` et
+`processed_events`. Les documents `users/{uid}` n'expirent pas : ils portent le
+quota et le dernier rejet.
+
+- Aucune règle de sécurité : aucun client ne parle à Firestore (ADR-0013).
+  Chaque fonction reçoit sur son compte d'exécution `roles/datastore.user`
+  (écriture) ou `roles/datastore.viewer` (lecture), jamais un rôle projet large.
+- `destroy` supprime la base (`deletion_policy = "DELETE"`). Avec
+  `firestore_deletion_protection = true`, GCP refuse la suppression et le destroy
+  échoue au lieu de perdre la grille.
+- Après une suppression, l'ID `(default)` n'est réutilisable qu'après environ
+  5 minutes : attendre avant de réappliquer le stack.
+- Le TTL supprime les documents expirés en général sous 24 h ; les requêtes
+  filtrent donc toujours sur `created_at` (ADR-0003).
+
 ## Secrets
 
 Les conteneurs et valeurs vivent dans Secret Manager ; ce stack donne à chaque

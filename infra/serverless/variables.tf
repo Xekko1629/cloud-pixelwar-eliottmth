@@ -75,3 +75,9 @@ variable "discord_application_id_version" {
     error_message = "Select an explicit numeric secret version, not latest."
   }
 }
+
+variable "firestore_deletion_protection" {
+  description = "Refuse the deletion of the Firestore database (destroy then fails); false keeps destroy fully automatic"
+  type        = bool
+  default     = false
+}
