@@ -11,7 +11,7 @@ export function App({ config }: { config: FrontendConfig }) {
       </header>
       <section className="app__status" aria-label="État des services">
         <p>API : {config.gatewayUrl ? 'disponible' : 'pas encore publiée'}</p>
-        <p>Temps réel : {config.realtimeUrl ? 'disponible' : 'pas encore déployé'}</p>
+        <p>Temps réel : {config.firestore ? 'disponible' : 'pas encore configuré'}</p>
       </section>
     </main>
   );

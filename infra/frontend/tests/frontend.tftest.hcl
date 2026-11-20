@@ -49,10 +49,11 @@ run "runtime_configuration" {
     condition = {
       for env in google_cloud_run_v2_service.frontend[0].template[0].containers[0].env : env.name => env.value
       } == {
-      APP_ENV           = "dev"
-      GATEWAY_URL       = "https://pixelwar-abc.ew.gateway.dev"
-      REALTIME_URL      = ""
-      DISCORD_CLIENT_ID = "1234567890123456789"
+      APP_ENV              = "dev"
+      GATEWAY_URL          = "https://pixelwar-abc.ew.gateway.dev"
+      FIRESTORE_PROJECT_ID = "pixelwar-test"
+      FIRESTORE_API_KEY    = ""
+      DISCORD_CLIENT_ID    = "1234567890123456789"
     }
     error_message = "The container gets the public configuration of its environment, and nothing else."
   }
@@ -118,12 +119,12 @@ run "reject_image_of_another_project" {
   expect_failures = [google_cloud_run_v2_service.frontend]
 }
 
-run "reject_realtime_url_with_path" {
+run "reject_malformed_firestore_api_key" {
   command = plan
 
   variables {
-    realtime_url = "https://realtime.example.run.app/stream"
+    firestore_api_key = "AIza-not-a-key\"; alert(1)"
   }
 
-  expect_failures = [var.realtime_url]
+  expect_failures = [var.firestore_api_key]
 }
