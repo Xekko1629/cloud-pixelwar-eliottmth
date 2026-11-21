@@ -9,3 +9,6 @@ enable_auth_proxy    = true
 enable_discord_pipeline = true
 enable_discord_delivery = true
 use_discord_proxy       = true
+
+# Web path (DRAW-01, SRV-11): POST /api/pixels and the grid reads behind the gateway.
+enable_web_api = true

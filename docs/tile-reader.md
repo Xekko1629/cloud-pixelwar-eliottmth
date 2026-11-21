@@ -5,9 +5,9 @@
 `app/functions/tile-reader/` fournit le handler HTTP Functions Framework
 `handleTileReader`. Sans Firebase, le navigateur ne lit plus Firestore : ce proxy
 est son seul chemin de lecture, derrière la gateway et avec le JWT de session
-([ADR-0013](adr/0013-lectures-temps-reel-sans-firebase.md)). Cette livraison est
-**locale, non déployée** : ni la fonction, ni son compte, ni le backend de la
-gateway ne sont déclarés en Terraform.
+([ADR-0013](adr/0013-lectures-temps-reel-sans-firebase.md)). La fonction, son
+compte et le backend `tiles` sont déclarés dans `infra/serverless/web-path.tf`,
+ses routes dans `infra/gateway/routes.tf` ([déploiement dev](deploy-web-path.md)).
 
 Le proxy lit Firestore et n'écrit jamais : son compte d'exécution n'aura que
 `roles/datastore.viewer`. Les écritures restent dans la transaction DATA-02.
@@ -169,9 +169,6 @@ changement de version, métadonnées sans id Discord, quota et dernier refus.
 
 ## Reste à faire avant la validation dev
 
-- Terraform : fonction (`service_type = "proxy"`), compte avec
-  `roles/datastore.viewer`, routes dans `infra/gateway/routes.tf` (auth `session`,
-  `cors = true`) et backend exporté dans `gateway_contract`.
 - Vérifier en dev que la gateway transmet `Content-Encoding: gzip`, `ETag` et le
   `304`, et le format réel de `X-Apigateway-Api-Userinfo`.
 - URL signées de la vue éloignée, après SRV-07 et DATA-05c.

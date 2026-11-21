@@ -17,8 +17,10 @@ module "pixel_draw" {
   project_id = var.project_id
   name       = local.pixel_draw_topic
   labels     = local.labels
-  # The web-proxy (DRAW-01) is added with the web path.
-  publishers = { command_worker = module.command_worker[0].service_account_member }
+  publishers = merge(
+    { command_worker = module.command_worker[0].service_account_member },
+    local.web_api_enabled ? { web_proxy = module.web_proxy[0].service_account_member } : {},
+  )
 }
 
 module "pixel_processed" {

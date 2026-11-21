@@ -24,7 +24,21 @@ locals {
     }
   } : {}
 
-  gateway_backends = merge(local.discord_backends, local.auth_backends)
+  # POST /api/pixels (backend "api") and the grid reads (backend "tiles").
+  web_backends = local.web_api_enabled ? {
+    api = {
+      function_name = module.web_proxy[0].name
+      uri           = module.web_proxy[0].uri
+      service_type  = module.web_proxy[0].service_type
+    }
+    tiles = {
+      function_name = module.tile_reader[0].name
+      uri           = module.tile_reader[0].uri
+      service_type  = module.tile_reader[0].service_type
+    }
+  } : {}
+
+  gateway_backends = merge(local.discord_backends, local.auth_backends, local.web_backends)
 }
 
 output "gateway_contract" {
@@ -45,6 +59,11 @@ output "gateway_contract" {
   precondition {
     condition     = var.environment != "dev" || !var.enable_discord_delivery || local.discord_pipeline_enabled
     error_message = "Create the dev Discord pipeline before enabling delivery."
+  }
+
+  precondition {
+    condition     = !var.enable_web_api || var.environment != "dev" || local.discord_delivery_enabled
+    error_message = "The web API publishes to pixel-draw: enable the dev pipeline and its delivery first."
   }
 }
 

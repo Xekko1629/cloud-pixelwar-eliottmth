@@ -3,9 +3,9 @@
 ## Périmètre et état
 
 `app/functions/web-proxy/` fournit le handler HTTP Functions Framework
-`handleWebProxy`, qui reçoit `POST /api/pixels` derrière la gateway. Cette
-livraison est **locale, non déployée** : ni la fonction, ni le topic
-`pixel-draw`, ni le backend `api` de la gateway ne sont déclarés en Terraform.
+`handleWebProxy`, qui reçoit `POST /api/pixels` derrière la gateway. La fonction,
+son droit de publication sur `pixel-draw` et le backend `api` sont déclarés dans
+`infra/serverless/web-path.tf` ([déploiement dev](deploy-web-path.md)).
 
 Le proxy valide toute la requête (1 à 500 pixels), puis publie **un message
 `pixel-draw` par pixel** ([ADR-0014](adr/0014-un-evenement-par-pixel.md), catalogue
@@ -158,10 +158,6 @@ publication, le passage par le vrai Functions Framework, et le contrat avec le
 
 ## Reste à faire avant la validation dev
 
-- Déclarer en Terraform la fonction, son compte avec `roles/pubsub.publisher`
-  sur `pixel-draw` uniquement, le topic `pixel-draw` (SRV-05) et le backend `api`
-  exporté dans `gateway_contract` (la route est déjà déclarée dans
-  `infra/gateway/routes.tf`).
 - Vérifier en dev le format réel de `X-Apigateway-Api-Userinfo` et le `401` de
   la gateway sans JWT.
 - Mesurer la latence de publication à froid.

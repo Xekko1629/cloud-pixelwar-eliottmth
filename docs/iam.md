@@ -58,6 +58,8 @@ portant son nom :
 | `command-worker` | `pubsub.publisher` | Topic `pixel-draw` | Publier le dessin d'un `/draw`. |
 | `draw-worker` | `datastore.user` | Projet | Transaction DATA-02 : tuiles, quotas, résultats, `config/global`. Rôle Firestore disponible seulement au niveau projet. |
 | | `pubsub.publisher` | Topics `pixel-processed`, `pixel-rejected` | Publier le résultat de chaque dessin. |
+| `web-proxy` | `pubsub.publisher` | Topic `pixel-draw` | Publier un événement par pixel dessiné sur le web (ADR-0014). |
+| `tile-reader` | `datastore.viewer` | Projet | Lire tuiles, métadonnées, `config/global` et le document de l'appelant. Jamais d'écriture. |
 | `auth-proxy` | `iam.serviceAccountTokenCreator` | `session-signer` seulement | Signer les JWT de session avec `signJwt` (ADR-0012). |
 | `invoke-<hash>` (un par worker) | `run.invoker` | Le service du worker | Identité OIDC de l'abonnement push Pub/Sub. Les workers sont en ingress interne. |
 | `pixelwar-gateway` | `run.invoker` | Chaque backend routé par la gateway | Seule identité qui appelle les proxys. Les proxys sont en ingress `ALLOW_ALL`, mais protégés par IAM. |
