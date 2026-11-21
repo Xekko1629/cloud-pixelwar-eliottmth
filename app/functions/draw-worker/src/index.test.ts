@@ -29,6 +29,7 @@ describe('draw-worker handler', () => {
     const { invoke, res } = setup({ process: processing, publish: publication });
     const pending = invoke();
     expect(res.status).not.toHaveBeenCalled(); expect(publication).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(processing).toHaveBeenCalledTimes(1));
     release(processedResult(processing.mock.calls[0][0]));
     await Promise.resolve();
     expect(publication).toHaveBeenCalledTimes(1); expect(res.status).not.toHaveBeenCalled();
@@ -65,7 +66,9 @@ describe('draw-worker handler', () => {
     publish.mockRejectedValueOnce(new Error('synthetic-interaction-token'));
     await invoke(); expect(res.status).toHaveBeenLastCalledWith(503); expect(res.send).not.toHaveBeenCalled();
     await invoke(); expect(res.status).toHaveBeenLastCalledWith(204);
-    expect(publish.mock.calls[0]).toEqual(publish.mock.calls[1]);
+    expect(publish.mock.calls[0][0]).toEqual(publish.mock.calls[1][0]);
+    expect(publish.mock.calls[0][1].correlation_id).toBe(publish.mock.calls[1][1].correlation_id);
+    expect(publish.mock.calls[0][1].traceparent.split('-')[1]).toBe(publish.mock.calls[1][1].traceparent.split('-')[1]);
     expect(JSON.stringify(write.mock.calls)).not.toContain('synthetic-interaction-token');
   });
   it('rejects malformed messages without reaching Firestore', async () => {

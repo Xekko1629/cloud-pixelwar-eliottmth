@@ -50,6 +50,10 @@ describe('dev-only Discord command verification', () => {
     expect(write).toHaveBeenCalledTimes(2);
     expect(write.mock.calls[0]).toEqual(write.mock.calls[1]);
   });
+  it('accepts a sampled W3C trace emitted by the instrumented proxy', async () => {
+    const body = pushBody(); body.message.attributes.traceparent = body.message.attributes.traceparent.slice(0, -1) + '1';
+    const { invoke, res } = setup(); await invoke(body); expect(res.status).toHaveBeenCalledWith(204);
+  });
   it.each([
     null, [], {}, { message: {} }, { ...pushBody(), subscription: 'other' },
     { ...pushBody(), message: { ...pushBody().message, messageId: 'synthetic-interaction-token' } },

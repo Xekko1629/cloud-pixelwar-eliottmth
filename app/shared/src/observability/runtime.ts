@@ -5,8 +5,8 @@ import { resourceFromAttributes } from '@opentelemetry/resources';
 import { MeterProvider, type IMetricReader } from '@opentelemetry/sdk-metrics';
 import { TracerProvider, BatchSpanProcessor, ParentBasedSampler, TraceIdRatioBasedSampler, type SpanExporter } from '@opentelemetry/sdk-trace';
 import { correlationKey, extractMessageContext, extractRequestContext, injectMessageContext, type TraceCarrier } from './context';
-import { createLogger, type LogFields } from './logger';
-import { createPixelMetrics } from './metrics';
+import { createLogger, logContextFields, type LogFields } from './logger';
+import { createPixelMetrics, createFunctionMetrics } from './metrics';
 
 export interface ObservabilityOptions {
   serviceName: string;
@@ -18,11 +18,14 @@ export interface ObservabilityOptions {
   spanExporter?: SpanExporter;
   metricReader?: IMetricReader;
   writeLog?: (line: string) => void;
+  exportTimeoutMillis?: number;
 }
 
 export function createObservability(options: ObservabilityOptions) {
   const ratio = options.samplingRatio ?? 1;
   if (!Number.isFinite(ratio) || ratio < 0 || ratio > 1) throw new Error('Sampling ratio must be between 0 and 1');
+  const exportTimeout = options.exportTimeoutMillis ?? 2000;
+  if (!Number.isSafeInteger(exportTimeout) || exportTimeout < 1 || exportTimeout > 10_000) throw new Error('Invalid export timeout');
   const resource = resourceFromAttributes({
     'service.name': options.serviceName,
     'service.version': options.serviceVersion ?? 'development',
@@ -36,7 +39,7 @@ export function createObservability(options: ObservabilityOptions) {
   const traces = new TracerProvider({
     resource,
     sampler: new ParentBasedSampler({ root: new TraceIdRatioBasedSampler(ratio) }),
-    spanProcessors: options.spanExporter ? [new BatchSpanProcessor({ exporter: options.spanExporter, exportTimeoutMillis: 2000 })] : [],
+    spanProcessors: options.spanExporter ? [new BatchSpanProcessor({ exporter: options.spanExporter, exportTimeoutMillis: exportTimeout })] : [],
   });
   const metrics = new MeterProvider({ resource, readers: options.metricReader ? [options.metricReader] : [] });
   const tracer = traces.getTracer('pixelwar');
@@ -70,8 +73,15 @@ export function createObservability(options: ObservabilityOptions) {
   return {
     log,
     pixels: createPixelMetrics(metrics.getMeter('pixelwar')),
-    request<T>(name: string, headers: TraceCarrier, work: (operation: { correlationId: string; span: Span }) => Promise<T>): Promise<T> {
-      return observed(name, SpanKind.SERVER, extractRequestContext(headers), {}, work);
+    functions: createFunctionMetrics(metrics.getMeter('pixelwar')),
+    logFields(): Record<string, string | boolean> { return logContextFields(contextManager.active(), options.projectId); },
+    request<T>(name: string, headers: TraceCarrier, work: (operation: { correlationId: string; span: Span }) => Promise<T>, trustedCorrelationId?: string): Promise<T> {
+      let parent = extractRequestContext(headers);
+      if (trustedCorrelationId !== undefined) {
+        if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(trustedCorrelationId)) throw new Error('Invalid trusted correlation ID');
+        parent = parent.setValue(correlationKey, trustedCorrelationId);
+      }
+      return observed(name, SpanKind.SERVER, parent, {}, work);
     },
     message<T>(eventType: string, attributes: TraceCarrier, work: (operation: { correlationId: string; span: Span }) => Promise<T>): Promise<T> {
       return observed(eventType, SpanKind.CONSUMER, extractMessageContext(attributes), { event_type: eventType }, work);

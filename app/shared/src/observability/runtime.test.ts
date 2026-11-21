@@ -82,6 +82,13 @@ describe('observed operations', () => {
   it.each([-1, 2, NaN])('rejects an invalid sampling ratio: %s', (samplingRatio) => {
     expect(() => createObservability({ ...defaults, samplingRatio })).toThrow('Sampling');
   });
+  it.each([0, 10_001, 1.5])('rejects an invalid exporter budget: %s', (exportTimeoutMillis) => {
+    expect(() => runtime({ exportTimeoutMillis })).toThrow('export timeout');
+  });
+  it('does not allow an arbitrary trusted correlation value in a request span', () => {
+    const obs = runtime();
+    expect(() => obs.request('safe', {}, async () => 1, 'synthetic/token')).toThrow('trusted correlation');
+  });
 });
 
 describe('business metrics', () => {
@@ -115,5 +122,22 @@ describe('business metrics', () => {
     expect(() => obs.pixels.latency('not-a-date')).toThrow();
     expect(() => obs.pixels.latency('2026-10-29T10:00:00Z', 0)).toThrow();
     expect(() => obs.pixels.latency(new Date(Date.now() - 1000).toISOString())).not.toThrow();
+  });
+
+  it('validates function/result metrics without publishing identifiers as labels', () => {
+    const obs = runtime();
+    expect(() => obs.functions.attempt('web', 'published', 'none', 1)).not.toThrow();
+    expect(() => obs.functions.attempt('web', 'published', 'none', -1)).toThrow();
+    expect(() => obs.functions.attempt('other' as 'web', 'published', 'none', 1)).toThrow();
+    expect(() => obs.functions.attempt('web', 'invalid' as 'published', 'none', 1)).toThrow();
+    expect(() => obs.functions.attempt('web', 'published', 'secret-token' as 'none', 1)).toThrow();
+    const result = { source: 'web' as const, type: 'pixel-rejected' as const, reason: 'out_of_bounds', requested_pixels: 1, applied_pixels: 0, ignored_pixels: 0,
+      occurred_at: '2026-11-20T10:00:00.000Z', processed_at: '2026-11-20T10:00:00.000Z' };
+    expect(() => obs.functions.drawResult(result)).not.toThrow();
+    expect(() => obs.functions.drawResult({ ...result, requested_pixels: -1 })).toThrow();
+    expect(() => obs.functions.drawResult({ ...result, type: 'other' as 'pixel-rejected' })).toThrow();
+    expect(() => obs.functions.drawResult({ ...result, processed_at: 'bad' })).toThrow();
+    expect(() => obs.functions.notificationAge(-1)).toThrow();
+    expect(() => obs.functions.notificationAge(0)).not.toThrow();
   });
 });

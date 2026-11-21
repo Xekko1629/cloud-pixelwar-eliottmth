@@ -2,7 +2,7 @@
 
 Ce catalogue décrit les messages échangés sur Pub/Sub entre les proxies, les workers et les sources externes (Cloud Storage, Cloud Scheduler). Le choix du broker Pub/Sub en push authentifié par OIDC est décrit dans [ADR-0002](adr/0002-broker-pubsub-push.md). Les workers sont des Cloud Run functions à ingress interne ([ADR-0008](adr/0008-compute-cloud-run-functions.md)).
 
-Le topic `discord-command` (v1) est le premier contrat implémenté : `discord-proxy` le produit et le worker de diagnostic `discord-command-verify` le valide (`app/functions/`). Les autres topics sont fixés ici avant leur implémentation. Les points que les sources ne tranchent pas sont marqués **À valider** et repris dans la section 9.
+Le topic `discord-command` (v1) est le premier contrat implémenté : `discord-proxy` le produit, `command-worker` le consomme et le worker de diagnostic `discord-command-verify` le valide (`app/functions/`). Les topics du parcours `/draw` sont ensuite implémentés par `command-worker` (BOT-04), `draw-worker` (DRAW-02) et `discord-notifier` (BOT-05) : `pixel-draw`, `pixel-processed`, `pixel-rejected`, ainsi que `render-requested`, `snapshot-requested`, `admin-requested` et `command-rejected` côté producteur. Les types partagés sont dans `app/shared/src/events/`. Les autres topics sont fixés ici avant leur implémentation. Les points que les sources ne tranchent pas sont marqués **À valider** et repris dans la section 9.
 
 Dans les tableaux, la colonne « Origine » indique la source du point : un ADR, un ticket (`#n`), un fichier du dépôt, ou « Proposition » (à valider).
 
@@ -13,11 +13,12 @@ Chaque message métier porte l'enveloppe suivante, sérialisée en JSON UTF-8. E
 | Champ | Type | Obligatoire | Format | Origine | Rôle |
 |---|---|---|---|---|---|
 | `schema_version` | entier | oui | `1` | `app/functions/discord-proxy/src/event.ts` | Version de l'enveloppe et du `payload`. Un consommateur refuse une version qu'il ne connaît pas. |
+| `type` | string | oui, sauf `discord-command` | Nom du topic de publication (`pixel-draw`, `pixel-processed`, etc.) | `app/shared/src/events/` | Permet au consommateur de refuser un message publié sur le mauvais topic, et au `discord-notifier` de vérifier que l'abonnement reçu correspond au type. Absent de `discord-command` v1, dont le contrat est figé par le proxy. |
 | `event_id` | string | oui | UUID canonique en minuscules, non nul | `app/shared/src/grid/event-order.ts` ; `event.ts` | Identifiant unique de l'événement, clé de déduplication (DATA-02). Pour `discord-command`, il est dérivé de l'interaction : UUID de forme v8 tiré du SHA-256 de `pixelwar:discord-command:v1:<application_id>:<interaction_id>`. Il est donc identique d'une livraison à l'autre. |
-| `correlation_id` | string | oui | `^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$` | `app/shared/src/observability/context.ts` | Relie logs, spans et messages d'une même action (BOT-09, OBS-03). Généré par le proxy, jamais repris d'un client (`docs/observability.md`). Pour `discord-command`, égal à `event_id`. |
+| `correlation_id` | string | oui | `^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$` ; UUID canonique en minuscules pour `pixel-draw`, `pixel-processed` et `pixel-rejected` | `app/shared/src/observability/context.ts` ; `draw-worker` et `discord-notifier` (`message.ts`) | Relie logs, spans et messages d'une même action (BOT-09, OBS-03). Généré par le proxy, jamais repris d'un client (`docs/observability.md`), puis recopié tel quel par chaque worker. Pour `discord-command`, égal à `event_id`. |
 | `occurred_at` | string | oui | ISO 8601 UTC avec millisecondes : `AAAA-MM-JJTHH:MM:SS.mmmZ` | `event-order.ts` ; `event.ts` | Date de création de l'événement. Sert à la latence de bout en bout et à la règle last-write-wins (ADR-0002). Pour `discord-command`, c'est la date encodée dans l'id d'interaction Discord (snowflake). Voir la section 9 pour les événements système. |
 | `source` | string | oui | `discord` ou `web` | ticket #28 | Origine de l'action. Les événements système (Cloud Scheduler, Cloud Storage) n'ont pas de valeur ici : **À valider**. |
-| `actor` | object | oui | `{ "uid": string, "name": string, "roles": string[] }` | `event.ts` ; `uid` = id Discord (ADR-0012) | Auteur de l'action. `uid` est l'id Discord, `name` le pseudo au moment de l'action (repris dans les métadonnées de pixel, ADR-0007), `roles` les ids de ses rôles Discord, triés et sans doublon. Proposition pour le web : `roles` vide, les droits admin restant vérifiés par l'allow-list. |
+| `actor` | object | oui | `discord-command` : `{ "uid": string, "name": string, "roles": string[] }` ; autres topics : `{ "uid": string, "name": string }` | `event.ts` ; `app/shared/src/events/` ; `uid` = id Discord (ADR-0012) | Auteur de l'action. `uid` est l'id Discord, `name` le pseudo au moment de l'action (repris dans les métadonnées de pixel, ADR-0007). `roles` (ids des rôles Discord, triés et sans doublon) ne sert qu'à l'autorisation faite par le `command-worker` : il n'est pas propagé en aval. Le `web-proxy` (DRAW-01) publie donc un `actor` sans `roles`. |
 | `payload` | object | oui | Schéma propre à chaque topic (section 3) | ticket #28 | Données métier. |
 
 Le contexte de trace (`traceparent`) n'est **pas** dans le corps : il ne circule que dans les attributs Pub/Sub (section 1.1). Il n'existe donc qu'une source de vérité.
@@ -27,12 +28,15 @@ Exemple d'enveloppe (valeurs fictives, `payload` d'un `pixel-draw`) :
 ```json
 {
   "schema_version": 1,
+  "type": "pixel-draw",
   "event_id": "3f6c2a9e-1b7d-8e8f-9a52-6c0d4b7e1f20",
   "correlation_id": "3f6c2a9e-1b7d-8e8f-9a52-6c0d4b7e1f20",
   "occurred_at": "2026-11-13T10:15:30.123Z",
   "source": "web",
   "actor": { "uid": "123456789012345678", "name": "exemple", "roles": [] },
-  "payload": { "x": 12, "y": -40, "color": 5 }
+  "payload": {
+    "pixels": [{ "x": 12, "y": -40, "color": 5 }]
+  }
 }
 ```
 
@@ -54,11 +58,11 @@ Les autres champs (`event_id`, `occurred_at`, `source`, `actor`, `payload`) ne v
 | Topic | Producteur(s) | Consommateur(s) (abonnement) | Ticket(s) |
 |---|---|---|---|
 | `discord-command` | `discord-proxy` (après réponse différée `type: 5`) | `command-worker` | BOT-03, BOT-04 |
-| `pixel-draw` | `web-proxy` (`POST /api/pixels`, un message par pixel de la requête) ; `command-worker` pour `/draw` (`source = discord`) | `draw-worker` | DRAW-01, DRAW-02, BOT-04 |
-| `pixel-processed` | `draw-worker`, un message par pixel | `discord-notifier` (filtré sur `source = discord`) ; consommateur de marquage de la vue éloignée | DRAW-02, BOT-05, DATA-05c |
-| `pixel-rejected` | `draw-worker`, un message par pixel | `discord-notifier` | DRAW-02, BOT-05 |
-
-Chaque message `pixel-draw` porte **un seul pixel** ([ADR-0014](adr/0014-un-evenement-par-pixel.md)) : un trait de brush devient une rafale d'événements unitaires, qui partagent le même `correlation_id`.
+| `pixel-draw` | `web-proxy` (`POST /api/pixels`) ; `command-worker` pour `/draw` (`source = discord`) | `draw-worker` | DRAW-01, DRAW-02, BOT-04 |
+| `pixel-processed` | `draw-worker` | `discord-notifier` (acquitte sans action les résultats `source = web`) ; consommateur de marquage de la vue éloignée | DRAW-02, BOT-05, DATA-05c |
+| `pixel-rejected` | `draw-worker` | `discord-notifier` | DRAW-02, BOT-05 |
+| `command-rejected` | `command-worker` (`/admin` ou `/snapshot` non autorisé) | À venir : réponse Discord du refus (nom du consommateur **à valider**) | BOT-04 |
+| `admin-requested` | `command-worker` (`/admin`, après autorisation) | À venir : `admin-worker` (nom **à valider**) | BOT-04, BOT-08 |
 | `render-requested` | `command-worker` (`/get`) | `render-worker` | BOT-04, BOT-06 |
 | `snapshot-requested` | `command-worker` (`/snapshot`) | `snapshot-worker` | BOT-04, BOT-07a |
 | `snapshot-ready` | Cloud Storage : notification `OBJECT_FINALIZE` du bucket `snapshots` (message natif, sans enveloppe, section 5) | `snapshot-notifier` | SRV-07, BOT-07b |
@@ -88,6 +92,8 @@ Contrat v1 implémenté (`app/functions/discord-proxy/src/event.ts`). Le proxy n
 
 Les rôles Discord de l'auteur sont dans `actor.roles` (section 1), pas dans le `payload`.
 
+Le `command-worker` revalide le message de bout en bout : `event_id`, `correlation_id` et `occurred_at` doivent être ceux que le proxy dérive de l'interaction, sinon le message est invalide (`400`). Les champs `application_id`, `interaction_id`, `guild_id`, `channel_id` et `interaction_token` forment ensuite le **contexte Discord** (`DiscordContext`, `app/shared/src/events/discord.ts`), recopié dans les messages en aval pour que le `discord-notifier` puisse modifier la réponse d'origine.
+
 ```json
 {
   "command": "draw",
@@ -104,98 +110,141 @@ Les rôles Discord de l'auteur sont dans `actor.roles` (section 1), pas dans le 
 
 | Champ | Type | Obligatoire | Contrainte | Origine |
 |---|---|---|---|---|
-Un message = un pixel ([ADR-0014](adr/0014-un-evenement-par-pixel.md)).
+| `pixels` | array | oui | De 1 à 500 éléments | `DEFAULT_MAX_BATCH_PIXELS = 500` (`app/shared/src/grid/constants.ts`) ; ADR-0007 (« 500 par défaut, configurable ») |
+| `pixels[].x` | entier | oui | De -1 000 000 000 à 1 000 000 000 | ADR-0007 ; `COORDINATE_LIMIT` (`constants.ts`) |
+| `pixels[].y` | entier | oui | Idem `x` | Idem |
+| `pixels[].color` | entier | oui | De 1 à 16 : index dans la palette. `0` (non peint) est interdit. | ADR-0007 ; `assertColor` (`constants.ts`) |
+| `discord` | object | si `source = discord`, interdit sinon | `DiscordContext` de la section 3.1. **Contient le token d'interaction, secret.** | BOT-04 ; `draw-worker` (`message.ts`) |
 
-| Champ | Type | Obligatoire | Contrainte | Origine |
-|---|---|---|---|---|
-| `x` | entier | oui | De -1 000 000 000 à 1 000 000 000 | ADR-0007 ; `COORDINATE_LIMIT` (`constants.ts`) |
-| `y` | entier | oui | Idem `x` | Idem |
-| `color` | entier | oui | De 1 à 16 : index dans la palette. `0` (non peint) est interdit. | ADR-0007 ; `assertColor` (`constants.ts`) |
+Identifiants :
+
+- Pour `source = discord`, le `command-worker` reprend l'`event_id`, le `correlation_id` et l'`occurred_at` du `discord-command`. Un `discord-command` relivré produit donc le même `pixel-draw`, que DATA-02 déduplique par `event_id`. Le `draw-worker` vérifie que l'`event_id` correspond bien à `discord.interaction_id`, et que `occurred_at` est la date du snowflake.
+- Pour `source = web`, le `web-proxy` (DRAW-01) génère l'`event_id` (UUID) et le `correlation_id`. Une requête rejouée par le navigateur doit porter le même `event_id` pour être dédupliquée : le mécanisme est à définir dans DRAW-01.
+- Le `pixel-draw` issu de `/draw` contient exactement un pixel.
 
 Contraintes complémentaires :
 
-- `POST /api/pixels` reçoit de 1 à 500 pixels par requête (`DEFAULT_MAX_BATCH_PIXELS`, `app/shared/src/grid/constants.ts`). Le `web-proxy` valide toute la requête, puis publie un message par pixel. Tous les messages d'une requête ont le même `correlation_id` et le même `occurred_at`, mais chacun son `event_id` (ADR-0014).
-- Une requête qui contient deux fois la même coordonnée est refusée par le proxy (400). Deux messages distincts peuvent en revanche viser la même coordonnée : le worker applique la règle last-write-wins (section 8.1).
-- Le proxy valide les bornes fixes et la palette, et répond 400 sinon (DRAW-01). Il ne lit pas Firestore.
-- Le `canvas_version` n'est pas dans le payload : proposition, le worker le lit dans `config/global` au traitement (ADR-0007). **À valider.**
-
-```json
-{ "x": 12, "y": -40, "color": 5 }
-```
-
-### 3.3 `pixel-processed`
-
-| Champ | Type | Obligatoire | Contrainte | Origine |
-|---|---|---|---|---|
-Un message par pixel traité (ADR-0014).
-
-| Champ | Type | Obligatoire | Contrainte | Origine |
-|---|---|---|---|---|
-| `x`, `y`, `color` | entiers | oui | Ceux du `pixel-draw` source | ADR-0014 |
-| `canvas_version` | entier | oui | ≥ 1 | `assertCanvasVersion` (`constants.ts`) ; `ProcessedEventDocument` (ADR-0007) |
-| `region` | string | oui | Format `rx_ry` | Format : `regionId` (`app/shared/src/grid/coordinates.ts`). Proposition : fourni pour le marquage de la vue éloignée. |
+- Pas deux fois la même coordonnée dans un lot. Le code partagé la refuse (`app/shared/src/grid/batch.ts`, « Duplicate coordinate in draw batch »). Le niveau qui la refuse, proxy (400) ou worker, est **À valider**.
+- Le nombre de pixels n'est pas un champ : il se dérive du tableau validé, jamais d'un compteur fourni par le client (`docs/rate-limits.md`, section « Contrat validé »).
+- Le proxy valide les bornes fixes et la palette, et répond 400 sinon (DRAW-01). Il ne lit pas Firestore. Côté Discord, le `command-worker` fait la même validation. Le `draw-worker` laisse DATA-02 seul juge des coordonnées, de la palette et du lot : un pixel invalide qui arriverait malgré tout est un message invalide (`400`, puis DLQ), pas un rejet métier.
+- Le `canvas_version` n'est pas dans le payload : le worker le lit dans `config/global` au traitement, dans la transaction DATA-02 (ADR-0007 ; `docs/drawing-transactions.md`).
 
 ```json
 {
-  "x": 12,
-  "y": -40,
-  "color": 5,
-  "canvas_version": 3,
-  "region": "0_-1"
+  "pixels": [{ "x": 12, "y": -40, "color": 5 }]
+}
+```
+
+### 3.3 `pixel-processed` et `pixel-rejected`
+
+Les deux topics partagent le même `payload`, publié par le `draw-worker` après le commit de la transaction DATA-02 (`app/functions/draw-worker/src/result.ts`, type `DrawResultEvent`).
+
+| Champ | Type | Obligatoire | Contrainte | Origine |
+|---|---|---|---|---|
+| `result` | object | oui | Résultat conservé `DrawResult` (`app/shared/src/drawing/command.ts`), décrit ci-dessous | DATA-02 |
+| `discord` | object | si `source = discord`, interdit sinon | `DiscordContext` recopié du `pixel-draw`. **Contient le token d'interaction, secret.** | DRAW-02 ; BOT-05 |
+
+Enveloppe :
+
+- `event_id` : dérivé de l'événement source, UUID de forme v8 tiré du SHA-256 de `pixelwar:draw-result:v1:<event_id du pixel-draw>`. Un rejeu publie donc le même `event_id`.
+- `correlation_id` : celui du `pixel-draw`.
+- `occurred_at` : `result.processed_at`, la date du traitement conservé. Un rejeu republie la même date.
+- `type` : égal à `result.type`.
+
+Champs de `result` :
+
+| Champ | Contrainte |
+|---|---|
+| `schema_version` | `1` |
+| `result_id`, `event_id` | `event_id` est celui du `pixel-draw` source ; `result_id` vaut `draw-result:<event_id>` |
+| `occurred_at`, `processed_at` | ISO 8601 UTC avec millisecondes |
+| `source`, `uid` | Égaux à `source` et `actor.uid` de l'enveloppe |
+| `canvas_version` | ≥ 1 |
+| `type` | `pixel-processed` ou `pixel-rejected` |
+| `requested_pixels` | Nombre de pixels du lot. Le nombre n'est jamais fourni par le client. |
+| `applied_pixels`, `ignored_pixels` | `pixel-processed` : leur somme vaut `requested_pixels` ; un pixel ignoré a perdu face à un pixel plus récent (LWW). `pixel-rejected` : tous deux à `0`. |
+| `regions` | Régions `rx_ry` réellement modifiées, triées ; vide pour un rejet |
+| `reason` | Seulement pour `pixel-rejected` : voir ci-dessous |
+| `quota` | Décision de quota (`RateLimitDecision`, `docs/rate-limits.md`) quand elle a été évaluée |
+
+Motifs de rejet (`reason`) :
+
+| Motif | Cause |
+|---|---|
+| `paused` | Dessin suspendu par `/admin pause` |
+| `rate_limit` | Quota insuffisant ; le détail et le délai sont dans `quota` |
+| `out_of_bounds` | Pixel hors des limites courantes de la grille (`config/global`) |
+| `batch_budget_exceeded` | Le lot dépasserait le budget de documents d'une transaction |
+| `expired` | Demande plus vieille que 14 jours (`MAX_DRAW_AGE_MS`) : rejeu tardif |
+
+`invalid_pixel` n'est pas un motif de rejet : un pixel invalide est refusé avant publication (section 3.2). Le refus d'autorisation passe par `command-rejected` (section 3.7).
+
+```json
+{
+  "result": {
+    "schema_version": 1,
+    "result_id": "draw-result:3f6c2a9e-1b7d-8e8f-9a52-6c0d4b7e1f20",
+    "event_id": "3f6c2a9e-1b7d-8e8f-9a52-6c0d4b7e1f20",
+    "occurred_at": "2026-11-13T10:15:30.123Z",
+    "processed_at": "2026-11-13T10:15:30.987Z",
+    "source": "web",
+    "uid": "123456789012345678",
+    "canvas_version": 3,
+    "type": "pixel-processed",
+    "requested_pixels": 1,
+    "applied_pixels": 1,
+    "ignored_pixels": 0,
+    "regions": ["0_-1"]
+  }
 }
 ```
 
 L'exemple correspond au pixel `(12, -40)` : `rx = floor(12 / 1024) = 0` et `ry = floor(-40 / 1024) = -1`, donc la région `0_-1` (`regionId(rx, ry)` renvoie `${rx}_${ry}`).
 
-### 3.4 `pixel-rejected`
-
-| Champ | Type | Obligatoire | Contrainte | Origine |
-|---|---|---|---|---|
-| `reason` | string | oui | `paused`, `rate_limit`, `invalid_pixel`, `unauthorized` ou `out_of_bounds` | `paused`, `rate_limit`, `invalid_pixel`, `unauthorized` : `docs/observability.md`. `out_of_bounds` : ADR-0007 et DRAW-02. Voir la section 9 sur `out_of_bounds`. |
-| `sub_reason` | string ou null | oui | Renseigné seulement si `reason = rate_limit` : `insufficient_quota` ou `drawing_disabled`, sinon `null`. `batch_exceeds_limit` ne s'applique plus à un pixel seul (ADR-0014). | `docs/rate-limits.md`, tableau des refus métier. Proposition de structure. |
-| `x`, `y` | entiers | oui | Ceux du `pixel-draw` source | ADR-0014 |
-| `retry_after_seconds` | entier ou null | oui | Secondes avant la minute suivante pour `insufficient_quota` ; `null` sinon | `docs/rate-limits.md`, tableau des refus métier |
-
 Le message ne contient jamais le détail d'une erreur technique ni d'une dépendance (`docs/observability.md`).
 
-```json
-{
-  "reason": "rate_limit",
-  "sub_reason": "insufficient_quota",
-  "x": 12,
-  "y": -40,
-  "retry_after_seconds": 18
-}
-```
+### 3.5 `render-requested` et `snapshot-requested`
 
-### 3.5 `render-requested`
+Publiés par le `command-worker` pour `/get` et `/snapshot` (après autorisation pour `/snapshot`).
 
 | Champ | Type | Obligatoire | Contrainte | Origine |
 |---|---|---|---|---|
-| `interaction_token` | string | oui | **Secret**, valide 15 min | BOT-06 (message de suivi) ; BOT-05 |
-| `channel_id` | string | oui | Id du canal | BOT-06 |
+| `discord` | object | oui | `DiscordContext` de la section 3.1. **Contient le token d'interaction, secret**, valide 15 min. | BOT-04 ; BOT-06 ; BOT-07a |
 
 La zone rendue n'est pas dans le message : elle est lue dans `config/global.bounds` au moment du rendu (DATA-05b). Proposition, à valider avec BOT-06.
 
 ```json
 {
-  "interaction_token": "<jeton d'interaction, secret>",
-  "channel_id": "223344556677889900"
+  "discord": {
+    "application_id": "1000000000000000000",
+    "interaction_id": "1100000000000000001",
+    "guild_id": "1200000000000000000",
+    "channel_id": "223344556677889900",
+    "interaction_token": "<jeton d'interaction, secret>"
+  }
 }
 ```
 
-### 3.6 `snapshot-requested`
+### 3.6 `admin-requested`
 
-Mêmes champs que `render-requested` : `interaction_token` (secret) et `channel_id`. Ces deux champs suffisent au `snapshot-worker` pour ranger le token et le canal dans les métadonnées de l'objet (BOT-07a).
+Publié par le `command-worker` pour `/admin`, seulement si l'auteur est dans l'allow-list (utilisateurs ou rôles).
 
-```json
-{
-  "interaction_token": "<jeton d'interaction, secret>",
-  "channel_id": "223344556677889900"
-}
-```
+| Champ | Type | Obligatoire | Contrainte | Origine |
+|---|---|---|---|---|
+| `options` | object | oui | `{ "subcommand": "pause" \| "resume" \| "clear" }`, `{ "subcommand": "ratelimit", "user": string, "limit": entier }` ou `{ "subcommand": "size", "width"?: entier, "height"?: entier }` | `AdminCommand` (`app/shared/src/events/discord.ts`) ; BOT-08 |
+| `discord` | object | oui | `DiscordContext`, **secret** | BOT-04 |
 
-### 3.7 `snapshot-ready` et `overview-tick`
+### 3.7 `command-rejected`
+
+Publié par le `command-worker` quand `/admin` ou `/snapshot` est demandé par un auteur hors allow-list. La commande n'est pas transmise au worker métier.
+
+| Champ | Type | Obligatoire | Contrainte | Origine |
+|---|---|---|---|---|
+| `command` | string | oui | `admin` ou `snapshot` | BOT-04 |
+| `reason` | string | oui | `unauthorized` | BOT-04 |
+| `discord` | object | oui | `DiscordContext`, **secret** | BOT-04 |
+
+### 3.8 `snapshot-ready` et `overview-tick`
 
 Ces deux topics reçoivent des messages natifs, sans enveloppe métier. Leur format est décrit en sections 5 et 6.
 
@@ -347,9 +396,9 @@ Pub/Sub livre au moins une fois, sans ordre garanti. Chaque consommateur doit do
 
 | Consommateur | Clé d'idempotence | Comportement en cas de rejeu |
 |---|---|---|
-| `command-worker` | `interaction_id` (BOT-04) | Ne publie ni second `pixel-draw` ni second `render-requested`. Le rejeu exige que les `event_id` dérivés soient déterministes : **À valider** (section 9). |
+| `command-worker` | `interaction_id` (BOT-04) | Sans état : un rejeu republie le même message, avec le même `event_id` (section 3.2). Le doublon est absorbé par le consommateur, par exemple DATA-02 pour `pixel-draw`. |
 | `draw-worker` | `event_id`, document `processed_events` (ADR-0007 ; `rate-limits.md`, étapes 1 à 4) | Dans la même transaction que les tuiles, les deltas et le compteur : le document de déduplication est lu en premier. S'il existe, le résultat d'origine est repris, sans réévaluer le quota ni écrire de pixel. |
-| `discord-notifier` | `event_id` (proposition) | Le `PATCH` de la réponse d'origine (BOT-05) est rejoué avec le même contenu : il reste identique. Proposition. |
+| `discord-notifier` | Aucune clé stockée : effet idempotent | Le `PATCH` de la réponse d'origine (`@original`, BOT-05) est rejoué avec le même contenu : le message reste identique, aucun second message n'est créé (`docs/discord-notifier.md`). |
 | `render-worker` | `event_id` (proposition) | BOT-06 demande de tester qu'une nouvelle livraison ne produit pas de notification en double, mais ne fixe pas de mécanisme : **À valider**. |
 | `snapshot-worker` | Clé d'objet stable par demande (BOT-07a, #54) | Proposition : `snapshots/<occurred_at de la demande>-<event_id>.png`, pour que le rejeu écrive le même objet. Le format exact est **À valider**. |
 | `snapshot-notifier` | `bucketId` + `objectId` + `objectGeneration` (section 5) | Une notification rejouée ne doit pas reposter le lien (#55). Le stockage de la trace d'envoi est **À valider**. |
@@ -376,20 +425,20 @@ Un rejet métier n'est jamais un message invalide : une coordonnée hors grille 
 Décisions que les sources ne tranchent pas. Chacune est à valider avant SRV-05 et les tickets workers.
 
 1. **`source` et `actor` pour les événements système.** L'enum n'accepte que `discord` et `web`. Cloud Scheduler et Cloud Storage n'ont pas de valeur : ajouter `system` (et un `actor` technique), ou ne pas porter l'enveloppe sur ces messages ?
-2. **`event_id` dérivés du `command-worker`.** Un `pixel-draw` publié à partir d'un `discord-command` rejoué ne doit pas avoir un second `event_id`. Proposition : même méthode que `discord-proxy`, avec le préfixe `pixelwar:pixel-draw:v1:<event_id source>`.
-3. **`event_id` des résultats** (`pixel-processed`, `pixel-rejected`) : réutiliser celui du `pixel-draw` source, ou en dériver un nouveau ?
+2. ~~**`event_id` dérivés du `command-worker`.**~~ Tranché par BOT-04 : le `pixel-draw` reprend l'`event_id` du `discord-command` (section 3.2).
+3. ~~**`event_id` des résultats.**~~ Tranché par DRAW-02 : dérivé de `pixelwar:draw-result:v1:<event_id source>` (section 3.3).
 4. **Publication fiable du résultat après commit.** `docs/rate-limits.md` indique que ce point reste ouvert : le résultat stocké doit être republié si le commit a réussi mais que la publication a échoué.
 5. **Horizon de déduplication.** `docs/rate-limits.md` fixe un horizon de rejeu de 7 jours, ADR-0008 parle de 15 jours pour le bucket de sources. Les deux chiffres sont à aligner avec la rétention Pub/Sub (7 jours).
-6. **Motif `out_of_bounds`.** ADR-0007 et DRAW-02 l'utilisent comme motif de `pixel-rejected`, la liste des motifs de métrique (`docs/observability.md`) ne le contient pas. L'ajouter, ou le classer dans `invalid_pixel` ?
-7. **Tranché (ADR-0014)** : une coordonnée en double dans une même requête est refusée par le proxy (400). Le regroupement des écritures dans une instance n'est activé que si le mode de base reste sous 200 pixels par seconde et par instance.
-8. **`canvas_version`** : lu par le worker dans `config/global` (proposition) ou porté par le message ?
+6. ~~**Motif `out_of_bounds`.**~~ Tranché par DATA-02 : motif de `pixel-rejected` à part entière (section 3.3). La liste des motifs de métrique de `docs/observability.md` reste à aligner.
+7. **Coordonnée en double dans un lot** : refusée par le proxy (400) ou par le worker (`pixel-rejected`) ?
+8. ~~**`canvas_version`.**~~ Tranché par DATA-02 : lu dans `config/global` pendant la transaction (section 3.2).
 9. **Régions marquées** pour la vue éloignée : collection, format, remise à zéro, et déclencheur de la régénération complète après `/admin clear` (DATA-05c).
 10. **Noms** : topic `overview-tick`, consommateur de marquage, et adoption de la convention de nommage des abonnements (section 7.1).
 11. **Backoff** des autres workers ; `max_delivery_attempts = 5` reste approximatif.
 12. **Droit de publication de Cloud Scheduler** sur `overview-tick` (non cité dans ADR-0002).
-13. **Secrets dans les messages** : le `interaction_token` circule dans `discord-command`, `render-requested` et `snapshot-requested`, et serait stocké dans les métadonnées de l'objet snapshot. Il est valide 15 min : une livraison retardée au-delà ne peut plus éditer le message. Le stocker dans GCS est-il acceptable ?
+13. **Secrets dans les messages** : le `interaction_token` circule dans `discord-command`, `pixel-draw`, `pixel-processed`, `pixel-rejected`, `render-requested`, `snapshot-requested`, `admin-requested` et `command-rejected` (toujours dans `payload.discord`, jamais dans les attributs ni dans Firestore), et serait stocké dans les métadonnées de l'objet snapshot. Il est valide 15 min : une livraison retardée au-delà ne peut plus éditer le message. Le stocker dans GCS est-il acceptable ?
 14. **`snapshot-ready`** : confirmer que le topic reste natif Cloud Storage, et ajouter `correlation_id` aux métadonnées de l'objet (BOT-07a ne le prévoit pas).
-15. **Rejeu tardif du `discord-notifier`** : si la redélivrance arrive après 15 min, le `PATCH` échoue. Quel comportement attendu ?
-16. **Filtre `source` du `discord-notifier`** : dans le worker ou par filtre d'abonnement.
+15. ~~**Rejeu tardif du `discord-notifier`.**~~ Tranché par BOT-05 : après 15 min, un log sûr est écrit et le message est acquitté (`204`) sans appeler Discord (`docs/discord-notifier.md`).
+16. ~~**Filtre `source` du `discord-notifier`.**~~ Tranché par BOT-05 : dans le worker, qui acquitte un résultat web sans action.
 17. **Idempotence des `render-worker` et `snapshot-worker`** : BOT-06 et BOT-07a demandent des tests, sans mécanisme (section 8.1).
 18. **Délais des workers** : mémoire, timeout et délai d'acquittement de `render-worker` et `snapshot-worker`, à calibrer.

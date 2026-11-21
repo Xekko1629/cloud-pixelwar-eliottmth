@@ -44,7 +44,8 @@ it('publishes retried draw commands to the local broker with an identical busine
     expect(first).toEqual(second);
     expect(first).toMatchObject({ type: 'pixel-draw', source: 'discord', payload: { pixels: [{ x: -1, y: 64, color: 3 }] } });
     for (const message of messages) {
-      expect(message.attributes).toEqual(commandPush().message.attributes);
+      expect(message.attributes.correlation_id).toBe(commandPush().message.attributes.correlation_id);
+      expect(message.attributes.traceparent.split('-')[1]).toBe(commandPush().message.attributes.traceparent.split('-')[1]);
       expect(JSON.stringify(message.attributes)).not.toContain('synthetic-interaction-token');
     }
     expect(JSON.stringify(write.mock.calls)).not.toContain('synthetic-interaction-token');

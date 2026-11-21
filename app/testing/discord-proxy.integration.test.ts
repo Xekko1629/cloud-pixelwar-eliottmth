@@ -34,7 +34,7 @@ it('publishes a signed /draw through the handler to the local Pub/Sub emulator b
     expect(event.payload).toMatchObject({ command: 'draw', options: { x: -1, y: 64, color: 3 } });
     expect(event.actor.uid).toBe('423456789012345678');
     expect(message.attributes.correlation_id).toBe(event.correlation_id);
-    expect(message.attributes.traceparent).toMatch(/^00-[a-f0-9]{32}-[a-f0-9]{16}-00$/);
+    expect(message.attributes.traceparent).toMatch(/^00-[a-f0-9]{32}-[a-f0-9]{16}-0[01]$/);
     expect(JSON.stringify(message.attributes)).not.toContain('synthetic-interaction-token');
   } finally {
     await subscription.close();

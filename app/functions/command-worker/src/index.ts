@@ -1,4 +1,5 @@
 import type { HttpFunction } from '@google-cloud/functions-framework';
+import { createFunctionTelemetry, type FunctionTelemetry } from '@pixelwar/shared/observability/function';
 import { InvalidCommand, MAX_PUSH_BYTES, parsePush, record, snowflake } from './message';
 import { createEventPublisher, type PublishEvent } from './publisher';
 import { routeCommand, validPermissions, type Permissions } from './route';
@@ -9,10 +10,12 @@ interface Options {
   permissions?: Permissions;
   publish?: PublishEvent;
   write?: (line: string) => void;
+  telemetry?: FunctionTelemetry;
 }
 
 export function createCommandWorkerHandler(options: Options): HttpFunction {
   const write = options.write ?? ((line: string) => { process.stdout.write(line); });
+  const telemetry = options.telemetry ?? createFunctionTelemetry('command-worker', { writeLog: write });
   // Snapshot authorization configuration; callers cannot mutate it during delivery.
   const permissions = options.permissions && validPermissions(options.permissions)
     ? { user_ids: [...options.permissions.user_ids], role_ids: [...options.permissions.role_ids] } : undefined;
@@ -29,13 +32,17 @@ export function createCommandWorkerHandler(options: Options): HttpFunction {
     }
     try {
       const { command, attributes, message_id } = parsePush(req.body, options.subscription, options.applicationId);
-      const event = routeCommand(command, permissions);
-      await options.publish(event, attributes);
-      write(`${JSON.stringify({
-        severity: event.type === 'command-rejected' ? 'WARNING' : 'INFO',
-        function: 'command-worker', event_type: 'discord.command.routed',
-        event_id: event.event_id, correlation_id: event.correlation_id, message_id, output_type: event.type,
-      })}\n`);
+      await telemetry.message('discord-command', attributes, async (operation) => {
+        const event = routeCommand(command, permissions);
+        operation.outcome('error', 'publish');
+        await options.publish!(event, operation.attributes());
+        operation.outcome(event.type === 'command-rejected' ? 'rejected' : 'published', event.type === 'command-rejected' ? 'unauthorized' : 'none');
+        write(`${JSON.stringify({
+          severity: event.type === 'command-rejected' ? 'WARNING' : 'INFO',
+          function: 'command-worker', event_type: 'discord.command.routed',
+          event_id: event.event_id, correlation_id: event.correlation_id, message_id, output_type: event.type, ...operation.logFields(),
+        })}\n`);
+      });
     } catch (error) {
       try {
         write(`${JSON.stringify({ severity: 'WARNING', function: 'command-worker',

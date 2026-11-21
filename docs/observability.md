@@ -99,9 +99,9 @@ message concurrent. Le baggage n'est ni extrait ni propagé.
 
 ```ts
 await obs.message('pixel-draw', pushBody.message.attributes ?? {}, async () => {
-  await commitPixels(event); // opération métier de l'appelant
-  obs.pixels.processed(1, event.source); // un pixel par événement (ADR-0014)
-  obs.pixels.latency(event.occurred_at); // appeler après le commit réel
+  const result = await commitPixels(event); // opération métier de l'appelant
+  // Observation du résultat durable, pas un compteur de pixels uniques.
+  obs.functions.drawResult(result);
   await nextTopic.publishMessage({
     data: Buffer.from(JSON.stringify(nextEvent)),
     attributes: obs.attributes(),
@@ -146,6 +146,10 @@ jamais le faire**. Ce logger n'est pas un détecteur automatique de secrets.
 | `pixelwar.pixels.processed` | Compteur / pixels | `source` : web ou discord |
 | `pixelwar.pixels.rejected` | Compteur / pixels | `source`, `reason` : paused, rate_limit, invalid_pixel, unauthorized |
 | `pixelwar.draw.end_to_end` | Histogramme / secondes | Aucun identifiant utilisateur |
+
+Ces instruments historiques restent disponibles dans la bibliothèque. Le parcours
+`/draw` utilise les observations de tentatives/résultats décrites ci-dessous,
+pour ne pas présenter une relivraison comme un nouveau pixel métier unique.
 
 Pas de `user_id`, coordonnées, message ID ou correlation ID dans les labels :
 ils multiplieraient le nombre de séries et les coûts. Un compteur porte sur les
@@ -217,6 +221,95 @@ Un test d'intégration envoie de vrais lots OTLP/protobuf à un récepteur HTTP 
 Les tests Terraform vérifient les ressources et le rôle supplémentaire.
 
 Les tests locaux ne prouvent pas la réception par GCP ni les droits runtime.
+
+## Instrumentation des fonctions du parcours draw
+
+`discord-proxy`, `command-worker`, `draw-worker` et `discord-notifier` utilisent
+`@pixelwar/shared/observability/function`. Une instance SDK est initialisée
+paresseusement et réutilisée par processus. Les sondes hello et diagnostic
+restent distinctes ; le lecteur de diagnostic accepte les flags W3C `00` et `01`.
+
+```ts
+const telemetry = createFunctionTelemetry('draw-worker', { writeLog: write });
+await telemetry.message('pixel-draw', validatedAttributes, async (operation) => {
+  operation.source(command.source);
+  const result = await processDraw(command);
+  operation.drawResult(result);
+  await publish(resultEvent, operation.attributes());
+  operation.outcome(result.type === 'pixel-rejected' ? 'rejected' : 'published', result.reason ?? 'none');
+  write(JSON.stringify({ event_type: 'draw.result.published', ...operation.logFields() }) + '\n');
+}); // flush terminé avant la réponse HTTP
+```
+
+Le proxy commence un span SERVER **après validation Ed25519 et validation de la
+commande**. Il ne reprend aucun header de trace public et utilise l'ID de commande
+stable comme corrélation de confiance. Le quatrième argument optionnel de
+`obs.request` est réservé à cet ID déjà validé ; ne jamais y passer une entrée
+publique non vérifiée. Les workers ouvrent des spans CONSUMER à partir des deux
+attributs de message validés, puis publient le contexte de leur propre span.
+Un retry garde l'ID métier et la corrélation, mais possède un nouvel ID de span.
+
+Les succès ont des logs liés à `logging.googleapis.com/trace` et `spanId`. Une
+erreur technique marque le span ERROR sans copier l'exception. Les refus métier,
+notifications expirées et messages web ignorés ne sont pas des erreurs techniques.
+La validation préliminaire, les PING et les chemins rejetés avant validation ne
+démarrent pas de SDK réseau ; les métriques HTTP de plateforme restent nécessaires
+pour compter ces requêtes, en complément des tentatives métier instrumentées.
+
+### Instruments du parcours
+
+| Instrument | Sens | Labels bornés |
+| --- | --- | --- |
+| `pixelwar.function.attempts` | Tentatives de traitement de messages validés, retries inclus | `source`, `outcome`, `reason` |
+| `pixelwar.function.duration` | Durée du traitement validé, sans initialisation SDK ni flush | mêmes labels |
+| `pixelwar.draw.result_pixels` | Pixels demandés/appliqués/ignorés dans les résultats observés | mêmes labels + `category` |
+| `pixelwar.draw.result_age` | Date de traitement conservée moins date de demande, en secondes | `source`, `outcome`, `reason` |
+| `pixelwar.notification.age` | Âge de l'interaction au début d'une tentative de notification | aucun label d'identité |
+
+`outcome` est limité à published/rejected/updated/expired/skipped_web/error.
+Les raisons sont une liste fermée (refus connus et catégories techniques).
+La fonction est identifiée par la ressource `service.name`, pas par une URL.
+Aucun ID utilisateur, message ou corrélation, token, nom ou coordonnée n'est
+autorisé comme label. Les petits écarts d'horloge futurs donnent une durée bornée
+à zéro, pas une métrique négative qui ferait échouer le métier.
+
+**Ces métriques ne sont pas un compteur transactionnel de pixels uniques.**
+Deux reprises d'un résultat durable donnent deux observations. Un export peut
+aussi échouer. Les documents DATA-02 restent la preuve des effets métier ; les
+dashboards doivent nommer les séries « tentatives » et « résultats observés ».
+
+### Export configuré et dégradation
+
+L'export Google est sélectionné hors tests lorsque `GOOGLE_CLOUD_PROJECT` et
+`APP_ENV=dev|prd` sont définis. `FUNCTION_REGION` (ou `GOOGLE_CLOUD_REGION`) et
+`K_REVISION` renseignent la ressource ; sans région connue, elle vaut `unknown`.
+Fournir la région dans le futur raccordement Terraform plutôt que supposer sa
+présence. En test, des exporteurs en mémoire sont injectés, sans ADC ni réseau GCP.
+Hors configuration cloud, le runtime local ne revendique pas d'ingestion GCP ;
+un projet présent avec une configuration incomplète produit
+`telemetry.export_not_configured`.
+
+Le helper configure un timeout HTTP d'export de 500 ms par exporteur et 1500 ms
+pour le lecteur de métriques. Il attend le flush terminé avant réponse, sans
+`Promise.race` abandonnant un export en arrière-plan. Ces budgets ne bornent pas
+le cold start ni la recherche ADC : mesurer la latence du proxy, dont le budget
+Discord initial est de 3 secondes, avant activation réelle.
+
+Un échec d'initialisation produit `telemetry.initialization_failed` et laisse le
+métier continuer sans SDK, avec propagation minimale sûre. Cette dégradation est
+mémorisée pour l'instance : corriger puis renouveler l'instance pour réinitialiser.
+Les échecs d'opération SDK ou d'export produisent respectivement
+`telemetry.operation_failed` et `telemetry.export_failed`, sans URL ni Error.
+Une panne d'export ne transforme pas un succès métier en retry et ne réexécute
+jamais le callback métier ; une vraie erreur métier/SDK de publication reste
+réessayable. Les logs applicatifs préexistants conservent leur propre contrat
+d'échec ; cette garantie de dégradation porte sur l'instrumentation ajoutée.
+
+Les tests vérifient les quatre spans parents/enfants, les logs corrélés, les
+labels, les duplications d'observations et un échec d'export après dessin, avec
+une seule consommation de quota et une notification réussie. L'exemple OTLP local
+vérifie également l'envoi de protobuf. Aucun dashboard ni alerte n'est créé ici :
+la revue globale BOT-09/DRAW-05 et les preuves GCP restent séparées.
 
 ## Vérification en environnement GCP
 
