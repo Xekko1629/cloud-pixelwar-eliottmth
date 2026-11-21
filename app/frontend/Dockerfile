@@ -14,7 +14,7 @@ RUN npm ci --workspace=@pixelwar/frontend --no-audit --no-fund \
 FROM nginxinc/nginx-unprivileged:1.30.6-alpine3.24@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03
 
 # Only these variables are substituted in the template (nginx's own $uri etc. are kept).
-ENV NGINX_ENVSUBST_FILTER="^(APP_ENV|GATEWAY_URL|REALTIME_URL|DISCORD_CLIENT_ID)$"
+ENV NGINX_ENVSUBST_FILTER="^(APP_ENV|GATEWAY_URL|FIRESTORE_PROJECT_ID|FIRESTORE_API_KEY|DISCORD_CLIENT_ID)$"
 
 USER root
 # The rendered template replaces the image's default server; conf.d stays writable by nginx.

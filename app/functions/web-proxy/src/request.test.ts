@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { InvalidDrawRequest, MAX_AUTHOR_NAME, parseDrawBody, webDrawEvent } from './request';
+import { InvalidDrawRequest, MAX_AUTHOR_NAME, parseDrawBody, webDrawEvents } from './request';
 
 const body = (value: unknown) => Buffer.from(typeof value === 'string' ? value : JSON.stringify(value));
 const reason = (action: () => unknown) => {
@@ -43,26 +43,30 @@ describe('parseDrawBody', () => {
   });
 });
 
-describe('webDrawEvent', () => {
-  it('builds the pixel-draw contract of the event catalogue for the web', () => {
-    const event = webDrawEvent([{ x: 1, y: 2, color: 3 }], identity, Date.UTC(2026, 10, 20, 10), () => '11111111-1111-4111-8111-111111111111');
-    expect(event).toEqual({
-      schema_version: 1, type: 'pixel-draw', event_id: '11111111-1111-4111-8111-111111111111',
-      correlation_id: '11111111-1111-4111-8111-111111111111', occurred_at: '2026-11-20T10:00:00.000Z',
-      source: 'web', actor: identity, payload: { pixels: [{ x: 1, y: 2, color: 3 }] },
-    });
+describe('webDrawEvents (ADR-0014)', () => {
+  it('publishes one pixel-draw event per pixel, sharing the correlation and occurrence of the stroke', () => {
+    let next = 0;
+    const ids = ['c0000000-0000-4000-8000-000000000000', 'e1000000-0000-4000-8000-000000000000', 'e2000000-0000-4000-8000-000000000000'];
+    const stroke = webDrawEvents([{ x: 1, y: 2, color: 3 }, { x: 2, y: 2, color: 4 }], identity, Date.UTC(2026, 10, 20, 10), () => ids[next++]);
+    expect(stroke.correlation_id).toBe(ids[0]);
+    expect(stroke.events).toEqual([1, 2].map((index) => ({
+      schema_version: 1, type: 'pixel-draw', event_id: ids[index], correlation_id: ids[0],
+      occurred_at: '2026-11-20T10:00:00.000Z', source: 'web', actor: identity,
+      payload: { pixels: [[{ x: 1, y: 2, color: 3 }, { x: 2, y: 2, color: 4 }][index - 1]] },
+    })));
   });
 
-  it('creates a new canonical UUID for every request', () => {
-    const first = webDrawEvent([{ x: 1, y: 2, color: 3 }], identity, 0);
-    const second = webDrawEvent([{ x: 1, y: 2, color: 3 }], identity, 0);
-    expect(first.event_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-    expect(second.event_id).not.toBe(first.event_id);
+  it('creates new canonical UUIDs for every pixel and every request', () => {
+    const first = webDrawEvents([{ x: 1, y: 2, color: 3 }, { x: 2, y: 2, color: 3 }], identity, 0);
+    const second = webDrawEvents([{ x: 1, y: 2, color: 3 }], identity, 0);
+    const all = [first.correlation_id, ...first.events.map((event) => event.event_id), second.correlation_id, second.events[0].event_id];
+    for (const id of all) expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(new Set(all).size).toBe(all.length);
   });
 
   it('keeps the author name within the DATA-02 limit, by code points', () => {
     const name = '😀'.repeat(MAX_AUTHOR_NAME + 5);
-    const event = webDrawEvent([{ x: 1, y: 2, color: 3 }], { ...identity, name }, 0);
+    const [event] = webDrawEvents([{ x: 1, y: 2, color: 3 }], { ...identity, name }, 0).events;
     expect(Array.from(event.actor.name)).toHaveLength(MAX_AUTHOR_NAME);
     expect(Buffer.byteLength(event.actor.name)).toBeLessThanOrEqual(128);
   });

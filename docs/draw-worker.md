@@ -45,8 +45,11 @@ doit correspondre à la configuration. Un événement web ne peut pas contenir c
 contexte Discord. Les données de notification ne sont jamais transmises au moteur
 DATA-02 et ne sont pas enregistrées dans ses documents Firestore.
 
-DATA-02 valide les coordonnées techniques, couleurs, auteurs et lots, avec
-500 pixels maximum par défaut. Un lot mal formé est une entrée invalide, pas
+Chaque message porte **exactement un pixel** (ADR-0014) : un message avec 0 ou
+plusieurs pixels est refusé (`400`) avant tout appel à DATA-02. Le moteur DATA-02
+garde sa capacité de lot, réservée à un éventuel regroupement d'écriture par
+instance (ADR-0014), qui n'est pas implémenté. DATA-02 valide les coordonnées
+techniques, couleurs et auteurs. Un lot mal formé est une entrée invalide, pas
 un dessin partiellement accepté. Un pixel techniquement valide mais hors des
 dimensions configurées produit en revanche le refus métier `out_of_bounds`.
 

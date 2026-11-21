@@ -1,6 +1,6 @@
 # ADR-0007 · Données : grille infinie ou bornée par un admin, tuiles 64×64, régions 1024×1024, palette de 16 couleurs
 
-- **Statut** : Accepté
+- **Statut** : Accepté ; partie « Écriture » (lots de pixels) à remplacer par [ADR-0014](0014-un-evenement-par-pixel.md), proposé
 - **Date** : 2026-10-23
 - **Tickets** : ARCH-01 (#26). Cadre de DATA-01, qui détaille le schéma, les encodages et le calcul des coûts. Utilisé aussi par DATA-02 à DATA-05c, BOT-02, BOT-06, BOT-07a, DRAW-01 à DRAW-03a, WEB-03a à WEB-05.
 - **Références** : Sujet §3.3, §3.4 · C06 §4 · C07 §3.4

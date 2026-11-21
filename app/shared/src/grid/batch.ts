@@ -30,7 +30,7 @@ export function groupPixelsByTile(pixels: readonly DrawPixel[], version: number,
   return tiles;
 }
 
-// Realtime deltas are written once per region and batch (ADR-0003). Coordinates
+// Realtime deltas are written once per region and transaction (ADR-0003, ADR-0014). Coordinates
 // are converted to the region-local 0..1023 space used by the delta codec.
 export function groupPixelsByRegion(
   pixels: readonly DrawPixel[],

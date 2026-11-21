@@ -2,8 +2,7 @@
 # auth-proxy calls IAM Credentials signJwt on it, Google keeps and rotates the private
 # keys, and API Gateway validates the tokens against its public keys
 # (https://www.googleapis.com/robot/v1/metadata/x509/<email>).
-# WEB-02a grants roles/iam.serviceAccountTokenCreator on this account to the runtime
-# identity of the auth-proxy only.
+# The auth-proxy runtime identity is its only token creator (auth-proxy.tf).
 resource "google_service_account" "session_signer" {
   project      = var.project_id
   account_id   = "session-signer"
