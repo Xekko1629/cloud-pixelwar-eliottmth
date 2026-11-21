@@ -10,6 +10,7 @@
     "./grid": "./src/grid/index.ts",
     "./events": "./src/events/index.ts",
     "./drawing": "./src/drawing/index.ts",
+    "./gateway": "./src/gateway/index.ts",
     "./render": "./src/render/index.ts",
     "./auth": "./src/auth/index.ts"
   },

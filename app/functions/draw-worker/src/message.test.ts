@@ -35,7 +35,8 @@ describe('pixel-draw input', () => {
   it.each([
     { schema_version: 2 }, { type: 'other' }, { source: 'other' }, { actor: null },
     { actor: { uid: 123, name: 'Name' } }, { actor: { uid: '123', name: 123 } },
-    { payload: null }, { payload: { pixels: null } }, { occurred_at: 123 },
+    { payload: null }, { payload: { pixels: null } }, { payload: { pixels: [] } },
+    { payload: { pixels: [{ x: 0, y: 0, color: 1 }, { x: 1, y: 0, color: 1 }] } }, { occurred_at: 123 },
     { event_id: 'bad' }, { correlation_id: 'bad' }, { event_id: '00000000-0000-0000-0000-000000000000' },
     { event_id: 'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA' }, { correlation_id: 'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA' },
   ])('rejects invalid event fields %j', (changes) => {
