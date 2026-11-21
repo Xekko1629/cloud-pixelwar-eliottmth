@@ -32,6 +32,10 @@ module "discord_proxy" {
   # (21/11), so one instance always stays warm.
   min_instances = 1
   max_instances = 2
+  # Discord sends its own checks (PING, bad signature) alongside real commands: with one
+  # request per instance, a /draw landed on a cold instance (4.5 s, dev, 21/11 15:56)
+  # while the warm one answered a check. The proxy is stateless and network-bound.
+  concurrency = 16
   environment_variables = {
     APP_ENV               = "dev"
     GOOGLE_CLOUD_PROJECT  = var.project_id

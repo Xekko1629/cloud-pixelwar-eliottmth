@@ -36,6 +36,8 @@ module "auth_proxy" {
   min_instances         = 0
   max_instances         = 3
   timeout_seconds       = 15
+  # Stateless and network-bound; a browser sends several requests at once.
+  concurrency = 16
   environment_variables = {
     APP_ENV              = var.environment
     GOOGLE_CLOUD_PROJECT = var.project_id

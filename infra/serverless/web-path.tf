@@ -30,6 +30,9 @@ module "web_proxy" {
   labels                = local.labels
   min_instances         = 0
   max_instances         = 3
+  # Stateless and network-bound; a browser sends several requests at once (tiles, state,
+  # CORS preflights). One instance per request multiplied cold starts.
+  concurrency = 16
   # One request publishes up to 500 messages, each bounded to 5 s.
   timeout_seconds = 15
   environment_variables = {
@@ -64,7 +67,10 @@ module "tile_reader" {
   labels                = local.labels
   min_instances         = 0
   max_instances         = 3
-  timeout_seconds       = 15
+  # Stateless and network-bound; a browser sends several requests at once (tiles, state,
+  # CORS preflights). One instance per request multiplied cold starts.
+  concurrency     = 16
+  timeout_seconds = 15
   environment_variables = {
     APP_ENV              = var.environment
     GOOGLE_CLOUD_PROJECT = var.project_id
