@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { HttpFunction } from '@google-cloud/functions-framework';
 import { createDiscordProxyHandler, handleDiscordProxy } from './index';
-import { drawInteraction, signedRequest, testApplication, testNow, testPublicKey } from '../../../testing/discord-proxy-fixtures';
+import { adminInteraction, drawInteraction, signedRequest, testApplication, testNow, testPublicKey } from '../../../testing/discord-proxy-fixtures';
 
 function response() {
   const res = { status: vi.fn(), json: vi.fn(), set: vi.fn() };
@@ -85,7 +85,25 @@ describe('Q2 Discord proxy', () => {
       expect(res.status).toHaveBeenCalledWith(400); expect(publish).not.toHaveBeenCalled();
     },
   );
-  it.each(['get', 'snapshot', 'admin', 'hello'])('answers unavailable /%s immediately', async (name) => {
+  it('forwards /admin and defers an answer only its author sees', async () => {
+    const { invoke, publish, res } = setup();
+    await invoke(signedRequest(adminInteraction('pause')));
+    expect(publish.mock.calls[0][0]).toMatchObject({ payload: { command: 'admin', options: { subcommand: 'pause' } } });
+    expect(res.json).toHaveBeenCalledWith({ type: 5, data: { flags: 64 } });
+  });
+  it('answers an incomplete /admin size at once, without publishing', async () => {
+    const { invoke, publish, res } = setup();
+    await invoke(signedRequest(adminInteraction('size', [{ type: 4, name: 'width', value: 20_000 }])));
+    expect(res.json).toHaveBeenCalledWith({ type: 4, data: expect.objectContaining({ flags: 64, content: expect.stringContaining('width') }) });
+    expect(publish).not.toHaveBeenCalled();
+  });
+  it('refuses a malformed /admin with 400, without publishing', async () => {
+    const { invoke, publish, res } = setup();
+    await invoke(signedRequest(adminInteraction('delete')));
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(publish).not.toHaveBeenCalled();
+  });
+  it.each(['get', 'snapshot', 'hello'])('answers unavailable /%s immediately', async (name) => {
     const interaction = drawInteraction(); interaction.data.name = name;
     const { invoke, publish, res } = setup(); await invoke(signedRequest(interaction));
     expect(res.json).toHaveBeenCalledWith({ type: 4, data: expect.objectContaining({ flags: 64, allowed_mentions: { parse: [] } }) });

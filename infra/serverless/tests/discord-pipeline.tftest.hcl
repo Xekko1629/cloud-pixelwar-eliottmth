@@ -70,6 +70,10 @@ run "disabled_by_default" {
     condition = (
       length(module.discord_proxy) == 0 && length(module.command_worker) == 0 &&
       length(module.draw_worker) == 0 && length(module.discord_notifier) == 0 &&
+      length(module.admin_worker) == 0 && length(module.admin_requested) == 0 &&
+      length(module.command_rejected) == 0 && length(module.admin_worker_subscription) == 0 &&
+      length(module.notifier_command_rejected_subscription) == 0 &&
+      length(google_project_iam_member.admin_worker_firestore) == 0 &&
       length(module.discord_commands) == 0 && length(module.pixel_draw) == 0 &&
       length(module.pixel_processed) == 0 && length(module.pixel_rejected) == 0 &&
       length(module.command_worker_subscription) == 0 && length(module.draw_worker_subscription) == 0 &&
@@ -134,7 +138,7 @@ run "delivery_wires_the_draw_path" {
     condition = (
       module.command_worker[0].invoker_service_account_email != module.command_worker[0].service_account_email &&
       module.discord_proxy[0].invoker_service_account_email == null &&
-      toset(keys(google_service_account_iam_member.push_token_creator)) == toset(["command_worker", "draw_worker", "discord_notifier"]) &&
+      toset(keys(google_service_account_iam_member.push_token_creator)) == toset(["command_worker", "draw_worker", "discord_notifier", "admin_worker"]) &&
       google_service_account_iam_member.push_token_creator["command_worker"].service_account_id == module.command_worker[0].invoker_service_account_name &&
       google_service_account_iam_member.push_token_creator["command_worker"].role == "roles/iam.serviceAccountTokenCreator" &&
       google_service_account_iam_member.push_token_creator["command_worker"].member == "serviceAccount:service-123456789@gcp-sa-pubsub.iam.gserviceaccount.com"
@@ -147,6 +151,33 @@ run "delivery_wires_the_draw_path" {
       google_project_iam_member.draw_worker_firestore[0].member == "serviceAccount:draw-worker@pixelwar-test.iam.gserviceaccount.com"
     )
     error_message = "Only the draw-worker runtime gets Firestore access on this path."
+  }
+}
+
+run "delivery_wires_the_admin_path" {
+  command = apply
+  variables {
+    enable_discord_pipeline = true
+    enable_discord_delivery = true
+    enable_discord_hello    = true
+  }
+
+  assert {
+    condition = (
+      module.admin_worker[0].service_type == "worker" &&
+      module.admin_requested[0].name == "admin-requested" && module.command_rejected[0].name == "command-rejected" &&
+      module.admin_worker_subscription[0].path == local.admin_worker_subscription &&
+      module.notifier_command_rejected_subscription[0].path == local.notifier_command_rejected_subscription &&
+      module.notifier_command_rejected_subscription[0].name == "discord-notifier-command-rejected"
+    )
+    error_message = "The admin path wires admin-requested to the admin-worker and command-rejected to the notifier, with the names each worker checks."
+  }
+  assert {
+    condition = (
+      google_project_iam_member.admin_worker_firestore[0].role == "roles/datastore.user" &&
+      google_service_account_iam_member.push_token_creator["admin_worker"].service_account_id == module.admin_worker[0].invoker_service_account_name
+    )
+    error_message = "The admin-worker writes Firestore and gets pushes through its own invoker."
   }
 }
 

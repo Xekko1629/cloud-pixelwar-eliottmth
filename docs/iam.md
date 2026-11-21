@@ -53,9 +53,10 @@ portant son nom :
 | Identité | Rôles | Ressource | Justification |
 |---|---|---|---|
 | `<fonction>` (runtime de chaque fonction) | `logging.logWriter`, `monitoring.metricWriter`, `cloudtrace.agent`, `telemetry.tracesWriter` | Projet | Logs JSON, métriques et traces. Ces rôles n'existent qu'au niveau projet. |
-| | `secretmanager.secretAccessor` | Les secrets de la fonction uniquement | `discord-hello` : `discord-public-key`. `discord-proxy` : `discord-public-key`, `discord-application-id`. `command-worker` : `discord-application-id`, `admin-allowlist`. `draw-worker`, `discord-notifier` : `discord-application-id`. `auth-proxy` : `discord-application-id`, `discord-oauth-client-secret`. |
+| | `secretmanager.secretAccessor` | Les secrets de la fonction uniquement | `discord-hello` : `discord-public-key`. `discord-proxy` : `discord-public-key`, `discord-application-id`. `command-worker`, `admin-worker` : `discord-application-id`, `admin-allowlist`. `draw-worker`, `discord-notifier` : `discord-application-id`. `auth-proxy` : `discord-application-id`, `discord-oauth-client-secret`. |
 | `discord-proxy` | `pubsub.publisher` | Topic `discord-command` | Publier les commandes vérifiées. |
-| `command-worker` | `pubsub.publisher` | Topic `pixel-draw` | Publier le dessin d'un `/draw`. |
+| `command-worker` | `pubsub.publisher` | Topics `pixel-draw`, `admin-requested`, `command-rejected` | Publier un `/draw`, un `/admin` autorisé ou un refus. |
+| `admin-worker` | `datastore.user` | Projet | Écrire `config/global`, `ratelimit_overrides`, `admin_events`, et purger les anciennes tuiles. |
 | `draw-worker` | `datastore.user` | Projet | Transaction DATA-02 : tuiles, quotas, résultats, `config/global`. Rôle Firestore disponible seulement au niveau projet. |
 | | `pubsub.publisher` | Topics `pixel-processed`, `pixel-rejected` | Publier le résultat de chaque dessin. |
 | `auth-proxy` | `iam.serviceAccountTokenCreator` | `session-signer` seulement | Signer les JWT de session avec `signJwt` (ADR-0012). |
@@ -68,7 +69,7 @@ portant son nom :
 
 | Identité | Rôles | Ressource | Justification |
 |---|---|---|---|
-| Agent Pub/Sub (`service-<numéro>@gcp-sa-pubsub`) | `iam.serviceAccountTokenCreator` | L'invoker de chaque worker abonné (`command-worker`, `draw-worker`, `discord-notifier`) | Émettre le jeton OIDC des pushes. |
+| Agent Pub/Sub (`service-<numéro>@gcp-sa-pubsub`) | `iam.serviceAccountTokenCreator` | L'invoker de chaque worker abonné (`command-worker`, `draw-worker`, `discord-notifier`, `admin-worker`) | Émettre le jeton OIDC des pushes. |
 | | `pubsub.publisher` | Le topic `<abonnement>-dlq` de chaque abonnement | Router les messages en échec vers la dead letter queue. |
 | | `pubsub.subscriber` | Chaque abonnement push | Retirer de l'abonnement un message transféré en dead letter. |
 

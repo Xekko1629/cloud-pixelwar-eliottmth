@@ -129,7 +129,7 @@ L'absence ou l'invalidité de ces paramètres rend le handler indisponible (`503
 La fonction reste privée, avec push OIDC et invoker dédiés : abonnements
 `discord-notifier-processed` et `discord-notifier-rejected` dans
 `infra/serverless/draw-path.tf` ([déploiement dev](deploy-draw-path.md)).
-L'abonnement `command-rejected` est ajouté avec l'étape admin.
+Le troisième abonnement, `discord-notifier-command-rejected`, répond aux `/admin` refusés (`infra/serverless/admin-path.tf`).
 
 Le token est présent dans les messages Pub/Sub et dans l'URL du PATCH : ne jamais
 logguer le corps, l'URL, les exceptions réseau ou les réponses Discord. Le client

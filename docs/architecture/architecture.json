@@ -147,6 +147,17 @@
       ]
     },
     {
+      "id": "t_admin",
+      "label": "admin-requested / command-rejected",
+      "view": "application",
+      "group": "Pub/Sub · suites",
+      "status": "deployed",
+      "terraform": [
+        "serverless:module.admin_requested",
+        "serverless:module.command_rejected"
+      ]
+    },
+    {
       "id": "t_render",
       "label": "render-requested",
       "view": "application",
@@ -224,6 +235,16 @@
       "status": "deployed",
       "terraform": [
         "serverless:module.discord_notifier"
+      ]
+    },
+    {
+      "id": "admin_worker",
+      "label": "admin-worker",
+      "view": "application",
+      "group": "Workers · étape 2 (ingress interne)",
+      "status": "deployed",
+      "terraform": [
+        "serverless:module.admin_worker"
       ]
     },
     {
@@ -613,6 +634,41 @@
       "label": "/get",
       "kind": "event",
       "status": "planned"
+    },
+    {
+      "from": "command_worker",
+      "to": "t_admin",
+      "label": "/admin",
+      "kind": "event",
+      "status": "deployed"
+    },
+    {
+      "from": "t_admin",
+      "to": "admin_worker",
+      "label": "push OIDC",
+      "kind": "event",
+      "status": "deployed"
+    },
+    {
+      "from": "t_admin",
+      "to": "discord_notifier",
+      "label": "refus : push OIDC",
+      "kind": "event",
+      "status": "deployed"
+    },
+    {
+      "from": "admin_worker",
+      "to": "firestore",
+      "label": "config/global, quotas, purge",
+      "kind": "request",
+      "status": "deployed"
+    },
+    {
+      "from": "admin_worker",
+      "to": "discord_api",
+      "label": "HTTPS PATCH (réponse)",
+      "kind": "request",
+      "status": "deployed"
     },
     {
       "from": "command_worker",

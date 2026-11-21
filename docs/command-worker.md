@@ -117,9 +117,9 @@ publication, met en cache les topics et borne le RPC à 5 secondes sans retry
 SDK ; cette borne ne garantit pas la durée totale d'un cold start.
 
 Le proxy BOT-03 reste limité à `/draw`. Le Terraform dev déclare le worker, son
-abonnement et `PIXEL_DRAW_TOPIC` (`infra/serverless/discord-command.tf`). Les
-topics `render-requested`, `snapshot-requested`, `admin-requested` et
-`command-rejected` sont ajoutés avec leurs consommateurs.
+abonnement, `PIXEL_DRAW_TOPIC` (`infra/serverless/discord-command.tf`),
+`ADMIN_REQUESTED_TOPIC` et `COMMAND_REJECTED_TOPIC` (`admin-path.tf`). Les topics
+`render-requested` et `snapshot-requested` arrivent avec BOT-06 et BOT-07.
 
 ## Validation locale
 

@@ -16,6 +16,11 @@ export function drawInteraction() {
     ] },
   };
 }
+/** /admin as Discord sends it: the subcommand is one option of type 1 holding its own options. */
+export function adminInteraction(subcommand: string, options?: unknown[]) {
+  const interaction = drawInteraction();
+  return { ...interaction, data: { type: 1, name: 'admin', options: [{ type: 1, name: subcommand, ...(options ? { options } : {}) }] } };
+}
 export function signedRequest(body: unknown, changes: Record<string, unknown> = {}, timestamp = String(testNow / 1000)) {
   const rawBody = Buffer.from(typeof body === 'string' ? body : JSON.stringify(body));
   const signature = sign(null, Buffer.concat([Buffer.from(timestamp), rawBody]), privateKey).toString('hex');

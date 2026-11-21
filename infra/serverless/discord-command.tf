@@ -45,8 +45,10 @@ module "command_worker" {
     GOOGLE_CLOUD_PROJECT         = var.project_id
     DISCORD_COMMAND_SUBSCRIPTION = local.command_worker_subscription
     PIXEL_DRAW_TOPIC             = local.pixel_draw_topic
-    # render-requested, snapshot-requested, admin-requested and command-rejected
-    # are added with their consumers; the proxy only forwards /draw for now.
+    ADMIN_REQUESTED_TOPIC        = local.admin_requested_topic
+    COMMAND_REJECTED_TOPIC       = local.command_rejected_topic
+    # render-requested and snapshot-requested are added with their workers (BOT-06,
+    # BOT-07); the proxy only forwards /draw and /admin.
   }
   secrets = {
     DISCORD_APPLICATION_ID  = { secret = "discord-application-id", version = var.discord_application_id_version }
@@ -71,6 +73,7 @@ locals {
     command_worker   = module.command_worker[0].invoker_service_account_name
     draw_worker      = module.draw_worker[0].invoker_service_account_name
     discord_notifier = module.discord_notifier[0].invoker_service_account_name
+    admin_worker     = module.admin_worker[0].invoker_service_account_name
   } : {}
 }
 
