@@ -115,13 +115,21 @@ describe('draw-worker with real local Firestore and Pub/Sub', () => {
     expect((await invoke(fresh)).status).toHaveBeenCalledWith(204);
     expect((await resultsFor(fresh))[0].event.type).toBe('pixel-processed');
   });
-  it('rejects a whole batch above the quota, without drawing or charging it', async () => {
+  it('evaluates the quota pixel by pixel (ADR-0014): the pixel above the limit alone is rejected', async () => {
     await ref('config/global').update({ default_limit_per_minute: 1 });
+    const first = command(); first.payload.pixels = [{ x: 0, y: 0, color: 2 }];
+    const second = command(); second.payload.pixels = [{ x: 1, y: 0, color: 3 }];
+    expect((await handler().invoke(first)).status).toHaveBeenCalledWith(204);
+    expect((await handler().invoke(second)).status).toHaveBeenCalledWith(204);
+    expect((await resultsFor(first))[0].event.type).toBe('pixel-processed');
+    expect((await resultsFor(second))[0].event.payload.result.reason).toBe('rate_limit');
+    expect((await db.collection(`${root}/tile_colors`).get()).size).toBe(1);
+    expect((await ref(`users/${first.actor.uid}`).get()).get('used_pixels')).toBe(1);
+  });
+  it('refuses a message that carries several pixels, before any Firestore write', async () => {
     const event = command(); event.payload.pixels = [{ x: 0, y: 0, color: 2 }, { x: 1, y: 0, color: 3 }];
-    expect((await handler().invoke(event)).status).toHaveBeenCalledWith(204);
-    expect((await resultsFor(event))[0].event.payload.result.reason).toBe('rate_limit');
+    expect((await handler().invoke(event)).status).toHaveBeenCalledWith(400);
     expect((await db.collection(`${root}/tile_colors`).get()).empty).toBe(true);
-    expect((await ref(`users/${event.actor.uid}`).get()).exists).toBe(false);
   });
   it.each([false, true])('recovers a publication outage after commit (uncertain success: %s)', async (uncertain) => {
     const event = command(); let first = true;

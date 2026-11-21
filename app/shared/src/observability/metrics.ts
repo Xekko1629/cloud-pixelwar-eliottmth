@@ -32,7 +32,7 @@ export function createPixelMetrics(meter: Meter) {
   };
 }
 
-export type FunctionOutcome = 'published' | 'rejected' | 'updated' | 'expired' | 'skipped_web' | 'error';
+export type FunctionOutcome = 'published' | 'rejected' | 'updated' | 'expired' | 'skipped_web' | 'served' | 'error';
 export type FunctionReason = 'none' | 'paused' | 'rate_limit' | 'out_of_bounds' | 'expired' | 'batch_budget_exceeded' |
   'unauthorized' | 'network' | 'http' | 'rate_limited' | 'invalid_clock' | 'publish' | 'processing';
 export interface DrawObservation {
@@ -45,7 +45,7 @@ export interface DrawObservation {
   occurred_at: string;
   processed_at: string;
 }
-const outcomes = ['published', 'rejected', 'updated', 'expired', 'skipped_web', 'error'];
+const outcomes = ['published', 'rejected', 'updated', 'expired', 'skipped_web', 'served', 'error'];
 const reasons = ['none', 'paused', 'rate_limit', 'out_of_bounds', 'expired', 'batch_budget_exceeded', 'unauthorized', 'network', 'http', 'rate_limited', 'invalid_clock', 'publish', 'processing'];
 
 /** Attempt/result observations, deliberately NOT an exactly-once accounting ledger. */

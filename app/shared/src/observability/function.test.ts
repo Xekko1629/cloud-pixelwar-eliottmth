@@ -32,6 +32,22 @@ describe('function instrumentation', () => {
     expect(consumer.parentSpanContext?.spanId).toBe(server.spanContext().spanId);
     expect(JSON.parse(worker.write.mock.calls[0][0])['logging.googleapis.com/trace']).toContain(server.spanContext().traceId);
   });
+  it('names the root span of each public route', async () => {
+    const discord = make('discord-proxy'); const web = make('web-proxy');
+    await discord.telemetry.request(attributes.correlation_id, async (op) => { op.outcome('published'); });
+    await web.telemetry.request(attributes.correlation_id, async (op) => { op.source('web'); op.outcome('published'); }, 'web.pixels.draw');
+    expect(discord.spans.getFinishedSpans()[0].name).toBe('discord.interactions.draw');
+    expect(web.spans.getFinishedSpans()[0].name).toBe('web.pixels.draw');
+    expect(web.spans.getFinishedSpans()[0].kind).toBe(SpanKind.SERVER);
+  });
+  it('records a served read as a valid outcome label', async () => {
+    const { telemetry, metrics, write } = make('tile-reader');
+    await telemetry.request(attributes.correlation_id, async (op) => { op.source('web'); op.outcome('served'); }, 'state.read');
+    const data = metrics.getMetrics().at(-1)!.scopeMetrics.flatMap((scope) => scope.metrics);
+    const attempt = data.find((metric) => metric.descriptor.name === 'pixelwar.function.attempts')!;
+    expect(attempt.dataPoints[0].attributes).toMatchObject({ source: 'web', outcome: 'served', reason: 'none' });
+    expect(JSON.stringify(write.mock.calls)).not.toContain('telemetry.operation_failed');
+  });
   it('records attempts/results again on retry without claiming unique committed pixels', async () => {
     const { telemetry, metrics } = make();
     for (let i = 0; i < 2; i++) await telemetry.message('pixel-draw', attributes, async (op) => { op.drawResult(result); op.outcome('published'); });

@@ -5,7 +5,7 @@ import type { Severity } from './logger';
 
 type Runtime = ReturnType<typeof createObservability>;
 type Carrier = { correlation_id: string; traceparent: string };
-type Service = 'discord-proxy' | 'command-worker' | 'draw-worker' | 'discord-notifier' | 'admin-worker';
+type Service = 'discord-proxy' | 'web-proxy' | 'tile-reader' | 'command-worker' | 'draw-worker' | 'discord-notifier' | 'admin-worker';
 export interface FunctionOperation {
   attributes(): Carrier;
   logFields(): Record<string, string | boolean>;
@@ -16,7 +16,8 @@ export interface FunctionOperation {
   notificationAge(createdAt: number): void;
 }
 export interface FunctionTelemetry {
-  request<T>(correlationId: string, work: (operation: FunctionOperation) => Promise<T>): Promise<T>;
+  /** Root span of a public request; the name defaults to the Discord draw route. */
+  request<T>(correlationId: string, work: (operation: FunctionOperation) => Promise<T>, name?: string): Promise<T>;
   message<T>(name: string, attributes: Carrier, work: (operation: FunctionOperation) => Promise<T>): Promise<T>;
 }
 interface Options {
@@ -100,9 +101,9 @@ export function createFunctionTelemetry(service: Service, options: Options = {})
     }
   }
   return {
-    request<T>(correlationId: string, work: (operation: FunctionOperation) => Promise<T>) {
+    request<T>(correlationId: string, work: (operation: FunctionOperation) => Promise<T>, name = 'discord.interactions.draw') {
       const attributes = { correlation_id: correlationId, traceparent: `00-${randomBytes(16).toString('hex')}-${randomBytes(8).toString('hex')}-00` };
-      return run(true, 'discord.interactions.draw', attributes, work);
+      return run(true, name, attributes, work);
     },
     message: <T>(name: string, attributes: Carrier, work: (operation: FunctionOperation) => Promise<T>) => run(false, name, attributes, work),
   };
