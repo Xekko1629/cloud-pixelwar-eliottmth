@@ -30,9 +30,11 @@ module "discord_proxy" {
   build_service_account = local.function_build.service_account
   build_repository      = local.function_build.repository
   labels                = local.labels
-  # Discord gives 3 s for the deferred answer; a cold start measured 3.03 s in dev
-  # (21/11), so one instance always stays warm.
-  min_instances = 1
+  # Discord gives 3 s for the deferred answer. The Node proxy took 3.03 s cold in dev
+  # (21/11) and needed one warm instance; the Go binary answers in 5 to 11 ms locally
+  # (ADR-0016), and the gateway warmer calls /discord/health every 5 minutes. To be
+  # confirmed by the first cold request after the deploy; revert to 1 if above 1 s.
+  min_instances = 0
   max_instances = 2
   # Discord sends its own checks (PING, bad signature) alongside real commands: with one
   # request per instance, a /draw landed on a cold instance (4.5 s, dev, 21/11 15:56)

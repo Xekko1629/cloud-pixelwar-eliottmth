@@ -103,5 +103,7 @@
   dépendances (`go.mod`, `go.sum`).
 - Toute évolution du contrat `discord-command` ou des réponses Discord se fait
   dans les deux versions, sous le contrôle des fichiers de référence.
-- L'instance toujours prête du proxy pourra être retirée si les mesures le
-  permettent.
+- L'instance toujours prête du proxy est retirée avec ce changement
+  (`min_instances = 0`), sur la foi des mesures locales. Si le premier appel à
+  froid mesuré en dev dépasse 1 s, on la remet (une ligne dans
+  `infra/serverless/discord-proxy.tf`).

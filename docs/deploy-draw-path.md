@@ -19,7 +19,7 @@ flowchart LR
 
 | Ressource | Fichier | Détail |
 | --- | --- | --- |
-| `discord-proxy` | `infra/serverless/discord-proxy.tf` | **Une instance toujours prête** (`min_instances = 1`) : un démarrage à froid a pris 3,03 s pour une limite Discord de 3 s |
+| `discord-proxy` | `infra/serverless/discord-proxy.tf` | Go (ADR-0016), `min_instances = 0` : le proxy Node avait besoin d'une instance toujours prête (3,03 s à froid pour une limite Discord de 3 s) ; le binaire Go répond en 5 à 11 ms en local. Revenir à 1 si le premier appel à froid mesuré en dev dépasse 1 s |
 | `command-worker` | `infra/serverless/discord-command.tf` | Remplace le worker de diagnostic `discord-command-verify`, supprimé. Concurrence 8 |
 | `draw-worker` | `infra/serverless/draw-path.tf` | `concurrency = 1`, 2 instances maximum, timeout 300 s, `roles/datastore.user` |
 | `discord-notifier` | `infra/serverless/draw-path.tf` | Timeout 30 s, concurrence 8, abonné à `pixel-processed` et `pixel-rejected` |
