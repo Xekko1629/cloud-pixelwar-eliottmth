@@ -46,6 +46,16 @@
       ]
     },
     {
+      "id": "warmup",
+      "label": "Cloud Scheduler",
+      "view": "application",
+      "group": "Entrée publique",
+      "status": "deployed",
+      "terraform": [
+        "gateway:google_cloud_scheduler_job.gateway_warmup"
+      ]
+    },
+    {
       "id": "discord_proxy",
       "label": "discord-proxy",
       "view": "application",
@@ -562,6 +572,13 @@
       "from": "gateway",
       "to": "discord_proxy",
       "label": "ID token Google (run.invoker)",
+      "kind": "request",
+      "status": "deployed"
+    },
+    {
+      "from": "warmup",
+      "to": "gateway",
+      "label": "garde chaud",
       "kind": "request",
       "status": "deployed"
     },

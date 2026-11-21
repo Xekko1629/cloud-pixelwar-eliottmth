@@ -22,6 +22,7 @@ locals {
     "cloudbuild.googleapis.com",
     "eventarc.googleapis.com",
     "pubsub.googleapis.com",
+    "cloudscheduler.googleapis.com", # gateway warm-up (infra/gateway/warmup.tf), overview tick (DATA-05c)
     "firestore.googleapis.com",
     "apigateway.googleapis.com",
     "servicemanagement.googleapis.com",

@@ -72,6 +72,8 @@ COMPONENTS = [
     C('gateway', 'API Gateway', 'gcp.api.APIGateway', 'application', 'Entrée publique',
       ('gateway:module.api_gateway',), 'JWT de session · SA pixelwar-gateway'),
     # --- Proxies -------------------------------------------------------------------------------
+    C('warmup', 'Cloud Scheduler', 'gcp.devtools.Scheduler', 'application', 'Entrée publique',
+      ('gateway:google_cloud_scheduler_job.gateway_warmup',), 'GET /discord/health toutes les 5 min'),
     C('discord_proxy', 'discord-proxy', 'gcp.compute.Run', 'application', 'Proxies (Cloud Run functions)',
       ('serverless:module.discord_proxy',), 'vérifie Ed25519 · SA discord-proxy'),
     C('discord_hello', 'discord-hello', 'gcp.compute.Run', 'application', 'Proxies (Cloud Run functions)',
@@ -184,6 +186,7 @@ FLOWS = [
     F('browser', 'frontend', 'HTTPS (fichiers statiques)'),
     F('browser', 'gateway', 'HTTPS + JWT de session'),
     F('gateway', 'discord_proxy', 'ID token Google (run.invoker)'),
+    F('warmup', 'gateway', 'garde chaud', layout=False),
     F('gateway', 'discord_hello', 'ID token Google'),
     F('gateway', 'web_proxy', 'POST /api/pixels (1 à 500)'),
     F('gateway', 'auth_proxy', '/auth/login, /auth/exchange'),
