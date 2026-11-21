@@ -50,6 +50,31 @@ locals {
       summary      = "Draw 1 to 500 pixels, published as one Pub/Sub event per pixel"
       cors         = true
     },
+    # Grid reads (SRV-11, ADR-0013), served by the tile-reader with ETag and gzip.
+    {
+      path         = "/api/regions/{rx}/{ry}/tiles"
+      method       = "get"
+      backend      = "tiles"
+      operation_id = "regionTiles"
+      summary      = "Painted tiles of a 1024x1024 region, binary and gzip"
+      cors         = true
+    },
+    {
+      path         = "/api/tiles/{tx}/{ty}/meta"
+      method       = "get"
+      backend      = "tiles"
+      operation_id = "tileMetadata"
+      summary      = "Pseudonym and date of the last pixels of a tile"
+      cors         = true
+    },
+    {
+      path         = "/api/state"
+      method       = "get"
+      backend      = "tiles"
+      operation_id = "userState"
+      summary      = "Global state and remaining quota of the caller"
+      cors         = true
+    },
     {
       # Temporary end-to-end check of the C05 checklist (SRV-09, #39): called through
       # the gateway with authentication, hence the default session auth.

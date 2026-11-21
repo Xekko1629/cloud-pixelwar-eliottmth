@@ -130,3 +130,39 @@ run "unsupported_contract_version_fails_closed" {
   }
   expect_failures = [data.terraform_remote_state.serverless]
 }
+
+run "web_backends_publish_draw_and_reads" {
+  command = plan
+
+  override_data {
+    target = data.terraform_remote_state.serverless
+    values = {
+      outputs = {
+        gateway_contract = {
+          schema_version = 1
+          project_id     = "pixelwar-test"
+          environment    = "dev"
+          region         = "europe-west1"
+          backends = {
+            api   = { function_name = "web-proxy", uri = "https://web-proxy.example.run.app", service_type = "proxy" }
+            tiles = { function_name = "tile-reader", uri = "https://tile-reader.example.run.app", service_type = "proxy" }
+          }
+        }
+      }
+    }
+  }
+
+  assert {
+    condition = toset(module.api_gateway[0].published_routes) == toset([
+      "POST /api/pixels (session)",
+      "GET /api/regions/{rx}/{ry}/tiles (session)",
+      "GET /api/tiles/{tx}/{ty}/meta (session)",
+      "GET /api/state (session)",
+      "OPTIONS /api/pixels (none)",
+      "OPTIONS /api/regions/{rx}/{ry}/tiles (none)",
+      "OPTIONS /api/tiles/{tx}/{ty}/meta (none)",
+      "OPTIONS /api/state (none)",
+    ])
+    error_message = "The web backends publish the draw route and the three grid reads behind the session JWT, plus their unauthenticated CORS preflights."
+  }
+}

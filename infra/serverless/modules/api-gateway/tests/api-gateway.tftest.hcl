@@ -236,3 +236,49 @@ run "reject_worker_backend" {
 
   expect_failures = [var.backends]
 }
+
+run "path_parameters_are_declared" {
+  command = plan
+
+  variables {
+    routes = [
+      { path = "/api/regions/{rx}/{ry}/tiles", method = "get", backend = "tiles", operation_id = "regionTiles", summary = "Tiles", cors = true },
+      { path = "/api/state", method = "get", backend = "tiles", operation_id = "userState", summary = "State", cors = true },
+    ]
+    backends = {
+      tiles = { function_name = "tile-reader", uri = "https://tile-reader-abc-ew.a.run.app", service_type = "proxy" }
+    }
+  }
+
+  assert {
+    condition = (
+      yamldecode(output.openapi).paths["/api/regions/{rx}/{ry}/tiles"].get.parameters == [
+        { name = "rx", in = "path", required = true, type = "string" },
+        { name = "ry", in = "path", required = true, type = "string" },
+      ] &&
+      yamldecode(output.openapi).paths["/api/regions/{rx}/{ry}/tiles"].options.parameters ==
+      yamldecode(output.openapi).paths["/api/regions/{rx}/{ry}/tiles"].get.parameters
+    )
+    error_message = "Every {name} of a path template is a required string path parameter, on the route and on its preflight."
+  }
+  assert {
+    condition     = !can(yamldecode(output.openapi).paths["/api/state"].get.parameters)
+    error_message = "A path without template declares no parameter."
+  }
+  assert {
+    condition     = yamldecode(output.openapi).paths["/api/regions/{rx}/{ry}/tiles"].get["x-google-backend"].path_translation == "APPEND_PATH_TO_ADDRESS"
+    error_message = "The backend receives the full path and parses the parameters itself."
+  }
+}
+
+run "reject_partial_segment_parameter" {
+  command = plan
+
+  variables {
+    routes = [
+      { path = "/api/regions/r{rx}/tiles", method = "get", backend = "api", operation_id = "bad", summary = "Bad" },
+    ]
+  }
+
+  expect_failures = [var.routes]
+}

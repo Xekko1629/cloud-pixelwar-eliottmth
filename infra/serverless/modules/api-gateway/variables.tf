@@ -78,6 +78,12 @@ variable "routes" {
   }
 
   validation {
+    # A template segment is a whole segment, e.g. /api/regions/{rx}/{ry}/tiles.
+    condition     = alltrue([for route in var.routes : can(regex("^(/([A-Za-z0-9._-]+|\\{[a-z][a-z0-9_]*\\}))+$", route.path))])
+    error_message = "Route paths are /-separated segments, each a literal or a whole {parameter} in lowercase."
+  }
+
+  validation {
     condition     = length(distinct([for route in var.routes : route.operation_id])) == length(var.routes)
     error_message = "Operation IDs must be unique."
   }

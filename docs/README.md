@@ -21,6 +21,7 @@
 - [Installation, vérification et retrait de la sonde Discord hello](discord-hello.md)
 - [Proxy Discord Q2 : contrat et tests locaux](discord-proxy.md)
 - [Déploiement dev du parcours `/draw` et checklist de test](deploy-draw-path.md)
+- [Déploiement dev du parcours web et checklist de test](deploy-web-path.md)
 - [Proxy d'écriture web : `POST /api/pixels` — DRAW-01](web-proxy.md)
 - [Lecteur de la grille pour le web : tuiles, métadonnées et état — SRV-11](tile-reader.md)
 - [Command worker : routage, autorisation et relivraisons](command-worker.md)
