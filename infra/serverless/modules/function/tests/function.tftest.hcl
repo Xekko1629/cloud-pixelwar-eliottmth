@@ -252,3 +252,21 @@ run "reject_latest_secret_version" {
   variables { secrets = { BOT_TOKEN = { secret = "discord-bot-token", version = "latest" } } }
   expect_failures = [var.secrets]
 }
+
+run "go_runtime_for_the_discord_proxy" {
+  command = plan
+  variables {
+    runtime     = "go126"
+    entry_point = "handleDiscordProxy"
+  }
+  assert {
+    condition     = google_cloudfunctions2_function.main.build_config[0].runtime == "go126" && output.runtime == "go126"
+    error_message = "The Discord proxy is built by the go126 runtime (ADR-0016)."
+  }
+}
+
+run "reject_an_unlisted_runtime" {
+  command = plan
+  variables { runtime = "python313" }
+  expect_failures = [var.runtime]
+}

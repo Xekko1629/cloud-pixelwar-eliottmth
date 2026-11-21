@@ -48,6 +48,7 @@ jobs:
               - 'scripts/check-gateway-migration.sh'
               # The plan zips the built functions: a code change is a redeployment.
               - 'app/functions/**'
+              - 'app/go/**'
               - 'app/shared/src/**'
               - 'app/shared/package.json'
               - 'app/package-lock.json'

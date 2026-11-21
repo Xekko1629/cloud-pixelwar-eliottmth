@@ -44,7 +44,7 @@ resource "google_cloudfunctions2_function" "main" {
   deletion_policy = var.deletion_protection ? "PREVENT" : "DELETE"
 
   build_config {
-    runtime           = "nodejs24"
+    runtime           = var.runtime
     entry_point       = var.entry_point
     service_account   = var.build_service_account
     docker_repository = var.build_repository

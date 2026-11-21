@@ -122,6 +122,10 @@ run "delivery_wires_the_draw_path" {
     error_message = "Delivery wires private workers and keeps hello routed until the explicit switch."
   }
   assert {
+    condition     = module.discord_proxy[0].runtime == "go126" && module.command_worker[0].runtime == "nodejs24"
+    error_message = "Only the Discord proxy runs on go126 (ADR-0016); the workers stay on nodejs24."
+  }
+  assert {
     condition = (
       module.command_worker_subscription[0].name == "command-worker" &&
       module.draw_worker_subscription[0].name == "draw-worker" &&

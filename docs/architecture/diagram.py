@@ -75,7 +75,7 @@ COMPONENTS = [
     C('warmup', 'Cloud Scheduler', 'gcp.devtools.Scheduler', 'application', 'Entrée publique',
       ('gateway:google_cloud_scheduler_job.gateway_warmup',), 'GET /discord/health toutes les 5 min'),
     C('discord_proxy', 'discord-proxy', 'gcp.compute.Run', 'application', 'Proxies (Cloud Run functions)',
-      ('serverless:module.discord_proxy',), 'vérifie Ed25519 · SA discord-proxy'),
+      ('serverless:module.discord_proxy',), 'Go · vérifie Ed25519 · SA discord-proxy'),
     C('discord_hello', 'discord-hello', 'gcp.compute.Run', 'application', 'Proxies (Cloud Run functions)',
       ('serverless:module.discord_hello',), 'sonde C05 · SA discord-hello'),
     C('web_proxy', 'web-proxy', 'gcp.compute.Run', 'application', 'Proxies (Cloud Run functions)',
