@@ -66,12 +66,23 @@ variable "discord_proxy_public_key_version" {
 }
 
 variable "discord_application_id_version" {
-  description = "Explicit numeric Secret Manager version of discord-application-id for the dev proxy and verifier"
+  description = "Explicit numeric Secret Manager version of discord-application-id for the dev proxy and workers"
   type        = string
   default     = "1"
 
   validation {
     condition     = can(regex("^[1-9][0-9]*$", var.discord_application_id_version))
+    error_message = "Select an explicit numeric secret version, not latest."
+  }
+}
+
+variable "admin_allowlist_version" {
+  description = "Explicit numeric Secret Manager version of admin-allowlist ({\"user_ids\": [], \"role_ids\": []}) for the command-worker"
+  type        = string
+  default     = "1"
+
+  validation {
+    condition     = can(regex("^[1-9][0-9]*$", var.admin_allowlist_version))
     error_message = "Select an explicit numeric secret version, not latest."
   }
 }

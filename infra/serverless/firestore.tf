@@ -96,3 +96,26 @@ output "firestore_database" {
   description = "Firestore database used by the functions (server libraries use (default) without configuration)"
   value       = google_firestore_database.main.name
 }
+
+# Global canvas configuration read by every DATA-02 transaction (draw-worker), the
+# tile-reader and the admin-worker. Without it every draw fails. Terraform only creates
+# it: /admin pause, clear and size change these fields afterwards, and a later apply
+# must never revert them, hence ignore_changes. To reset it, delete the document and
+# re-apply.
+resource "google_firestore_document" "global_config" {
+  project     = var.project_id
+  database    = google_firestore_database.main.name
+  collection  = "config"
+  document_id = "global"
+  fields = jsonencode({
+    paused                   = { booleanValue = false }
+    canvas_version           = { integerValue = "1" }
+    size                     = { nullValue = null }
+    bounds                   = { nullValue = null }
+    default_limit_per_minute = { integerValue = "20" }
+  })
+
+  lifecycle {
+    ignore_changes = [fields]
+  }
+}

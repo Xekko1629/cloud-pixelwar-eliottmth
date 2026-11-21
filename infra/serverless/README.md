@@ -61,32 +61,23 @@ Voir le [contrat du module Gateway](modules/api-gateway/README.md). La
 `enable_discord_hello`, n'est jamais instanciée en prd et publie seulement le
 callback `/discord/interactions` lorsqu'elle est activée.
 
-### Dispositif Discord de diagnostic (dev)
+### Parcours `/draw` (dev)
 
-`discord-proxy.tf` et `discord-command.tf` préparent le proxy, le topic, le worker
-privé de vérification, le push OIDC, les retries et la DLQ avec son abonnement
-d'inspection. Les deux abonnements conservent les messages non acquittés 7 jours,
-sans conserver les acquittés et sans expiration pour inactivité.
+`discord-proxy.tf`, `discord-command.tf` et `draw-path.tf` déclarent le proxy, le
+`command-worker`, le `draw-worker`, le `discord-notifier`, leurs topics et leurs
+abonnements push. Chaque abonnement passe par le module
+[`push-subscription`](modules/push-subscription) : push OIDC avec l'invoker dédié
+du worker, retry de 10 à 60 s, DLQ et abonnement d'inspection, 7 jours de rétention.
+`config/global` est créé une fois dans `firestore.tf`.
 
-- `enable_discord_pipeline=true` crée le dispositif en dev seulement.
-- `enable_discord_delivery=true` active ensuite le push et ses droits, après
-  l'initialisation IAM ciblée du deployer et du planner.
-- `use_discord_proxy=true` choisit séparément le proxy comme backend exporté.
-- `dev.tfvars` active la création, sans livraison, et **garde le routage sur hello**.
+- `enable_discord_pipeline=true` crée fonctions et topics, en dev seulement.
+- `enable_discord_delivery=true` crée les abonnements et les droits de l'agent Pub/Sub.
+- `use_discord_proxy=true` route `/discord/interactions` vers le proxy.
 - Ces trois flags n'ont aucun effet en prd ; leurs valeurs par défaut sont `false`.
 
-Cette configuration n'est pas appliquée. `infra/iam/discord-verify.tf` prépare
-les droits CI sur le seul nouvel invoker : opt-in dev après création du compte,
-apply IAM autorisé séparément avant activation de la livraison. Voir
-[les phases et prérequis](../../docs/discord-proxy.md).
-Le nom d'abonnement est partagé via une valeur locale pour éviter un cycle
-entre la fonction et l'abonnement.
-
-Revenir vers hello change seulement `use_discord_proxy`, pas les activations du
-pipeline et de la livraison. Les désactiver planifierait des suppressions. Le CLI
-ciblé `--draw` est prêt localement, son exécution réelle, l'alerte DLQ et la validation dev
-restent à faire. Le worker de
-diagnostic n'est pas le futur worker métier.
+Revenir vers hello change seulement `use_discord_proxy` : désactiver le pipeline
+ou la livraison supprimerait les abonnements et leurs messages. Voir
+[le déploiement dev du parcours `/draw`](../../docs/deploy-draw-path.md).
 
 ## Authentification web (auth-proxy)
 

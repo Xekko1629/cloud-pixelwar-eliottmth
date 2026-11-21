@@ -8,8 +8,9 @@ Cloud Run doit vérifier l'identité avant le handler ; le code valide le messag
 les autorisations métier et la publication de l'événement suivant.
 
 Il ne dessine pas, ne modifie ni quota ni configuration Firestore, ne rend pas
-d'image et n'appelle pas Discord. Le worker temporaire `discord-command-verify`
-reste distinct : aucune substitution d'abonnement ou de ressource n'est implicite.
+d'image et n'appelle pas Discord. Il consomme l'abonnement `command-worker` du
+topic `discord-command`, à la place de l'ancien worker de diagnostic
+`discord-command-verify` (SRV-05, [déploiement dev](deploy-draw-path.md)).
 
 ## Contrats proposés et compatibilité
 
@@ -115,10 +116,10 @@ acquitter le message. Le publisher initialise son client à la première
 publication, met en cache les topics et borne le RPC à 5 secondes sans retry
 SDK ; cette borne ne garantit pas la durée totale d'un cold start.
 
-Le proxy BOT-03 reste limité à `/draw`. Aucun topic, abonnement, droit IAM ou
-Terraform du worker n'est ajouté ici. L'activation d'autres commandes, les
-consommateurs admin/rendu/notification, les ressources et le raccordement push
-doivent être revus et validés séparément avant utilisation réelle.
+Le proxy BOT-03 reste limité à `/draw`. Le Terraform dev déclare le worker, son
+abonnement et `PIXEL_DRAW_TOPIC` (`infra/serverless/discord-command.tf`). Les
+topics `render-requested`, `snapshot-requested`, `admin-requested` et
+`command-rejected` sont ajoutés avec leurs consommateurs.
 
 ## Validation locale
 

@@ -140,10 +140,9 @@ Mesurer en dev conflits, latence, débit, backlog et coût avant augmentation.
 Le document global des bornes peut créer de la contention. Le timeout total et
 les reprises doivent aussi rester compatibles avec le token Discord de 15 minutes.
 
-Ce profil n'est **pas appliqué** : ce changement n'ajoute pas de module Terraform,
-topic, abonnement, IAM ou bascule. Les contrats ARCH-03, le raccordement privé
-OIDC, les droits runtime Firestore/publication et ce calibrage doivent être revus
-séparément avant le déploiement.
+Ce profil est celui du Terraform dev (`infra/serverless/draw-path.tf`), avec
+l'abonnement `draw-worker` à 330 s et `roles/datastore.user` pour le runtime.
+Voir le [déploiement dev du parcours `/draw`](deploy-draw-path.md).
 
 ## Tests
 

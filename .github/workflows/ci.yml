@@ -69,6 +69,9 @@ jobs:
             'serverless/modules/pubsub-topic':
               - 'infra/serverless/modules/pubsub-topic/**'
               - '.github/workflows/**'
+            'serverless/modules/push-subscription':
+              - 'infra/serverless/modules/push-subscription/**'
+              - '.github/workflows/**'
             # The plan uses the image built from app/frontend: an app change is a redeployment.
             frontend:
               - 'infra/frontend/**'

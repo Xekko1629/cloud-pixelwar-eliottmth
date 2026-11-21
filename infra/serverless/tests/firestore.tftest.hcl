@@ -100,3 +100,23 @@ run "database_output" {
     error_message = "Functions use the (default) database with the server libraries, without Firebase."
   }
 }
+
+run "global_config_is_created_complete" {
+  command = apply
+
+  assert {
+    condition = (
+      google_firestore_document.global_config.collection == "config" &&
+      google_firestore_document.global_config.document_id == "global" &&
+      google_firestore_document.global_config.database == "(default)" &&
+      jsondecode(google_firestore_document.global_config.fields) == {
+        paused                   = { booleanValue = false }
+        canvas_version           = { integerValue = "1" }
+        size                     = { nullValue = null }
+        bounds                   = { nullValue = null }
+        default_limit_per_minute = { integerValue = "20" }
+      }
+    )
+    error_message = "config/global must hold every field DATA-02 requires: an incomplete document blocks every draw."
+  }
+}

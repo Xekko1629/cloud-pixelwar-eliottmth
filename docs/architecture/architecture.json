@@ -122,7 +122,7 @@
       "group": "Pub/Sub · entrée",
       "status": "deployed",
       "terraform": [
-        "serverless:module.discord_command_dlq"
+        "serverless:module.command_worker_subscription"
       ]
     },
     {
@@ -130,7 +130,7 @@
       "label": "pixel-draw",
       "view": "application",
       "group": "Pub/Sub · entrée",
-      "status": "planned",
+      "status": "deployed",
       "terraform": [
         "serverless:module.pixel_draw"
       ]
@@ -140,7 +140,7 @@
       "label": "pixel-processed / rejected",
       "view": "application",
       "group": "Pub/Sub · suites",
-      "status": "planned",
+      "status": "deployed",
       "terraform": [
         "serverless:module.pixel_processed",
         "serverless:module.pixel_rejected"
@@ -197,21 +197,11 @@
       ]
     },
     {
-      "id": "discord_verify",
-      "label": "discord-command-verify",
-      "view": "application",
-      "group": "Workers · étape 1 (ingress interne)",
-      "status": "deployed",
-      "terraform": [
-        "serverless:module.discord_command_verify"
-      ]
-    },
-    {
       "id": "command_worker",
       "label": "command-worker",
       "view": "application",
       "group": "Workers · étape 1 (ingress interne)",
-      "status": "planned",
+      "status": "deployed",
       "terraform": [
         "serverless:module.command_worker"
       ]
@@ -221,7 +211,7 @@
       "label": "draw-worker",
       "view": "application",
       "group": "Workers · étape 1 (ingress interne)",
-      "status": "planned",
+      "status": "deployed",
       "terraform": [
         "serverless:module.draw_worker"
       ]
@@ -231,7 +221,7 @@
       "label": "discord-notifier",
       "view": "application",
       "group": "Workers · étape 2 (ingress interne)",
-      "status": "planned",
+      "status": "deployed",
       "terraform": [
         "serverless:module.discord_notifier"
       ]
@@ -605,24 +595,17 @@
     },
     {
       "from": "t_discord_command",
-      "to": "discord_verify",
-      "label": "push OIDC",
-      "kind": "event",
-      "status": "deployed"
-    },
-    {
-      "from": "t_discord_command",
       "to": "command_worker",
       "label": "push OIDC",
       "kind": "event",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "command_worker",
       "to": "t_pixel_draw",
       "label": "/draw",
       "kind": "event",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "command_worker",
@@ -643,28 +626,28 @@
       "to": "draw_worker",
       "label": "push OIDC",
       "kind": "event",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "draw_worker",
       "to": "firestore",
       "label": "transaction : tuile + delta + quota",
       "kind": "request",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "draw_worker",
       "to": "t_pixel_result",
       "label": "publish",
       "kind": "event",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "t_pixel_result",
       "to": "discord_notifier",
       "label": "push OIDC",
       "kind": "event",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "t_render",
@@ -734,7 +717,7 @@
       "to": "discord_api",
       "label": "HTTPS PATCH (réponse)",
       "kind": "request",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "render_worker",

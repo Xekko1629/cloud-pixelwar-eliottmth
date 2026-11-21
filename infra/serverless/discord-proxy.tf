@@ -45,11 +45,3 @@ output "discord_proxy_function_uri" {
   description = "Private IAM-protected dev proxy endpoint; not routed until use_discord_proxy is approved"
   value       = one(module.discord_proxy[*].uri)
 }
-
-output "discord_verify_invoker" {
-  description = "Non-secret identity created in phase 1; verify it before the separately approved infra/iam bootstrap"
-  value = local.discord_pipeline_enabled ? {
-    name  = module.discord_command_verify[0].invoker_service_account_name
-    email = module.discord_command_verify[0].invoker_service_account_email
-  } : null
-}

@@ -1,6 +1,7 @@
 locals {
-  discord_verify_name         = "discord-command-verify"
-  discord_verify_subscription = "projects/${var.project_id}/subscriptions/${local.discord_verify_name}"
+  command_worker_name = "command-worker"
+  # Deterministic name: the subscription output depends on the worker URI (cycle).
+  command_worker_subscription = "projects/${var.project_id}/subscriptions/${local.command_worker_name}"
 }
 
 module "discord_commands" {
@@ -13,34 +14,26 @@ module "discord_commands" {
   publishers = { discord = module.discord_proxy[0].service_account_member }
 }
 
-module "discord_command_dlq" {
-  source = "./modules/pubsub-topic"
-  count  = local.discord_pipeline_enabled ? 1 : 0
-
-  project_id = var.project_id
-  name       = "discord-command-verify-dlq"
-  labels     = local.labels
-}
-
-module "discord_command_verify_source" {
+# BOT-04: routes each verified command; /draw becomes a pixel-draw event.
+module "command_worker_source" {
   source = "./modules/function-source"
   count  = local.discord_pipeline_enabled ? 1 : 0
 
-  name       = local.discord_verify_name
-  source_dir = "${path.root}/../../app/dist/functions/discord-command-verify"
+  name       = local.command_worker_name
+  source_dir = "${path.root}/../../app/dist/functions/command-worker"
   bucket     = local.function_build.sources_bucket
 }
 
-module "discord_command_verify" {
+module "command_worker" {
   source = "./modules/function"
   count  = local.discord_pipeline_enabled ? 1 : 0
 
   project_id            = var.project_id
   region                = var.region
-  name                  = local.discord_verify_name
+  name                  = local.command_worker_name
   service_type          = "worker"
-  source_archive        = module.discord_command_verify_source[0].source_archive
-  entry_point           = "handleDiscordCommandVerify"
+  source_archive        = module.command_worker_source[0].source_archive
+  entry_point           = "handleCommandWorker"
   build_service_account = local.function_build.service_account
   build_repository      = local.function_build.repository
   labels                = local.labels
@@ -48,17 +41,20 @@ module "discord_command_verify" {
   max_instances         = 2
   timeout_seconds       = 30
   environment_variables = {
-    APP_ENV                     = "dev"
-    GOOGLE_CLOUD_PROJECT        = var.project_id
-    DISCORD_VERIFY_SUBSCRIPTION = local.discord_verify_subscription
+    APP_ENV                      = var.environment
+    GOOGLE_CLOUD_PROJECT         = var.project_id
+    DISCORD_COMMAND_SUBSCRIPTION = local.command_worker_subscription
+    PIXEL_DRAW_TOPIC             = local.pixel_draw_topic
+    # render-requested, snapshot-requested, admin-requested and command-rejected
+    # are added with their consumers; the proxy only forwards /draw for now.
   }
   secrets = {
-    DISCORD_APPLICATION_ID = { secret = "discord-application-id", version = var.discord_application_id_version }
+    DISCORD_APPLICATION_ID  = { secret = "discord-application-id", version = var.discord_application_id_version }
+    DISCORD_ADMIN_ALLOWLIST = { secret = "admin-allowlist", version = var.admin_allowlist_version }
   }
 }
 
-# Ensure the managed Pub/Sub agent exists, without creating a second push invoker.
-# The API is enabled by infra/iam. Service identity generation is a future apply action.
+# Ensure the managed Pub/Sub agent exists; it signs the push tokens and forwards to DLQs.
 resource "google_project_service_identity" "discord_pubsub" {
   provider = google-beta
   count    = local.discord_pipeline_enabled ? 1 : 0
@@ -67,79 +63,38 @@ resource "google_project_service_identity" "discord_pubsub" {
   service = "pubsub.googleapis.com"
 }
 
-# Prerequisite: deployer must be allowed to manage this new SA policy (see docs).
-# No broad IAM grant is added here to solve that bootstrap requirement.
-resource "google_service_account_iam_member" "discord_verify_token_creator" {
-  count = local.discord_delivery_enabled ? 1 : 0
+locals {
+  pubsub_agent_member = local.discord_pipeline_enabled ? "serviceAccount:${google_project_service_identity.discord_pubsub[0].email}" : null
 
-  service_account_id = module.discord_command_verify[0].invoker_service_account_name
+  # One tokenCreator per worker invoker, shared by all the subscriptions of that worker.
+  push_invokers = local.discord_delivery_enabled ? {
+    command_worker   = module.command_worker[0].invoker_service_account_name
+    draw_worker      = module.draw_worker[0].invoker_service_account_name
+    discord_notifier = module.discord_notifier[0].invoker_service_account_name
+  } : {}
+}
+
+# The CI deployer manages service account policies (roles/iam.serviceAccountAdmin, infra/iam).
+resource "google_service_account_iam_member" "push_token_creator" {
+  for_each = local.push_invokers
+
+  service_account_id = each.value
   role               = "roles/iam.serviceAccountTokenCreator"
-  member             = "serviceAccount:${google_project_service_identity.discord_pubsub[0].email}"
+  member             = local.pubsub_agent_member
 }
 
-resource "google_pubsub_topic_iam_member" "discord_verify_dlq_publisher" {
-  count = local.discord_delivery_enabled ? 1 : 0
+module "command_worker_subscription" {
+  source = "./modules/push-subscription"
+  count  = local.discord_delivery_enabled ? 1 : 0
 
-  project = var.project_id
-  topic   = module.discord_command_dlq[0].name
-  role    = "roles/pubsub.publisher"
-  member  = "serviceAccount:${google_project_service_identity.discord_pubsub[0].email}"
-}
+  project_id                    = var.project_id
+  name                          = local.command_worker_name
+  topic_id                      = module.discord_commands[0].id
+  push_endpoint                 = module.command_worker[0].uri
+  invoker_service_account_email = module.command_worker[0].invoker_service_account_email
+  pubsub_agent_member           = local.pubsub_agent_member
+  ack_deadline_seconds          = 60
+  labels                        = local.labels
 
-# Create the DLQ's storage cursor before source delivery can begin.
-resource "google_pubsub_subscription" "discord_verify_dlq" {
-  count = local.discord_pipeline_enabled ? 1 : 0
-
-  project                    = var.project_id
-  name                       = "discord-command-verify-dlq-inspect"
-  topic                      = module.discord_command_dlq[0].id
-  labels                     = local.labels
-  message_retention_duration = "604800s"
-  retain_acked_messages      = false
-  expiration_policy { ttl = "" }
-}
-
-resource "google_pubsub_subscription" "discord_verify" {
-  count = local.discord_delivery_enabled ? 1 : 0
-
-  project                    = var.project_id
-  name                       = local.discord_verify_name
-  topic                      = module.discord_commands[0].id
-  labels                     = local.labels
-  ack_deadline_seconds       = 30
-  message_retention_duration = "604800s"
-  retain_acked_messages      = false
-  expiration_policy { ttl = "" }
-
-  push_config {
-    push_endpoint = module.discord_command_verify[0].uri
-    oidc_token {
-      service_account_email = module.discord_command_verify[0].invoker_service_account_email
-      audience              = module.discord_command_verify[0].uri
-    }
-  }
-  retry_policy {
-    minimum_backoff = "10s"
-    maximum_backoff = "60s"
-  }
-  dead_letter_policy {
-    dead_letter_topic     = module.discord_command_dlq[0].id
-    max_delivery_attempts = 5
-  }
-
-  depends_on = [
-    google_service_account_iam_member.discord_verify_token_creator,
-    google_pubsub_topic_iam_member.discord_verify_dlq_publisher,
-    google_pubsub_subscription.discord_verify_dlq,
-  ]
-}
-
-# Required for forwarding to the DLQ; this is not the worker runtime identity.
-resource "google_pubsub_subscription_iam_member" "discord_verify_dlq_forwarder" {
-  count = local.discord_delivery_enabled ? 1 : 0
-
-  project      = var.project_id
-  subscription = google_pubsub_subscription.discord_verify[0].name
-  role         = "roles/pubsub.subscriber"
-  member       = "serviceAccount:${google_project_service_identity.discord_pubsub[0].email}"
+  depends_on = [google_service_account_iam_member.push_token_creator]
 }
