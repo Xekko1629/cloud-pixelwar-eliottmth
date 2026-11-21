@@ -88,7 +88,7 @@ COMPONENTS = [
     C('t_discord_command', 'discord-command', 'gcp.analytics.PubSub', 'application', 'Pub/Sub · entrée',
       ('serverless:module.discord_commands',)),
     C('t_dlq', 'DLQ', 'gcp.analytics.PubSub', 'application', 'Pub/Sub · entrée',
-      ('serverless:module.discord_command_dlq',), 'une par abonnement · alerte si > 0'),
+      ('serverless:module.command_worker_subscription',), 'une par abonnement · alerte si > 0'),
     C('t_pixel_draw', 'pixel-draw', 'gcp.analytics.PubSub', 'application', 'Pub/Sub · entrée',
       ('serverless:module.pixel_draw',), '1 message = 1 pixel'),
     C('t_pixel_result', 'pixel-processed / rejected', 'gcp.analytics.PubSub', 'application',
@@ -104,8 +104,6 @@ COMPONENTS = [
     C('scheduler', 'Cloud Scheduler', 'gcp.devtools.Scheduler', 'application', 'Pub/Sub · suites',
       ('serverless:google_cloud_scheduler_job.overview',), 'chaque minute'),
     # --- Workers ---------------------------------------------------------------------------------
-    C('discord_verify', 'discord-command-verify', 'gcp.compute.Run', 'application', 'Workers · étape 1 (ingress interne)',
-      ('serverless:module.discord_command_verify',), 'diagnostic du contrat v1'),
     C('command_worker', 'command-worker', 'gcp.compute.Run', 'application', 'Workers · étape 1 (ingress interne)',
       ('serverless:module.command_worker',), 'commandes + droits admin'),
     C('draw_worker', 'draw-worker', 'gcp.compute.Run', 'application', 'Workers · étape 1 (ingress interne)',
@@ -190,7 +188,6 @@ FLOWS = [
     # Events
     F('discord_proxy', 't_discord_command', 'publish', 'event'),
     F('web_proxy', 't_pixel_draw', 'publish × N', 'event'),
-    F('t_discord_command', 'discord_verify', 'push OIDC', 'event'),
     F('t_discord_command', 'command_worker', 'push OIDC', 'event'),
     F('command_worker', 't_pixel_draw', '/draw', 'event'),
     F('command_worker', 't_render', '/get', 'event'),

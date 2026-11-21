@@ -2,7 +2,7 @@
 
 Ce catalogue décrit les messages échangés sur Pub/Sub entre les proxies, les workers et les sources externes (Cloud Storage, Cloud Scheduler). Le choix du broker Pub/Sub en push authentifié par OIDC est décrit dans [ADR-0002](adr/0002-broker-pubsub-push.md). Les workers sont des Cloud Run functions à ingress interne ([ADR-0008](adr/0008-compute-cloud-run-functions.md)).
 
-Le topic `discord-command` (v1) est le premier contrat implémenté : `discord-proxy` le produit, `command-worker` le consomme et le worker de diagnostic `discord-command-verify` le valide (`app/functions/`). Les topics du parcours `/draw` sont ensuite implémentés par `command-worker` (BOT-04), `draw-worker` (DRAW-02) et `discord-notifier` (BOT-05) : `pixel-draw`, `pixel-processed`, `pixel-rejected`, ainsi que `render-requested`, `snapshot-requested`, `admin-requested` et `command-rejected` côté producteur. Les types partagés sont dans `app/shared/src/events/`. Les autres topics sont fixés ici avant leur implémentation. Les points que les sources ne tranchent pas sont marqués **À valider** et repris dans la section 9.
+Le topic `discord-command` (v1) est le premier contrat implémenté : `discord-proxy` le produit, `command-worker` le consomme (`app/functions/`). Les topics du parcours `/draw` sont ensuite implémentés par `command-worker` (BOT-04), `draw-worker` (DRAW-02) et `discord-notifier` (BOT-05) : `pixel-draw`, `pixel-processed`, `pixel-rejected`, ainsi que `render-requested`, `snapshot-requested`, `admin-requested` et `command-rejected` côté producteur. Les types partagés sont dans `app/shared/src/events/`. Les autres topics sont fixés ici avant leur implémentation. Les points que les sources ne tranchent pas sont marqués **À valider** et repris dans la section 9.
 
 Dans les tableaux, la colonne « Origine » indique la source du point : un ADR, un ticket (`#n`), un fichier du dépôt, ou « Proposition » (à valider).
 
@@ -353,7 +353,7 @@ Points non tranchés, détaillés en section 9 :
 
 ### 7.1 Abonnements
 
-Convention proposée, reprise de `discord-command-verify` (`infra/serverless/discord-command.tf`) : l'abonnement porte le nom de son consommateur, suffixé du topic quand un consommateur en écoute plusieurs. Sa DLQ s'appelle `<abonnement>-dlq` et l'abonnement d'inspection de la DLQ `<abonnement>-dlq-inspect`.
+Convention appliquée par le module `infra/serverless/modules/push-subscription` : l'abonnement porte le nom de son consommateur, suffixé du topic quand un consommateur en écoute plusieurs. Sa DLQ s'appelle `<abonnement>-dlq` et l'abonnement d'inspection de la DLQ `<abonnement>-dlq-inspect`.
 
 | Abonnement | Topic | Worker (push) | Ticket |
 |---|---|---|---|
@@ -369,7 +369,7 @@ Convention proposée, reprise de `discord-command-verify` (`infra/serverless/dis
 | `snapshot-notifier` | `snapshot-ready` | `snapshot-notifier` | BOT-07b |
 | `overview-worker` | `overview-tick` | `overview-worker` | DATA-05c |
 
-Le `discord-notifier` écoute deux topics : il a donc deux abonnements, qui pointent vers la même URL. Le filtre sur `source = discord` se fait dans le worker ou dans un filtre d'abonnement : **À valider** (section 9).
+Le `discord-notifier` écoute deux topics : il a donc deux abonnements, qui pointent vers la même URL. Le filtre sur `source = discord` se fait dans le worker : un résultat web est acquitté sans action. Le message ne porte pas d'attribut `source` qui permettrait un filtre d'abonnement.
 
 Chaque abonnement pousse vers l'URL `run.app` de son worker, avec un service account d'invocation dédié qui n'a `run.invoker` que sur ce worker (ADR-0002 ; #35).
 
@@ -380,9 +380,9 @@ Chaque abonnement pousse vers l'URL `run.app` de son worker, avec un service acc
 | DLQ | Un topic de DLQ par abonnement | SRV-05 ; ADR-0002 |
 | Abonnement de debug sur la DLQ | Un par DLQ, pour inspecter et rejouer | SRV-05 |
 | Nombre de tentatives avant DLQ | `max_delivery_attempts = 5` : **valeur approximative**, pas une garantie de cinq exécutions exactes | SRV-05 ; ADR-0002 (« 5 par défaut ») ; #35 |
-| Backoff | Exponentiel, de 10 s à 60 s pour `discord-command-verify` ; à confirmer pour les autres workers | SRV-05 ; ADR-0002 ; `discord-command.tf` |
+| Backoff | Exponentiel, de 10 s à 60 s pour tous les abonnements | SRV-05 ; ADR-0002 ; `modules/push-subscription` |
 | Rétention | Au moins 7 jours | SRV-05 ; `docs/rate-limits.md` (« rejeu Pub/Sub/DLQ (7 jours prévus) ») |
-| Délai d'acquittement | Aligné sur le timeout du worker (30 s pour `discord-command-verify`), 600 s au maximum en push | ADR-0002 ; #35 ; BOT-06 |
+| Délai d'acquittement | Supérieur au timeout du worker, 600 s au maximum en push : 60 s pour `command-worker` et le notifier, 330 s pour `draw-worker` | ADR-0002 ; #35 ; `docs/deploy-draw-path.md` |
 | Droits de l'agent Pub/Sub | `publisher` sur la DLQ, `subscriber` sur l'abonnement source | SRV-05 ; ADR-0002 |
 | Droits du créateur d'abonnement | `iam.serviceAccounts.actAs` sur le service account d'invocation | ADR-0002 ; #35 |
 

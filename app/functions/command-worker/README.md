@@ -4,7 +4,7 @@ Route les événements `discord-command` vers leur événement métier, sans des
 ni appeler Discord. Fonction HTTP privée attendue : `handleCommandWorker`.
 
 Voir [le contrat, la configuration et les tests](../../../docs/command-worker.md).
-Le worker de diagnostic `discord-command-verify` est conservé séparément.
+Il remplace le worker de diagnostic `discord-command-verify` sur le topic `discord-command`.
 
 ## Fichiers
 

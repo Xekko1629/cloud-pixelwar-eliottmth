@@ -27,7 +27,7 @@ Federation, sans clé. L'environnement GitHub sélectionne l'identité :
 | | `container.admin` | Projet, prd seulement | Cluster des runners, CRD et RBAC des charts Helm (`deployer_cluster_roles`). |
 | | `resourcemanager.projectIamAdmin` **sous condition** `modifiedGrantsByRole` | Projet | Ne peut accorder ou retirer que les rôles de `deployer_grantable_roles` : `logging.logWriter`, `monitoring.metricWriter`, `cloudtrace.agent`, `telemetry.tracesWriter`, `datastore.user`, `datastore.viewer`, `artifactregistry.reader`, `storage.objectViewer`. Jamais owner, editor ou un rôle d'admin IAM. |
 | | `deployerSecretIamPolicy` (personnalisé) | Chaque secret applicatif | Donner `secretAccessor` au runtime d'une fonction sur son secret. |
-| | `deployerServiceAccountIamPolicy` (personnalisé), `iam.serviceAccountUser` | `external-secrets` (prd), invoker de `discord-command-verify` (dev) | Bindings ajoutés par les stacks jetables sur des comptes persistants. |
+| | `deployerServiceAccountIamPolicy` (personnalisé), `iam.serviceAccountUser` | `external-secrets` (prd) | Bindings ajoutés par les stacks jetables sur des comptes persistants. Les comptes créés par serverless (invokers, `session-signer`) sont couverts par `iam.serviceAccountAdmin`. |
 | | `secretmanager.secretAccessor` | Secret `arc-github-app` (prd) | Jeton GitHub App de courte durée pour gérer les variables des runners. |
 | `github-planner` (planner), environnement `<env>-plan` | `viewer` | Projet | Plans de PR en lecture seule. |
 | | `plannerResourceIamRead` (personnalisé) : `storage.buckets`, `pubsub.topics`, `pubsub.subscriptions`, `iam.serviceAccounts` `.getIamPolicy` | Projet | Lire les policies que `viewer` ne couvre pas, pour rafraîchir les bindings pendant un plan. |
@@ -53,8 +53,11 @@ portant son nom :
 | Identité | Rôles | Ressource | Justification |
 |---|---|---|---|
 | `<fonction>` (runtime de chaque fonction) | `logging.logWriter`, `monitoring.metricWriter`, `cloudtrace.agent`, `telemetry.tracesWriter` | Projet | Logs JSON, métriques et traces. Ces rôles n'existent qu'au niveau projet. |
-| | `secretmanager.secretAccessor` | Les secrets de la fonction uniquement | `discord-hello` : `discord-public-key`. `discord-proxy` : `discord-public-key`, `discord-application-id`. `discord-command-verify` : `discord-application-id`. `auth-proxy` : `discord-application-id`, `discord-oauth-client-secret`. |
-| `discord-proxy` | `pubsub.publisher` | Topic des commandes Discord | Publier les commandes vérifiées. |
+| | `secretmanager.secretAccessor` | Les secrets de la fonction uniquement | `discord-hello` : `discord-public-key`. `discord-proxy` : `discord-public-key`, `discord-application-id`. `command-worker` : `discord-application-id`, `admin-allowlist`. `draw-worker`, `discord-notifier` : `discord-application-id`. `auth-proxy` : `discord-application-id`, `discord-oauth-client-secret`. |
+| `discord-proxy` | `pubsub.publisher` | Topic `discord-command` | Publier les commandes vérifiées. |
+| `command-worker` | `pubsub.publisher` | Topic `pixel-draw` | Publier le dessin d'un `/draw`. |
+| `draw-worker` | `datastore.user` | Projet | Transaction DATA-02 : tuiles, quotas, résultats, `config/global`. Rôle Firestore disponible seulement au niveau projet. |
+| | `pubsub.publisher` | Topics `pixel-processed`, `pixel-rejected` | Publier le résultat de chaque dessin. |
 | `auth-proxy` | `iam.serviceAccountTokenCreator` | `session-signer` seulement | Signer les JWT de session avec `signJwt` (ADR-0012). |
 | `invoke-<hash>` (un par worker) | `run.invoker` | Le service du worker | Identité OIDC de l'abonnement push Pub/Sub. Les workers sont en ingress interne. |
 | `pixelwar-gateway` | `run.invoker` | Chaque backend routé par la gateway | Seule identité qui appelle les proxys. Les proxys sont en ingress `ALLOW_ALL`, mais protégés par IAM. |
@@ -65,9 +68,9 @@ portant son nom :
 
 | Identité | Rôles | Ressource | Justification |
 |---|---|---|---|
-| Agent Pub/Sub (`service-<numéro>@gcp-sa-pubsub`) | `iam.serviceAccountTokenCreator` | Invoker de `discord-command-verify` | Émettre le jeton OIDC des pushes. |
-| | `pubsub.publisher` | Topic `discord-command-verify-dlq` | Router les messages en échec vers la dead letter queue. |
-| | `pubsub.subscriber` | Abonnement `discord-command-verify` | Retirer de l'abonnement un message transféré en dead letter. |
+| Agent Pub/Sub (`service-<numéro>@gcp-sa-pubsub`) | `iam.serviceAccountTokenCreator` | L'invoker de chaque worker abonné (`command-worker`, `draw-worker`, `discord-notifier`) | Émettre le jeton OIDC des pushes. |
+| | `pubsub.publisher` | Le topic `<abonnement>-dlq` de chaque abonnement | Router les messages en échec vers la dead letter queue. |
+| | `pubsub.subscriber` | Chaque abonnement push | Retirer de l'abonnement un message transféré en dead letter. |
 
 Les autres agents (Cloud Build, Cloud Functions, Cloud Run, Artifact Registry,
 GKE…) reçoivent leurs rôles `*.serviceAgent` de Google à l'activation des APIs.

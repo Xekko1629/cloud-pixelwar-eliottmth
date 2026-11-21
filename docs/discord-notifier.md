@@ -126,9 +126,10 @@ pas les résultats d'autres consommateurs Pub/Sub.
 | `DISCORD_COMMAND_REJECTED_SUBSCRIPTION` | Facultatif : nom complet distinct de l'abonnement `command-rejected` |
 
 L'absence ou l'invalidité de ces paramètres rend le handler indisponible (`503`).
-La fonction doit rester privée, avec push OIDC et invoker dédiés ; ces ressources
-et leur IAM ne sont pas ajoutées ici. Aucun apply ni appel Discord réel n'est
-impliqué par l'ajout de cette fonction aux sources construites.
+La fonction reste privée, avec push OIDC et invoker dédiés : abonnements
+`discord-notifier-processed` et `discord-notifier-rejected` dans
+`infra/serverless/draw-path.tf` ([déploiement dev](deploy-draw-path.md)).
+L'abonnement `command-rejected` est ajouté avec l'étape admin.
 
 Le token est présent dans les messages Pub/Sub et dans l'URL du PATCH : ne jamais
 logguer le corps, l'URL, les exceptions réseau ou les réponses Discord. Le client
