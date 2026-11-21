@@ -47,3 +47,8 @@ output "runtime" {
   description = "Cloud Functions runtime of the function"
   value       = var.runtime
 }
+
+output "concurrency" {
+  description = "Maximum concurrent requests per instance"
+  value       = var.concurrency
+}

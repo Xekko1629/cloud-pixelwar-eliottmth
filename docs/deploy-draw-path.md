@@ -114,7 +114,18 @@ la plateforme peut encore démarrer une nouvelle instance. `warmup_schedule = nu
 la désactive.
 
 Prérequis : l'API `cloudscheduler.googleapis.com` est activée par `infra/iam`
-(appliqué à la main) avant le deploy.
+(appliqué à la main) avant le deploy. Premier appel du job constaté le 21/11 à
+17:00, heure de Paris : `204` en 0,029 s.
+
+## Concurrence des proxies (21/11, 16:56)
+
+Nouvel échec du premier `/draw` à 16:56, heure de Paris (le warmer n'avait pas encore tourné) :
+Discord a envoyé en même temps un PING, une requête mal signée (ses contrôles de
+l'endpoint) et le `/draw`. Avec une requête par instance, les deux contrôles ont
+occupé l'instance toujours prête et le `/draw` a démarré une instance froide
+(4,5 s). Les quatre proxies (`discord-proxy`, `web-proxy`, `tile-reader`,
+`auth-proxy`) passent à 16 requêtes par instance : ils ne gardent aucun état et
+attendent surtout le réseau. Le `draw-worker` reste à 1 (contention Firestore).
 
 ## Checklist de test manuel
 

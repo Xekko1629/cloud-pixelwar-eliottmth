@@ -105,3 +105,20 @@ run "refuse_web_api_without_delivery" {
   }
   expect_failures = [output.gateway_contract]
 }
+
+run "proxies_serve_concurrent_requests" {
+  command = plan
+  variables {
+    enable_web_api       = true
+    enable_auth_proxy    = true
+    enable_discord_hello = true
+  }
+  assert {
+    condition = (
+      module.discord_proxy[0].concurrency == 16 && module.web_proxy[0].concurrency == 16 &&
+      module.tile_reader[0].concurrency == 16 && module.auth_proxy[0].concurrency == 16 &&
+      module.draw_worker[0].concurrency == 1
+    )
+    error_message = "Stateless proxies serve 16 requests per instance; the draw-worker keeps 1 (Firestore contention)."
+  }
+}
