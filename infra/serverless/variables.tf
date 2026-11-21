@@ -87,6 +87,12 @@ variable "admin_allowlist_version" {
   }
 }
 
+variable "enable_web_api" {
+  description = "Deploy the web-proxy and tile-reader and export them to the gateway (dev only for now: needs the /draw pipeline)"
+  type        = bool
+  default     = false
+}
+
 variable "snapshot_retention_days" {
   description = "Age in days after which /snapshot images are deleted; a V4 signed URL lives 7 days at most"
   type        = number

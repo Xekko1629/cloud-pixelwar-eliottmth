@@ -52,7 +52,7 @@ export function createAdminWorkerHandler(options: Options): HttpFunction {
           operation.outcome('rejected', 'unauthorized');
           operation.log('WARNING', 'Admin command refused: not in the allow-list.', 'admin.unauthorized');
           const edited = await options.edit!(request.target, adminResponse({ status: 'unauthorized' }));
-          if (edited === 'expired') operation.log('WARNING', 'Admin refusal not shown: interaction expired.', 'admin.notification_expired');
+          if (edited !== 'updated') operation.log('WARNING', 'Admin refusal not shown.', notShown(edited));
           return;
         }
         const { result, replayed } = await options.apply!(request.event_id, request.options, request.actor.uid);
@@ -62,9 +62,10 @@ export function createAdminWorkerHandler(options: Options): HttpFunction {
           result.status === 'applied' ? 'Admin command applied.' : 'Admin command not applied: configuration missing.',
           `admin.${request.options.subcommand}.${replayed ? 'replayed' : result.status}`);
         const edited = await options.edit!(request.target, adminResponse(result, clear ? 'pending' : undefined));
-        if (edited === 'expired') {
-          operation.outcome('expired', 'expired');
-          operation.log('WARNING', 'Admin answer not shown: interaction expired.', 'admin.notification_expired');
+        if (edited !== 'updated') {
+          // The effect stays applied; a retry could never show the answer.
+          operation.outcome('expired', edited);
+          operation.log('WARNING', 'Admin answer not shown.', notShown(edited));
         }
         if (clear) {
           const report = await options.purge!(clear.canvas_version);
@@ -101,3 +102,8 @@ export const handleAdminWorker = createAdminWorkerHandler({
   edit: createOriginalResponseEditor(),
   purge: db ? purgeOldVersions.bind(null, db) : undefined,
 });
+
+/** Log event of an answer Discord can no longer show: expired token or unknown interaction (404). */
+function notShown(edited: 'expired' | 'unknown_interaction'): string {
+  return edited === 'expired' ? 'admin.notification_expired' : 'admin.notification_unknown_interaction';
+}

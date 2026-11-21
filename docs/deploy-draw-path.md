@@ -19,9 +19,10 @@ flowchart LR
 
 | Ressource | Fichier | Détail |
 | --- | --- | --- |
-| `command-worker` | `infra/serverless/discord-command.tf` | Remplace le worker de diagnostic `discord-command-verify`, supprimé |
+| `discord-proxy` | `infra/serverless/discord-proxy.tf` | **Une instance toujours prête** (`min_instances = 1`) : un démarrage à froid a pris 3,03 s pour une limite Discord de 3 s |
+| `command-worker` | `infra/serverless/discord-command.tf` | Remplace le worker de diagnostic `discord-command-verify`, supprimé. Concurrence 8 |
 | `draw-worker` | `infra/serverless/draw-path.tf` | `concurrency = 1`, 2 instances maximum, timeout 300 s, `roles/datastore.user` |
-| `discord-notifier` | `infra/serverless/draw-path.tf` | Timeout 30 s, abonné à `pixel-processed` et `pixel-rejected` |
+| `discord-notifier` | `infra/serverless/draw-path.tf` | Timeout 30 s, concurrence 8, abonné à `pixel-processed` et `pixel-rejected` |
 | Topics `pixel-draw`, `pixel-processed`, `pixel-rejected` | `infra/serverless/draw-path.tf` | Un seul publisher par topic : le runtime du producteur |
 | 4 abonnements push, chacun avec sa DLQ | module `modules/push-subscription` | `command-worker`, `draw-worker`, `discord-notifier-processed`, `discord-notifier-rejected` |
 | `config/global` | `infra/serverless/firestore.tf` | Créé une fois ; jamais réécrit par un apply suivant |
@@ -84,6 +85,19 @@ sur la sonde hello. Ne jamais passer `enable_discord_delivery` ni
 `enable_discord_pipeline` à `false` : cela supprimerait les abonnements et les
 messages qu'ils contiennent.
 
+## Premier essai du 21/11 et réglages
+
+- Premier `/draw` en échec dans Discord : démarrage à froid du proxy à 3,03 s. Le
+  pixel était pourtant dessiné ; le notifier recevait ensuite `404` de Discord et
+  réessayait jusqu'à la DLQ. Corrigé : une instance du proxy toujours prête, et
+  `404` traité comme définitif après 10 s.
+- Deuxième `/draw` lent (environ 30 s) : quatre démarrages à froid en chaîne, et un
+  `500` « aucune instance disponible » du `command-worker` (une requête par instance),
+  réessayé par Pub/Sub après 10 s. Corrigé : concurrence 8 pour le `command-worker`
+  et le notifier. À chaud, chaque étape prend 0,2 à 0,6 s.
+- 33 `/draw` ensuite, tous traités ; pic de 17 dans une même minute, donc aucun refus
+  de quota (20 par minute calendaire).
+
 ## Checklist de test manuel
 
 À remplir pendant l'essai. Ne cocher qu'une ligne réellement exécutée, avec sa date.
@@ -95,7 +109,7 @@ Les logs sont dans Cloud Logging, filtrés par `resource.labels.service_name`.
 | 1 | Fonctions | `discord-proxy`, `command-worker`, `draw-worker`, `discord-notifier` ACTIVE | Console Cloud Run functions | |
 | 2 | Abonnements | 4 abonnements push et 4 `-dlq-inspect`, DLQ vides | Console Pub/Sub | |
 | 3 | `config/global` | Les 5 champs ci-dessus | Console Firestore | |
-| 4 | Appel direct d'un worker sans token | `403` | `curl` sur l'URI `run.app` | |
+| 4 | Appel direct d'un worker sans token | `404` : un worker en ingress interne ne répond pas depuis Internet | `curl` sur l'URI `run.app` | |
 | 5 | Requête mal signée sur `/discord/interactions` | `401` | `curl` sur la Gateway | |
 | 6 | Enregistrer `/draw` | `npm run discord:commands -- --draw`, puis avec `--apply` après relecture | [CLI](discord-commands.md) | |
 | 7 | `/draw x:0 y:0 color:5` | Message différé, puis « pixel posé » en quelques secondes | Discord | |

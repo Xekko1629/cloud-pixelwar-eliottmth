@@ -41,6 +41,7 @@ module "api_gateway" {
 
 ## Fonctionnement
 
+- **Paramètres de chemin** : un segment `{nom}` en minuscules (`/api/regions/{rx}/{ry}/tiles`) est déclaré en paramètre `path` de type `string`, sur la route et sur son preflight, comme l'exige OpenAPI 2.0. La fonction reçoit le chemin complet et valide elle-même les valeurs (une région négative est valide). Un paramètre qui n'occupe pas tout le segment est refusé au plan.
 - **Routage** : `x-google-backend.address` est l'`uri` exportée par le module `function`, avec `path_translation: APPEND_PATH_TO_ADDRESS`. La fonction reçoit le chemin complet (`/discord/interactions`) et la query string d'origine. Le Functions Framework envoie tous les chemins au même handler, qui peut donc vérifier `req.path` et `req.method`. Le corps est transmis tel quel, ce qui permet au `discord-proxy` de vérifier la signature Ed25519 sur le corps brut.
 - **Authentification vers la fonction** : la gateway signe un ID token Google au nom de son service account, avec l'URL de la fonction comme audience (`jwt_audience`, fixée explicitement). Cloud Run le vérifie avant d'exécuter le code. La gateway remplace donc l'en-tête `Authorization` d'origine : pour les routes protégées (SRV-04c), les claims de l'utilisateur arrivent dans `X-Apigateway-Api-Userinfo`.
 - **Délais** : 15 s par défaut, 3 s pour les interactions Discord (le délai de réponse imposé par Discord).

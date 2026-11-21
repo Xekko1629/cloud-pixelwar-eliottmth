@@ -37,12 +37,20 @@ locals {
     path => [for operation in local.operations : operation if operation.path == path]
   }
 
+  # OpenAPI 2.0 requires every {name} of a path template to be declared as a path
+  # parameter, on each of its operations; API Gateway rejects the config otherwise.
+  # Declared as strings: the backend parses and validates them (e.g. negative regions).
+  path_parameters = {
+    for path in keys(local.paths) : path => flatten(regexall("\\{([a-z][a-z0-9_]*)\\}", path))
+  }
+
   session_issuer   = "${var.session_signer_account_id}@${var.project_id}.iam.gserviceaccount.com"
   session_audience = coalesce(var.session_audience, var.project_id)
 
   openapi = templatefile("${path.module}/openapi.yaml.tftpl", {
-    title = var.api_id
-    paths = local.paths
+    title      = var.api_id
+    paths      = local.paths
+    parameters = local.path_parameters
     # Session JWTs of this environment (ADR-0012): signed by the session signer service
     # account through IAM Credentials signJwt, so Google holds and rotates the keys.
     session_issuer   = local.session_issuer

@@ -70,7 +70,7 @@
       "label": "web-proxy",
       "view": "application",
       "group": "Proxies (Cloud Run functions)",
-      "status": "planned",
+      "status": "deployed",
       "terraform": [
         "serverless:module.web_proxy"
       ]
@@ -90,7 +90,7 @@
       "label": "tile-reader",
       "view": "application",
       "group": "Proxies (Cloud Run functions)",
-      "status": "planned",
+      "status": "deployed",
       "terraform": [
         "serverless:module.tile_reader"
       ]
@@ -577,7 +577,7 @@
       "to": "web_proxy",
       "label": "POST /api/pixels (1 à 500)",
       "kind": "request",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "gateway",
@@ -591,7 +591,7 @@
       "to": "tile_reader",
       "label": "GET /api/regions, /api/state",
       "kind": "request",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "auth_proxy",
@@ -612,7 +612,7 @@
       "to": "t_pixel_draw",
       "label": "publish × N",
       "kind": "event",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "t_discord_command",
@@ -794,7 +794,7 @@
       "to": "firestore",
       "label": "lecture (IAM)",
       "kind": "read",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "render_worker",
