@@ -41,8 +41,19 @@ variable "source_archive" {
   }
 }
 
+variable "runtime" {
+  description = "Cloud Functions runtime: nodejs24 for every function, go126 for the Discord proxy (ADR-0016)"
+  type        = string
+  default     = "nodejs24"
+
+  validation {
+    condition     = contains(["nodejs24", "go126"], var.runtime)
+    error_message = "runtime must be nodejs24, or go126 (ADR-0016)."
+  }
+}
+
 variable "entry_point" {
-  description = "Exported Node.js HTTP handler in the deployment archive"
+  description = "HTTP handler in the deployment archive: exported JavaScript function, or name registered with functions.HTTP in Go"
   type        = string
 
   validation {

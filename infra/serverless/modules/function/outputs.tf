@@ -42,3 +42,8 @@ output "invoker_service_account_name" {
   description = "Worker push identity resource name for scoped actAs / tokenCreator grants; null for proxies"
   value       = var.service_type == "worker" ? google_service_account.invoker[0].name : null
 }
+
+output "runtime" {
+  description = "Cloud Functions runtime of the function"
+  value       = var.runtime
+}

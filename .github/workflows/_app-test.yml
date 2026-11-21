@@ -51,6 +51,21 @@ jobs:
       - name: Build the functions
         run: npm run build:functions
 
+      # Discord proxy in Go (ADR-0016): same reference cases as the TypeScript proxy
+      # (testing/golden/discord-proxy.json, checked above by the unit tests).
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: app/go/discord-proxy/go.mod
+          cache-dependency-path: app/go/discord-proxy/go.sum
+
+      - name: Go proxy formatting, vet and tests
+        working-directory: app/go/discord-proxy
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then echo "gofmt needed: $unformatted"; exit 1; fi
+          go vet ./...
+          go test -race -cover ./...
+
       - name: Publish coverage in run summary
         if: always()
         run: node testing/coverage-summary.mjs

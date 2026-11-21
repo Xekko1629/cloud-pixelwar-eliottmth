@@ -2,9 +2,11 @@
 
 ## Périmètre et état
 
-`app/functions/discord-proxy/` fournit un handler HTTP Functions Framework
-`handleDiscordProxy`, déployé en dev derrière la gateway
-([parcours `/draw`](deploy-draw-path.md), [parcours admin](deploy-admin-path.md)).
+Depuis l'[ADR-0016](adr/0016-proxy-discord-en-go.md), le proxy déployé est écrit en
+**Go** ([`app/go/discord-proxy`](../app/go/discord-proxy/README.md), runtime `go126`).
+`app/functions/discord-proxy` (TypeScript) reste l'implémentation de référence du
+contrat : ses tests produisent `app/testing/golden/discord-proxy.json`, que les tests
+Go rejouent. Le `command-worker` valide ses messages contre cette référence.
 
 Le proxy vérifie la signature Ed25519 du corps brut (fenêtre de timestamp
 ±5 minutes), répond au PING et publie `/draw` dans `discord-command`. Il attend

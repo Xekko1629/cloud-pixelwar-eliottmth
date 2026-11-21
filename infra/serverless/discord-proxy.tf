@@ -10,8 +10,9 @@ module "discord_proxy_source" {
   source = "./modules/function-source"
   count  = local.discord_pipeline_enabled ? 1 : 0
 
-  name       = "discord-proxy"
-  source_dir = "${path.root}/../../app/dist/functions/discord-proxy"
+  name = "discord-proxy"
+  # Go sources (ADR-0016): Cloud Build compiles them, no build step in the CI.
+  source_dir = "${path.root}/../../app/go/discord-proxy"
   bucket     = local.function_build.sources_bucket
 }
 
@@ -23,6 +24,7 @@ module "discord_proxy" {
   region                = var.region
   name                  = "discord-proxy"
   service_type          = "proxy"
+  runtime               = "go126"
   source_archive        = module.discord_proxy_source[0].source_archive
   entry_point           = "handleDiscordProxy"
   build_service_account = local.function_build.service_account
