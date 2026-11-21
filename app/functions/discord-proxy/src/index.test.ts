@@ -4,7 +4,7 @@ import { createDiscordProxyHandler, handleDiscordProxy } from './index';
 import { adminInteraction, drawInteraction, signedRequest, testApplication, testNow, testPublicKey } from '../../../testing/discord-proxy-fixtures';
 
 function response() {
-  const res = { status: vi.fn(), json: vi.fn(), set: vi.fn() };
+  const res = { status: vi.fn(), json: vi.fn(), set: vi.fn(), send: vi.fn() };
   res.status.mockReturnValue(res); res.set.mockReturnValue(res);
   return res;
 }
@@ -127,6 +127,23 @@ describe('Q2 Discord proxy', () => {
   it.each([{ publicKey: '' }, { applicationId: '' }, { publish: undefined }])('fails closed when misconfigured: %j', async (config) => {
     const { invoke, res, publish } = setup(config); await invoke();
     expect(res.status).toHaveBeenCalledWith(503); expect(publish).not.toHaveBeenCalled();
+  });
+  it('answers the warm-up health check without signature, publication or log', async () => {
+    const { invoke, publish, log, res } = setup();
+    await invoke({ path: '/discord/health', method: 'GET', get: () => undefined } as unknown as Parameters<HttpFunction>[0]);
+    expect(res.status).toHaveBeenCalledWith(204);
+    expect(publish).not.toHaveBeenCalled(); expect(log).not.toHaveBeenCalled();
+  });
+  it('answers the health check even without runtime configuration', async () => {
+    const res = response();
+    await createDiscordProxyHandler({})({ path: '/discord/health', method: 'GET' } as unknown as Parameters<HttpFunction>[0],
+      res as unknown as Parameters<HttpFunction>[1]);
+    expect(res.status).toHaveBeenCalledWith(204);
+  });
+  it('refuses another method on the health check', async () => {
+    const { invoke, res } = setup();
+    await invoke({ path: '/discord/health', method: 'POST', get: () => undefined } as unknown as Parameters<HttpFunction>[0]);
+    expect(res.status).toHaveBeenCalledWith(405);
   });
   it('limits the method and path', async () => {
     const { invoke, res, publish } = setup();

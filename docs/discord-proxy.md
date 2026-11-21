@@ -20,6 +20,10 @@ confirmation ou le refus n'est visible que par son auteur. `/admin size` avec un
 seule des deux dimensions reçoit une réponse immédiate, sans publication, car
 Discord ne sait pas exiger « les deux ou aucune ».
 
+`GET /discord/health` répond `204` sans signature, sans publication et sans log :
+c'est la cible du job Scheduler qui garde la gateway et le proxy chauds
+([détails](deploy-draw-path.md#démarrage-à-froid-de-la-gateway-2111-1600)).
+
 Le pseudo est coupé à 32 caractères (points de code), la limite du
 `command-worker` : un pseudo Discord plus long envoyait sinon `/draw` en DLQ.
 

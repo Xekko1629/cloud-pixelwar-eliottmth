@@ -16,6 +16,17 @@ locals {
       auth             = "none"
     },
     {
+      # Warm-up target of the Scheduler job (warmup.tf): answered 204 by the proxy without
+      # signature, publication or log. Public like the interactions callback.
+      path             = "/discord/health"
+      method           = "get"
+      backend          = "discord"
+      operation_id     = "discordHealth"
+      summary          = "Warm-up check keeping the gateway and the Discord proxy warm"
+      deadline_seconds = 3
+      auth             = "none"
+    },
+    {
       path         = "/auth/login"
       method       = "get"
       backend      = "auth"

@@ -31,8 +31,37 @@ override_data {
 run "signed_dev_route_only" {
   command = plan
   assert {
-    condition     = length(module.api_gateway) == 1 && module.api_gateway[0].published_routes == ["POST /discord/interactions (none)"]
+    condition     = length(module.api_gateway) == 1 && module.api_gateway[0].published_routes == ["POST /discord/interactions (none)", "GET /discord/health (none)"]
     error_message = "Publish only routes with exported backends, with Discord signature auth delegated to its handler."
+  }
+}
+
+run "warmup_calls_the_public_health_route" {
+  command = plan
+
+  override_module {
+    target  = module.api_gateway
+    outputs = { url = "https://pixelwar-test.ew.gateway.dev", published_routes = [] }
+  }
+
+  assert {
+    condition = (
+      google_cloud_scheduler_job.gateway_warmup[0].schedule == "*/5 * * * *" &&
+      google_cloud_scheduler_job.gateway_warmup[0].http_target[0].http_method == "GET" &&
+      google_cloud_scheduler_job.gateway_warmup[0].http_target[0].uri == "https://pixelwar-test.ew.gateway.dev/discord/health" &&
+      length(google_cloud_scheduler_job.gateway_warmup[0].http_target[0].oidc_token) == 0 &&
+      google_cloud_scheduler_job.gateway_warmup[0].retry_config[0].retry_count == 0
+    )
+    error_message = "Every 5 minutes, one unauthenticated GET on the public health route, without retry."
+  }
+}
+
+run "warmup_can_be_disabled" {
+  command = plan
+  variables { warmup_schedule = null }
+  assert {
+    condition     = length(google_cloud_scheduler_job.gateway_warmup) == 0
+    error_message = "warmup_schedule = null disables the warm-up job."
   }
 }
 

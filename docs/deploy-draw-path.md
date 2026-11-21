@@ -98,6 +98,24 @@ messages qu'ils contiennent.
 - 33 `/draw` ensuite, tous traités ; pic de 17 dans une même minute, donc aucun refus
   de quota (20 par minute calendaire).
 
+## Démarrage à froid de la gateway (21/11, 16:00)
+
+Même avec une instance du proxy toujours prête, le premier `/draw` après 15 minutes
+d'inactivité a échoué : 3,75 s au total, dont 0,72 s dans le proxy. Les 3 s restantes
+viennent de l'**API Gateway**, documentée comme ajoutant 3 à 5 s aux premières requêtes
+après 15 à 20 minutes sans trafic. Les logs montrent le même schéma : 1,8 s après
+4 min, 6 s après 7 min (proxy froid en plus), 3,75 s après 15 min.
+
+Correctif : un job Cloud Scheduler (`infra/gateway/warmup.tf`) appelle
+`GET /discord/health` toutes les 5 minutes. La route est publique ; le proxy répond
+`204` sans signature, sans publication et sans log. La gateway et l'instance du proxy
+restent chaudes pour quelques centimes par mois. C'est une protection de bon effort :
+la plateforme peut encore démarrer une nouvelle instance. `warmup_schedule = null`
+la désactive.
+
+Prérequis : l'API `cloudscheduler.googleapis.com` est activée par `infra/iam`
+(appliqué à la main) avant le deploy.
+
 ## Checklist de test manuel
 
 À remplir pendant l'essai. Ne cocher qu'une ligne réellement exécutée, avec sa date.
@@ -119,7 +137,8 @@ Les logs sont dans Cloud Logging, filtrés par `resource.labels.service_name`.
 | 11 | Dépasser le quota (21 `/draw` en moins d'une minute) | Refus `rate_limit` avec le délai | Discord | |
 | 12 | Coordonnée hors limites (`x:2000000000`) | Discord refuse la valeur avant l'envoi (bornes de la définition `/draw`) | Discord | |
 | 13 | DLQ après les essais | Toujours vides | Console Pub/Sub | |
-| 14 | Temps de réponse | Réponse différée sous 3 s à froid et à chaud | Logs du proxy | |
+| 14 | Temps de réponse | Réponse différée sous 3 s à froid et à chaud | Logs de la gateway (`apigateway.googleapis.com/Gateway`) | |
+| 15 | Warm-up | Job `gateway-warmup` exécuté toutes les 5 min, `204` dans les logs de la gateway ; premier `/draw` après 30 min d'inactivité sous 3 s | Cloud Scheduler, logs de la gateway | |
 
 Hors de cette étape : routes web, `/admin` (le `command-worker` n'a pas encore de
 topic admin, `/admin` n'est d'ailleurs pas transmis par le proxy), `/get`,

@@ -28,6 +28,12 @@ export function createDiscordProxyHandler(options: Options): HttpFunction {
     } : undefined,
   });
   return async (req, res): Promise<void> => {
+    // Warm-up target of the gateway Scheduler job (infra/gateway/warmup.tf): keeps the
+    // gateway and this instance warm. No signature, no publication, no log line.
+    if (req.path === HEALTH_PATH) {
+      if (req.method !== 'GET') { res.set('Allow', 'GET').status(405).json({ error: 'Method not allowed.' }); return; }
+      res.status(204).send(); return;
+    }
     if (!key || !options.applicationId || !options.publish) {
       res.status(503).json({ error: 'Proxy unavailable.' }); return;
     }
@@ -85,6 +91,9 @@ export function createDiscordProxyHandler(options: Options): HttpFunction {
 function ephemeral(content: string) {
   return { type: 4, data: { content, flags: 64, allowed_mentions: { parse: [] } } };
 }
+
+/** Public through the gateway, answered without touching Discord or Pub/Sub. */
+export const HEALTH_PATH = '/discord/health';
 
 export const handleDiscordProxy = createDiscordProxyHandler({
   publicKey: process.env.DISCORD_PUBLIC_KEY, applicationId: process.env.DISCORD_APPLICATION_ID,
