@@ -68,7 +68,7 @@ Les autres champs (`event_id`, `occurred_at`, `source`, `actor`, `payload`) ne v
 | `snapshot-ready` | Cloud Storage : notification `OBJECT_FINALIZE` du bucket `snapshots` (message natif, sans enveloppe, section 5) | `snapshot-notifier` | SRV-07, BOT-07b |
 | `overview-tick` (nom **à valider**) | Cloud Scheduler (message natif, section 6) | `overview-worker` | SRV-05, DATA-05c |
 
-Un pixel posé sur le web n'est pas notifié par `pixel-rejected` : le dernier rejet et sa raison sont reportés dans `users/{uid}`, que le navigateur reçoit par l'événement `user` du flux `realtime` (DRAW-04 ; ADR-0013). Le nom du champ (par exemple `last_rejection`) est une proposition. Le topic `pixel-rejected` ne sert donc qu'au `discord-notifier`.
+Un pixel posé sur le web n'est pas notifié par `pixel-rejected` : le dernier rejet et sa raison sont reportés dans `users/{uid}`, que le navigateur lit par `GET /api/state` au chargement et après chaque trait (DRAW-04 ; ADR-0015). Le nom du champ (par exemple `last_rejection`) est une proposition. Le topic `pixel-rejected` ne sert donc qu'au `discord-notifier`.
 
 Les DLQ sont décrites en section 7.
 
@@ -131,10 +131,7 @@ Contraintes complémentaires :
 
 ```json
 {
-  "pixels": [
-    { "x": 12, "y": -40, "color": 5 },
-    { "x": 13, "y": -40, "color": 5 }
-  ]
+  "pixels": [{ "x": 12, "y": -40, "color": 5 }]
 }
 ```
 
@@ -194,15 +191,15 @@ Motifs de rejet (`reason`) :
     "uid": "123456789012345678",
     "canvas_version": 3,
     "type": "pixel-processed",
-    "requested_pixels": 2,
-    "applied_pixels": 2,
+    "requested_pixels": 1,
+    "applied_pixels": 1,
     "ignored_pixels": 0,
     "regions": ["0_-1"]
   }
 }
 ```
 
-L'exemple correspond aux pixels `(12, -40)` et `(13, -40)` : `rx = floor(12 / 1024) = 0` et `ry = floor(-40 / 1024) = -1`, donc la région `0_-1` (`regionId(rx, ry)` renvoie `${rx}_${ry}`).
+L'exemple correspond au pixel `(12, -40)` : `rx = floor(12 / 1024) = 0` et `ry = floor(-40 / 1024) = -1`, donc la région `0_-1` (`regionId(rx, ry)` renvoie `${rx}_${ry}`).
 
 Le message ne contient jamais le détail d'une erreur technique ni d'une dépendance (`docs/observability.md`).
 

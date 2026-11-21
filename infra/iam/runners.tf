@@ -35,7 +35,7 @@ resource "google_secret_manager_secret_iam_member" "external_secrets" {
   member    = google_service_account.external_secrets[0].member
 }
 
-# The deployer mints a short-lived GitHub App token to manage RUNNER_LABEL
+# The deployer mints a short-lived GitHub App token to manage RUNNER_SMALL and RUNNER_MEDIUM
 resource "google_secret_manager_secret_iam_member" "deployer" {
   count = local.runners_count
 

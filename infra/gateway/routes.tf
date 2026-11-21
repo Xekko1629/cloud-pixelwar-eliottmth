@@ -30,8 +30,16 @@ locals {
       method       = "post"
       backend      = "auth"
       operation_id = "authExchange"
-      summary      = "Exchange the Discord code for a session JWT"
+      summary      = "Exchange the Discord code for a session JWT (Discord token dropped)"
       auth         = "none"
+      cors         = true
+    },
+    {
+      path         = "/api/session/refresh"
+      method       = "post"
+      backend      = "auth"
+      operation_id = "refreshSession"
+      summary      = "New session JWT while the Discord login is less than 12 h old"
       cors         = true
     },
     {
@@ -39,7 +47,7 @@ locals {
       method       = "post"
       backend      = "api"
       operation_id = "drawPixels"
-      summary      = "Draw one pixel or a brush batch (published to Pub/Sub)"
+      summary      = "Draw 1 to 500 pixels, published as one Pub/Sub event per pixel"
       cors         = true
     },
     {

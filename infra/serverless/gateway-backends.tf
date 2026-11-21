@@ -1,7 +1,7 @@
 # Export deployed proxies, not Gateway resources: the separate gateway state
 # consumes this contract only after a successful serverless apply (ADR-0010).
 locals {
-  gateway_backends = local.discord_proxy_routed && local.discord_pipeline_enabled ? {
+  discord_backends = local.discord_proxy_routed && local.discord_pipeline_enabled ? {
     discord = {
       function_name = module.discord_proxy[0].name
       uri           = module.discord_proxy[0].uri
@@ -14,6 +14,17 @@ locals {
       service_type  = module.discord_hello[0].service_type
     }
   } : {}
+
+  # /auth/* and /api/session/refresh (infra/gateway/routes.tf, backend "auth").
+  auth_backends = local.auth_proxy_enabled ? {
+    auth = {
+      function_name = module.auth_proxy[0].name
+      uri           = module.auth_proxy[0].uri
+      service_type  = module.auth_proxy[0].service_type
+    }
+  } : {}
+
+  gateway_backends = merge(local.discord_backends, local.auth_backends)
 }
 
 output "gateway_contract" {

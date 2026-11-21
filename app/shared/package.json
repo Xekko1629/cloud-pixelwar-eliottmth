@@ -10,7 +10,9 @@
     "./grid": "./src/grid/index.ts",
     "./events": "./src/events/index.ts",
     "./drawing": "./src/drawing/index.ts",
-    "./discord": "./src/discord/index.ts"
+    "./discord": "./src/discord/index.ts",
+    "./render": "./src/render/index.ts",
+    "./auth": "./src/auth/index.ts"
   },
   "dependencies": {
     "@google-cloud/firestore": "9.4.0",

@@ -35,7 +35,9 @@
 ### Flux
 
 1. `GET /auth/login` : l'`auth-proxy` renvoie l'URL d'autorisation Discord
-   (scope `identify`) et un `state` signé (HMAC, quelques minutes). Inchangé.
+   (scope `identify`) et un `state` signé, valable 10 minutes. Précision (WEB-02a) : le
+   `state` est un JWT signé lui aussi par `session-signer`, avec une audience distincte
+   (`<projet>/oauth-state`), plutôt qu'un HMAC : aucune clé supplémentaire à gérer.
 2. Discord redirige vers `https://<frontend>/auth/callback?code=…&state=…`.
 3. Le frontend vérifie son `state`, puis appelle `POST /auth/exchange { code, state }`.
 4. L'`auth-proxy` vérifie le `state`, échange le code, lit `GET /users/@me`,
