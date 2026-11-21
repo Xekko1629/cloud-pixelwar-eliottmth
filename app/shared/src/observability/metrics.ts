@@ -33,7 +33,7 @@ export function createPixelMetrics(meter: Meter) {
 }
 
 export type FunctionOutcome = 'published' | 'rejected' | 'updated' | 'expired' | 'skipped_web' | 'served' | 'error';
-export type FunctionReason = 'none' | 'paused' | 'rate_limit' | 'out_of_bounds' | 'expired' | 'batch_budget_exceeded' |
+export type FunctionReason = 'none' | 'paused' | 'rate_limit' | 'out_of_bounds' | 'expired' | 'unknown_interaction' | 'batch_budget_exceeded' |
   'unauthorized' | 'network' | 'http' | 'rate_limited' | 'invalid_clock' | 'publish' | 'processing';
 export interface DrawObservation {
   source: PixelSource;
@@ -46,7 +46,7 @@ export interface DrawObservation {
   processed_at: string;
 }
 const outcomes = ['published', 'rejected', 'updated', 'expired', 'skipped_web', 'served', 'error'];
-const reasons = ['none', 'paused', 'rate_limit', 'out_of_bounds', 'expired', 'batch_budget_exceeded', 'unauthorized', 'network', 'http', 'rate_limited', 'invalid_clock', 'publish', 'processing'];
+const reasons = ['none', 'paused', 'rate_limit', 'out_of_bounds', 'expired', 'unknown_interaction', 'batch_budget_exceeded', 'unauthorized', 'network', 'http', 'rate_limited', 'invalid_clock', 'publish', 'processing'];
 
 /** Attempt/result observations, deliberately NOT an exactly-once accounting ledger. */
 export function createFunctionMetrics(meter: Meter) {

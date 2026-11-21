@@ -4,6 +4,12 @@
 
 /** An interaction token stays valid 15 minutes after the interaction (Discord). */
 export const TOKEN_LIFETIME_MS = 15 * 60_000;
+/**
+ * A 404 younger than this may only mean Discord has not yet stored the deferred answer:
+ * it stays retryable. Older, the interaction was never acknowledged (e.g. a proxy cold
+ * start beyond 3 s, seen in dev on 21/11) and no retry can ever edit it.
+ */
+export const UNKNOWN_INTERACTION_AFTER_MS = 10_000;
 const DISCORD_EPOCH_MS = 1_420_070_400_000n;
 
 /** The token is a secret: it never reaches a log, a span, an error message or Firestore. */
@@ -19,7 +25,14 @@ export interface OriginalResponseBody {
   embeds: never[];
   components: never[];
 }
-export type EditOriginalResponse = (target: OriginalResponseTarget, body: OriginalResponseBody) => Promise<'updated' | 'expired'>;
+/**
+ * - updated: the message shows the new content;
+ * - expired: the 15-minute token is over, the message can no longer be edited;
+ * - unknown_interaction: Discord answered 404 (Unknown Webhook) for an interaction older than
+ *   UNKNOWN_INTERACTION_AFTER_MS: the deferred response was never acknowledged in time.
+ */
+export type EditOutcome = 'updated' | 'expired' | 'unknown_interaction';
+export type EditOriginalResponse = (target: OriginalResponseTarget, body: OriginalResponseBody) => Promise<EditOutcome>;
 
 export class NotificationFailure extends Error {
   constructor(readonly reason: 'network' | 'http' | 'rate_limited' | 'invalid_clock', readonly status?: number, readonly retryAfterSeconds?: number) {
@@ -65,6 +78,7 @@ export function createOriginalResponseEditor(options: Options = {}): EditOrigina
       // The response may contain message content or credentials: never read or log it.
       try { await response.body?.cancel(); } catch { /* Discarding a body cannot invalidate a successful PATCH. */ }
       if (response.ok) return 'updated';
+      if (response.status === 404 && start - target.created_at >= UNKNOWN_INTERACTION_AFTER_MS) return 'unknown_interaction';
       if (clock() >= expires) return 'expired';
       const retryAfter = response.headers.get('Retry-After');
       const delay = retryAfter && /^\d+(?:\.\d+)?$/.test(retryAfter) ? Number(retryAfter) : undefined;

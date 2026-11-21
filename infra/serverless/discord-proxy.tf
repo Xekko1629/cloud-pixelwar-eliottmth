@@ -28,8 +28,10 @@ module "discord_proxy" {
   build_service_account = local.function_build.service_account
   build_repository      = local.function_build.repository
   labels                = local.labels
-  min_instances         = 0
-  max_instances         = 2
+  # Discord gives 3 s for the deferred answer; a cold start measured 3.03 s in dev
+  # (21/11), so one instance always stays warm.
+  min_instances = 1
+  max_instances = 2
   environment_variables = {
     APP_ENV               = "dev"
     GOOGLE_CLOUD_PROJECT  = var.project_id

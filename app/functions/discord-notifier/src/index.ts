@@ -30,11 +30,14 @@ export function createDiscordNotifierHandler(options: Options): HttpFunction {
       await telemetry.message(notice.result.type, notice.attributes, async (operation) => {
         operation.source(notice.source);
         if (notice.source === 'discord') operation.notificationAge(notice.discord.created_at);
-        let outcome: 'skipped_web' | 'updated' | 'expired';
+        let outcome: 'skipped_web' | 'updated' | 'expired' | 'unknown_interaction';
         try { outcome = notice.source === 'web' ? 'skipped_web' : await options.update!(notice); }
         catch (error) { if (error instanceof NotificationFailure) operation.outcome('error', error.reason); throw error; }
-        operation.outcome(outcome, outcome === 'expired' ? 'expired' : 'none');
-        write(`${JSON.stringify({ severity: outcome === 'expired' ? 'WARNING' : 'INFO', function: 'discord-notifier',
+        // Neither an expired token nor an unknown interaction can ever be edited: acknowledge (204).
+        const lost = outcome === 'expired' || outcome === 'unknown_interaction';
+        if (lost) operation.outcome('expired', outcome as 'expired' | 'unknown_interaction');
+        else operation.outcome(outcome as 'skipped_web' | 'updated', 'none');
+        write(`${JSON.stringify({ severity: lost ? 'WARNING' : 'INFO', function: 'discord-notifier',
           event_type: `discord.notification.${outcome}`, ...identifiers, ...operation.logFields() })}\n`);
       });
     } catch (error) {

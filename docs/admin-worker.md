@@ -74,6 +74,7 @@ fois** ; la seconde livraison renvoie le même message Discord et reprend la pur
 | --- | --- |
 | Commande appliquée, refusée ou déjà traitée, réponse affichée | `204` |
 | Token d'interaction expiré (15 min) | Log `admin.notification_expired`, `204` : l'effet reste appliqué |
+| Interaction inconnue de Discord (`404` après 10 s) | Log `admin.notification_unknown_interaction`, `204` : l'effet reste appliqué |
 | Discord indisponible avant expiration | `503` (avec `Retry-After` si Discord en donne un) : la relivraison renvoie le même message |
 | Purge interrompue par son budget de temps | `503` : la relivraison reprend la purge, sans effacer à nouveau |
 | Message invalide, `event_id` réutilisé pour une autre sous-commande | `400`, puis DLQ |
@@ -125,6 +126,7 @@ l'interaction.
 | `admin.<sous-commande>.applied` / `.replayed` / `.rejected` | Résultat de la transaction |
 | `admin.unauthorized` | Auteur hors allow-list à la revérification |
 | `admin.notification_expired` | Réponse non affichée, token expiré |
+| `admin.notification_unknown_interaction` | Réponse non affichée, interaction jamais acquittée par Discord |
 | `admin.purge.complete` / `admin.purge.incomplete` / `admin.purge.retry` | Purge après `clear` |
 | `admin.message.invalid` / `admin.failed` | `400` / `503` |
 

@@ -113,9 +113,11 @@ module "discord_notifier" {
   build_service_account = local.function_build.service_account
   build_repository      = local.function_build.repository
   labels                = local.labels
-  min_instances         = 0
-  max_instances         = 2
-  timeout_seconds       = 30
+  # Network-bound (one Discord PATCH per message), see command-worker.
+  concurrency     = 8
+  min_instances   = 0
+  max_instances   = 2
+  timeout_seconds = 30
   environment_variables = {
     APP_ENV                        = var.environment
     GOOGLE_CLOUD_PROJECT           = var.project_id
