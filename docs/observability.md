@@ -266,7 +266,7 @@ pour compter ces requêtes, en complément des tentatives métier instrumentées
 | `pixelwar.draw.result_age` | Date de traitement conservée moins date de demande, en secondes | `source`, `outcome`, `reason` |
 | `pixelwar.notification.age` | Âge de l'interaction au début d'une tentative de notification | aucun label d'identité |
 
-`outcome` est limité à published/rejected/updated/expired/skipped_web/error.
+`outcome` est limité à published/rejected/updated/expired/skipped_web/served/error.
 Les raisons sont une liste fermée (refus connus et catégories techniques).
 La fonction est identifiée par la ressource `service.name`, pas par une URL.
 Aucun ID utilisateur, message ou corrélation, token, nom ou coordonnée n'est
