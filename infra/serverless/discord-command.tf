@@ -37,9 +37,12 @@ module "command_worker" {
   build_service_account = local.function_build.service_account
   build_repository      = local.function_build.repository
   labels                = local.labels
-  min_instances         = 0
-  max_instances         = 2
-  timeout_seconds       = 30
+  # Network-bound and stateless: one instance serves several pushes instead of Cloud Run
+  # answering 500 "no available instance" during a cold start (measured in dev, 21/11).
+  concurrency     = 8
+  min_instances   = 0
+  max_instances   = 2
+  timeout_seconds = 30
   environment_variables = {
     APP_ENV                      = var.environment
     GOOGLE_CLOUD_PROJECT         = var.project_id

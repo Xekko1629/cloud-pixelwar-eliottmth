@@ -3,6 +3,7 @@ import { notificationEvent, notifierNow, notifierPush, notifierSubscriptions } f
 import { testApplication, testNow } from '../../../testing/discord-proxy-fixtures';
 import { parseNoticePush, TOKEN_LIFETIME_MS, type DiscordNotice } from './message';
 import { createOriginalResponseUpdater, NotificationFailure } from './discord';
+import { UNKNOWN_INTERACTION_AFTER_MS } from '@pixelwar/shared/discord';
 
 const notice = (): DiscordNotice => {
   const parsed = parseNoticePush(notifierPush(), notifierSubscriptions, testApplication);
@@ -51,7 +52,20 @@ describe('original interaction response updater', () => {
     expect(await update(notice())).toBe('updated');
     expect(request.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
   });
-  it.each([400, 401, 403, 404, 429, 500, 503])('keeps non-success status %s retryable before expiry without leaking its body', async (status) => {
+  it('reports an unknown interaction (404) instead of a retryable failure, without leaking its body', async () => {
+    // Discord answers 404 Unknown Webhook when the deferred response was never acknowledged
+    // (proxy cold start beyond 3 s): a retry could never edit that message.
+    const request = vi.fn<typeof fetch>().mockResolvedValue(new Response('synthetic-interaction-token', { status: 404 }));
+    const update = createOriginalResponseUpdater({ fetch: request, now: () => testNow + UNKNOWN_INTERACTION_AFTER_MS });
+    expect(await update(notice())).toBe('unknown_interaction');
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+  it('keeps a 404 retryable while the deferred answer may not be stored yet', async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 404 }));
+    const update = createOriginalResponseUpdater({ fetch: request, now: () => testNow + UNKNOWN_INTERACTION_AFTER_MS - 1 });
+    await expect(update(notice())).rejects.toMatchObject({ reason: 'http', status: 404 });
+  });
+  it.each([400, 401, 403, 429, 500, 503])('keeps non-success status %s retryable before expiry without leaking its body', async (status) => {
     const request = vi.fn<typeof fetch>().mockResolvedValue(new Response('synthetic-interaction-token', { status }));
     const update = createOriginalResponseUpdater({ fetch: request, now: () => notifierNow });
     try { await update(notice()); throw new Error('Expected failure'); }

@@ -87,8 +87,11 @@ après création de l'interaction, y compris exactement à cette limite.
 
 - Token encore utilisable : attendre le PATCH confirmé avant `204`.
 - Réseau, timeout, HTTP non-2xx ou rate limit : `503` pour permettre une reprise.
-  Une erreur Discord `404` avant l'échéance n'est pas assimilée automatiquement
-  à une expiration ; elle peut aussi précéder la disponibilité du message initial.
+- Discord `404` (Unknown Webhook) : moins de 10 s après l'interaction, la réponse
+  différée n'est peut-être pas encore enregistrée, donc `503` et reprise. Au-delà,
+  l'interaction n'a jamais été acquittée (vu en dev le 21/11 : démarrage à froid du
+  proxy à 3,03 s pour une limite Discord de 3 s) : log `WARNING`
+  `discord.notification.unknown_interaction`, puis `204`, sans passage par la DLQ.
 - Token expiré : **ne plus appeler Discord**, log `WARNING` avec
   `discord.notification.expired`, puis `204`. Le résultat du dessin est conservé,
   mais l'utilisateur n'aura pas sa confirmation finale. Aucun message de secours

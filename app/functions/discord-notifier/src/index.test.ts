@@ -36,6 +36,12 @@ describe('notifier acknowledgement', () => {
     expect(res.status).toHaveBeenCalledWith(204);
     expect(JSON.parse(write.mock.calls[0][0])).toMatchObject({ severity: 'WARNING', event_type: 'discord.notification.expired' });
   });
+  it('acknowledges an unknown interaction (Discord 404) with a warning rather than a retry', async () => {
+    const { invoke, update, write, res } = setup(); update.mockResolvedValue('unknown_interaction');
+    await invoke();
+    expect(res.status).toHaveBeenCalledWith(204);
+    expect(JSON.parse(write.mock.calls[0][0])).toMatchObject({ severity: 'WARNING', event_type: 'discord.notification.unknown_interaction' });
+  });
   it('skips valid web results without any Discord call', async () => {
     const { invoke, update, res, write } = setup();
     await invoke(notifierPush(notificationEvent('pixel-processed', 'web')));

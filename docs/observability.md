@@ -267,6 +267,8 @@ pour compter ces requêtes, en complément des tentatives métier instrumentées
 | `pixelwar.notification.age` | Âge de l'interaction au début d'une tentative de notification | aucun label d'identité |
 
 `outcome` est limité à published/rejected/updated/expired/skipped_web/served/error.
+Une réponse Discord impossible à afficher est comptée `expired`, avec la raison
+`expired` (token de 15 min dépassé) ou `unknown_interaction` (404 de Discord).
 Les raisons sont une liste fermée (refus connus et catégories techniques).
 La fonction est identifiée par la ressource `service.name`, pas par une URL.
 Aucun ID utilisateur, message ou corrélation, token, nom ou coordonnée n'est

@@ -86,6 +86,20 @@ describe('admin-worker', () => {
     expect(logs().map((line) => line.event_type)).toContain('admin.notification_expired');
   });
 
+  it('acknowledges an unknown interaction (Discord 404), keeping the change', async () => {
+    const { invoke, apply, logs } = setup({ edit: vi.fn().mockResolvedValue('unknown_interaction') });
+    expect((await invoke()).status).toHaveBeenCalledWith(204);
+    expect(apply).toHaveBeenCalledTimes(1);
+    expect(logs().map((line) => line.event_type)).toContain('admin.notification_unknown_interaction');
+  });
+
+  it('acknowledges a refusal that can no longer be shown, without applying anything', async () => {
+    const { invoke, apply, logs } = setup({ permissions: { user_ids: [], role_ids: [] }, edit: vi.fn().mockResolvedValue('unknown_interaction') });
+    expect((await invoke()).status).toHaveBeenCalledWith(204);
+    expect(apply).not.toHaveBeenCalled();
+    expect(logs().map((line) => line.event_type)).toContain('admin.notification_unknown_interaction');
+  });
+
   it('answers the missing configuration without applying anything', async () => {
     const apply = vi.fn().mockResolvedValue({ result: { status: 'rejected', subcommand: 'pause', reason: 'configuration_missing' }, replayed: false });
     const { invoke, edit } = setup({ apply });
