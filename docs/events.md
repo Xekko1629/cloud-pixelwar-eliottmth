@@ -18,7 +18,7 @@ Chaque message métier porte l'enveloppe suivante, sérialisée en JSON UTF-8. E
 | `correlation_id` | string | oui | `^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$` ; UUID canonique en minuscules pour `pixel-draw`, `pixel-processed` et `pixel-rejected` | `app/shared/src/observability/context.ts` ; `draw-worker` et `discord-notifier` (`message.ts`) | Relie logs, spans et messages d'une même action (BOT-09, OBS-03). Généré par le proxy, jamais repris d'un client (`docs/observability.md`), puis recopié tel quel par chaque worker. Pour `discord-command`, égal à `event_id`. |
 | `occurred_at` | string | oui | ISO 8601 UTC avec millisecondes : `AAAA-MM-JJTHH:MM:SS.mmmZ` | `event-order.ts` ; `event.ts` | Date de création de l'événement. Sert à la latence de bout en bout et à la règle last-write-wins (ADR-0002). Pour `discord-command`, c'est la date encodée dans l'id d'interaction Discord (snowflake). Voir la section 9 pour les événements système. |
 | `source` | string | oui | `discord` ou `web` | ticket #28 | Origine de l'action. Les événements système (Cloud Scheduler, Cloud Storage) n'ont pas de valeur ici : **À valider**. |
-| `actor` | object | oui | `discord-command` : `{ "uid": string, "name": string, "roles": string[] }` ; autres topics : `{ "uid": string, "name": string }` | `event.ts` ; `app/shared/src/events/` ; `uid` = id Discord (ADR-0012) | Auteur de l'action. `uid` est l'id Discord, `name` le pseudo au moment de l'action (repris dans les métadonnées de pixel, ADR-0007). `roles` (ids des rôles Discord, triés et sans doublon) ne sert qu'à l'autorisation faite par le `command-worker` : il n'est pas propagé en aval. Le `web-proxy` (DRAW-01) publie donc un `actor` sans `roles`. |
+| `actor` | object | oui | `discord-command` et `admin-requested` : `{ "uid": string, "name": string, "roles": string[] }` ; autres topics : `{ "uid": string, "name": string }` | `event.ts` ; `app/shared/src/events/` ; `uid` = id Discord (ADR-0012) | Auteur de l'action. `uid` est l'id Discord, `name` le pseudo au moment de l'action (repris dans les métadonnées de pixel, ADR-0007). `roles` (ids des rôles Discord, triés et sans doublon) ne sert qu'à l'autorisation faite par le `command-worker` : il n'est pas propagé en aval. Le `web-proxy` (DRAW-01) publie donc un `actor` sans `roles`. |
 | `payload` | object | oui | Schéma propre à chaque topic (section 3) | ticket #28 | Données métier. |
 
 Le contexte de trace (`traceparent`) n'est **pas** dans le corps : il ne circule que dans les attributs Pub/Sub (section 1.1). Il n'existe donc qu'une source de vérité.
@@ -61,8 +61,8 @@ Les autres champs (`event_id`, `occurred_at`, `source`, `actor`, `payload`) ne v
 | `pixel-draw` | `web-proxy` (`POST /api/pixels`, un message par pixel de la requête, [ADR-0014](adr/0014-un-evenement-par-pixel.md)) ; `command-worker` pour `/draw` (`source = discord`) | `draw-worker` | DRAW-01, DRAW-02, BOT-04 |
 | `pixel-processed` | `draw-worker`, un message par `pixel-draw` | `discord-notifier` (acquitte sans action les résultats `source = web`) ; consommateur de marquage de la vue éloignée | DRAW-02, BOT-05, DATA-05c |
 | `pixel-rejected` | `draw-worker`, un message par `pixel-draw` | `discord-notifier` | DRAW-02, BOT-05 |
-| `command-rejected` | `command-worker` (`/admin` ou `/snapshot` non autorisé) | À venir : réponse Discord du refus (nom du consommateur **à valider**) | BOT-04 |
-| `admin-requested` | `command-worker` (`/admin`, après autorisation) | À venir : `admin-worker` (nom **à valider**) | BOT-04, BOT-08 |
+| `command-rejected` | `command-worker` (`/admin` ou `/snapshot` non autorisé) | `discord-notifier` (réponse du refus) | BOT-04, BOT-08 |
+| `admin-requested` | `command-worker` (`/admin`, après autorisation) | `admin-worker` | BOT-04, BOT-08, DATA-04 |
 | `render-requested` | `command-worker` (`/get`) | `render-worker` | BOT-04, BOT-06 |
 | `snapshot-requested` | `command-worker` (`/snapshot`) | `snapshot-worker` | BOT-04, BOT-07a |
 | `snapshot-ready` | Cloud Storage : notification `OBJECT_FINALIZE` du bucket `snapshots` (message natif, sans enveloppe, section 5) | `snapshot-notifier` | SRV-07, BOT-07b |
@@ -229,7 +229,9 @@ La zone rendue n'est pas dans le message : elle est lue dans `config/global.boun
 
 ### 3.6 `admin-requested`
 
-Publié par le `command-worker` pour `/admin`, seulement si l'auteur est dans l'allow-list (utilisateurs ou rôles).
+Publié par le `command-worker` pour `/admin`, seulement si l'auteur est dans l'allow-list (utilisateurs ou rôles). Consommé par l'`admin-worker` (`docs/admin-worker.md`).
+
+C'est le seul message, après `discord-command`, dont `actor` garde `roles` : l'`admin-worker` revérifie l'allow-list avant tout effet, et n'applique rien pour un auteur qui n'y figure plus.
 
 | Champ | Type | Obligatoire | Contrainte | Origine |
 |---|---|---|---|---|
@@ -238,7 +240,7 @@ Publié par le `command-worker` pour `/admin`, seulement si l'auteur est dans l'
 
 ### 3.7 `command-rejected`
 
-Publié par le `command-worker` quand `/admin` ou `/snapshot` est demandé par un auteur hors allow-list. La commande n'est pas transmise au worker métier.
+Publié par le `command-worker` quand `/admin` ou `/snapshot` est demandé par un auteur hors allow-list. La commande n'est pas transmise au worker métier. Le `discord-notifier` remplace la réponse différée par un message de refus fixe. L'enveloppe reprend `event_id`, `correlation_id` et `occurred_at` du `discord-command`.
 
 | Champ | Type | Obligatoire | Contrainte | Origine |
 |---|---|---|---|---|
@@ -360,6 +362,8 @@ Convention proposée, reprise de `discord-command-verify` (`infra/serverless/dis
 | `discord-notifier-processed` | `pixel-processed` | `discord-notifier` | BOT-05 |
 | `overview-mark` | `pixel-processed` | Consommateur de marquage (nom à valider) | DATA-05c |
 | `discord-notifier-rejected` | `pixel-rejected` | `discord-notifier` | BOT-05 |
+| `discord-notifier-command-rejected` | `command-rejected` | `discord-notifier` | BOT-08 |
+| `admin-worker` | `admin-requested` | `admin-worker` | BOT-08 |
 | `render-worker` | `render-requested` | `render-worker` | BOT-06 |
 | `snapshot-worker` | `snapshot-requested` | `snapshot-worker` | BOT-07a |
 | `snapshot-notifier` | `snapshot-ready` | `snapshot-notifier` | BOT-07b |
@@ -400,6 +404,7 @@ Pub/Sub livre au moins une fois, sans ordre garanti. Chaque consommateur doit do
 |---|---|---|
 | `command-worker` | `interaction_id` (BOT-04) | Sans état : un rejeu republie le même message, avec le même `event_id` (section 3.2). Le doublon est absorbé par le consommateur, par exemple DATA-02 pour `pixel-draw`. |
 | `draw-worker` | `event_id`, document `processed_events` (ADR-0007 ; `rate-limits.md`, étapes 1 à 4) | Dans la même transaction que les tuiles, les deltas et le compteur : le document de déduplication est lu en premier. S'il existe, le résultat d'origine est repris, sans réévaluer le quota ni écrire de pixel. |
+| `admin-worker` | `event_id`, document `admin_events/<event_id>` écrit dans la même transaction que l'effet | Le résultat enregistré est repris : un `clear` relivré n'incrémente pas deux fois `canvas_version`. Même `event_id` avec une autre sous-commande : message invalide. La purge des anciennes tuiles reprend où elle s'était arrêtée. |
 | `discord-notifier` | Aucune clé stockée : effet idempotent | Le `PATCH` de la réponse d'origine (`@original`, BOT-05) est rejoué avec le même contenu : le message reste identique, aucun second message n'est créé (`docs/discord-notifier.md`). |
 | `render-worker` | `event_id` (proposition) | BOT-06 demande de tester qu'une nouvelle livraison ne produit pas de notification en double, mais ne fixe pas de mécanisme : **À valider**. |
 | `snapshot-worker` | Clé d'objet stable par demande (BOT-07a, #54) | Proposition : `snapshots/<occurred_at de la demande>-<event_id>.png`, pour que le rejeu écrive le même objet. Le format exact est **À valider**. |
