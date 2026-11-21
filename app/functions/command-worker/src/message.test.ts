@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { commandFixture, commandPush, commandSubscription } from '../../../testing/command-worker-fixtures';
-import { testApplication } from '../../../testing/discord-proxy-fixtures';
+import { adminInteraction, testApplication } from '../../../testing/discord-proxy-fixtures';
+import { commandEvent } from '../../discord-proxy/src/event';
 import { parsePush } from './message';
 
 const parse = (body: unknown = commandPush()) => parsePush(body, commandSubscription, testApplication);
@@ -82,5 +83,25 @@ describe('discord-command reader', () => {
     const result = parse(body);
     expect(result.command.actor.roles).toHaveLength(1);
     expect(result.attributes.traceparent.endsWith('-01')).toBe(true);
+  });
+});
+
+describe('contract with the real discord-proxy for /admin', () => {
+  it.each([
+    ['pause', undefined, { subcommand: 'pause' }],
+    ['size', undefined, { subcommand: 'size' }],
+    ['size', [{ type: 4, name: 'width', value: 20_000 }, { type: 4, name: 'height', value: 30_000 }], { subcommand: 'size', width: 20_000, height: 30_000 }],
+    ['ratelimit', [{ type: 6, name: 'user', value: '623456789012345678' }, { type: 4, name: 'limit', value: 5 }], { subcommand: 'ratelimit', user: '623456789012345678', limit: 5 }],
+  ])('accepts /admin %s as published by the proxy', (subcommand, options, expected) => {
+    const event = commandEvent(adminInteraction(subcommand, options), testApplication);
+    const { command } = parsePush(commandPush(event), commandSubscription, testApplication);
+    expect(command.command).toEqual({ command: 'admin', options: expected });
+    expect(command.actor.roles).toEqual(['523456789012345678']);
+  });
+  it('accepts the 32-character name the proxy cuts from a long username', () => {
+    const interaction = adminInteraction('pause');
+    interaction.member.user.username = 'x'.repeat(80);
+    const { command } = parsePush(commandPush(commandEvent(interaction, testApplication)), commandSubscription, testApplication);
+    expect(command.actor.name).toBe('x'.repeat(32));
   });
 });

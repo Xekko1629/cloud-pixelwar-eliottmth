@@ -3,16 +3,25 @@
 ## Périmètre et état
 
 `app/functions/discord-proxy/` fournit un handler HTTP Functions Framework
-`handleDiscordProxy`. Cette livraison est **locale, non déployée**. Terraform
-prépare les fonctions, topics, abonnements et droits de diagnostic dev ; aucun
-apply n'a été exécuté. Le backend Gateway reste la sonde
-[`discord-hello`](discord-hello.md) et le catalogue Discord n'est pas modifié.
+`handleDiscordProxy`, déployé en dev derrière la gateway
+([parcours `/draw`](deploy-draw-path.md), [parcours admin](deploy-admin-path.md)).
 
 Le proxy vérifie la signature Ed25519 du corps brut (fenêtre de timestamp
 ±5 minutes), répond au PING et publie `/draw` dans `discord-command`. Il attend
 la confirmation Pub/Sub avant de répondre `200 { "type": 5 }`. Aucun traitement
 n'est lancé après la réponse. Les autres commandes reçoivent une réponse
 immédiate éphémère « pas encore disponible » sans publication.
+
+`/admin` est aussi publié. Discord envoie la sous-commande comme une option de
+type 1 qui contient ses propres options ; le proxy l'aplatit en
+`{ "subcommand": "pause" }` ou `{ "subcommand": "ratelimit", "user": "…", "limit": 5 }`,
+le format du `command-worker`. Sa réponse différée porte `flags: 64` : la
+confirmation ou le refus n'est visible que par son auteur. `/admin size` avec une
+seule des deux dimensions reçoit une réponse immédiate, sans publication, car
+Discord ne sait pas exiger « les deux ou aucune ».
+
+Le pseudo est coupé à 32 caractères (points de code), la limite du
+`command-worker` : un pseudo Discord plus long envoyait sinon `/draw` en DLQ.
 
 Il ne dessine pas, ne consulte pas Firestore et n'applique ni quota, ni pause,
 ni autorisation admin. La validation des options vérifie uniquement la forme,

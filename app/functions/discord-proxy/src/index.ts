@@ -2,7 +2,7 @@ import { createPublicKey, verify } from 'node:crypto';
 import type { HttpFunction } from '@google-cloud/functions-framework';
 import { createLogger } from '@pixelwar/shared/observability/logger';
 import { createFunctionTelemetry, type FunctionTelemetry } from '@pixelwar/shared/observability/function';
-import { commandEvent, record } from './event';
+import { commandEvent, FORWARDED_COMMANDS, record, UserInputError, type ForwardedCommand } from './event';
 import { createCommandPublisher, type PublishCommand } from './publisher';
 
 interface Options {
@@ -55,14 +55,13 @@ export function createDiscordProxyHandler(options: Options): HttpFunction {
     if (interaction.type !== 2 || !record(interaction.data) || interaction.data.type !== 1 || typeof interaction.data.name !== 'string') {
       res.status(400).json({ error: 'Unsupported interaction.' }); return;
     }
-    if (interaction.data.name !== 'draw') {
-      res.status(200).json({ type: 4, data: {
-        content: 'Seule /draw est disponible sur ce proxy Q2.', flags: 64, allowed_mentions: { parse: [] },
-      } }); return;
+    if (!FORWARDED_COMMANDS.includes(interaction.data.name as ForwardedCommand)) {
+      res.status(200).json(ephemeral('Cette commande n\'est pas encore disponible.')); return;
     }
     let event;
-    try { event = commandEvent(interaction, options.applicationId); } catch {
-      res.status(400).json({ error: 'Invalid draw interaction.' }); return;
+    try { event = commandEvent(interaction, options.applicationId); } catch (error) {
+      if (error instanceof UserInputError) { res.status(200).json(ephemeral(error.answer)); return; }
+      res.status(400).json({ error: 'Invalid command interaction.' }); return;
     }
     try {
       // Root trace only after signature/command validation; never trust public trace headers.
@@ -77,8 +76,14 @@ export function createDiscordProxyHandler(options: Options): HttpFunction {
       log('ERROR', 'Discord command publication failed; delivery may be uncertain.', { event_type: 'discord.proxy.publish_failed' });
       res.status(503).json({ error: 'Command publication unavailable.' }); return;
     }
-    res.status(200).json({ type: 5 });
+    // /admin answers (confirmation or refusal) are only shown to their author.
+    res.status(200).json(event.payload.command === 'admin' ? { type: 5, data: { flags: 64 } } : { type: 5 });
   };
+}
+
+/** Immediate answer only its author sees, without any mention. */
+function ephemeral(content: string) {
+  return { type: 4, data: { content, flags: 64, allowed_mentions: { parse: [] } } };
 }
 
 export const handleDiscordProxy = createDiscordProxyHandler({

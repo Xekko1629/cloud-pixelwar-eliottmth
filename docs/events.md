@@ -78,12 +78,12 @@ Les exemples ci-dessous donnent le `payload` seul ; l'enveloppe de la section 1 
 
 ### 3.1 `discord-command`
 
-Contrat v1 implémenté (`app/functions/discord-proxy/src/event.ts`). Le proxy ne publie que `/draw` ; les autres commandes suivront le même schéma, avec leurs propres `options`.
+Contrat v1 implémenté (`app/functions/discord-proxy/src/event.ts`). Le proxy publie `/draw` et `/admin` ; `/get` et `/snapshot` suivront le même schéma, avec leurs propres `options`.
 
 | Champ | Type | Obligatoire | Contrainte | Origine |
 |---|---|---|---|---|
-| `command` | string | oui | `draw` (puis `get`, `snapshot`, `admin`) | BOT-02 ; BOT-04 (routage) |
-| `options` | object | oui | Objet aplati. Pour `draw` : exactement `x`, `y`, `color`, entiers, avec les bornes de `pixel-draw` (section 3.2). | `event.ts` ; le `command-worker` revalide (`docs/discord-commands.md`) |
+| `command` | string | oui | `draw` ou `admin` (puis `get`, `snapshot`) | BOT-02 ; BOT-04 (routage) |
+| `options` | object | oui | Objet aplati. Pour `draw` : exactement `x`, `y`, `color`, entiers, avec les bornes de `pixel-draw` (section 3.2). Pour `admin` : `subcommand` et ses options (section 3.6). | `event.ts` ; le `command-worker` revalide (`docs/discord-commands.md`) |
 | `interaction_id` | string | oui | Snowflake Discord | BOT-04 (idempotence par id d'interaction) |
 | `application_id` | string | oui | Snowflake, égal à l'application de l'environnement | `event.ts` : un callback d'une autre application est refusé |
 | `guild_id` | string | oui | Snowflake | `event.ts` |

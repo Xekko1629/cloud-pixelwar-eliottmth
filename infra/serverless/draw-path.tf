@@ -125,6 +125,8 @@ module "discord_notifier" {
     GOOGLE_CLOUD_PROJECT           = var.project_id
     DISCORD_PROCESSED_SUBSCRIPTION = local.notifier_processed_subscription
     DISCORD_REJECTED_SUBSCRIPTION  = local.notifier_rejected_subscription
+    # Refusals of /admin by the command-worker (admin-path.tf).
+    DISCORD_COMMAND_REJECTED_SUBSCRIPTION = local.notifier_command_rejected_subscription
   }
   secrets = {
     DISCORD_APPLICATION_ID = { secret = "discord-application-id", version = var.discord_application_id_version }

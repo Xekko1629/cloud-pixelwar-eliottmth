@@ -50,6 +50,21 @@ de façon ciblée. Il conserve `/hello` et les autres commandes.
 | `DISCORD_GUILD_ID` | Obligatoire en dev ; absente en prd, même pas vide |
 | `DISCORD_BOT_TOKEN` | Requis seulement pour une modification réelle |
 
+## Mode ciblé `/admin` en dev
+
+Même stratégie que `--draw` ci-dessous (GET, puis POST si absente ou PATCH de son ID),
+pour la seule commande `/admin` et ses cinq sous-commandes. Les autres commandes de la
+guilde ne sont pas touchées. Aperçu hors ligne, puis apply après accord :
+
+```sh
+npm run discord:commands -- --admin
+npm run discord:commands -- --admin --apply --confirm-application-id "$DISCORD_APPLICATION_ID"
+```
+
+`default_member_permissions = "0"` masque `/admin` aux non-administrateurs du serveur
+dans l'interface Discord ; l'allow-list `admin-allowlist` reste le seul contrôle réel.
+`--hello`, `--draw` et `--admin` sont exclusifs.
+
 ## Mode ciblé `/draw` en dev
 
 Ce mode reprend la définition `draw` de `definitions.ts`, sans recopier la

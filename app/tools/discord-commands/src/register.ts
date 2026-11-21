@@ -63,23 +63,44 @@ export async function registerHelloCommand(
   await sendRegistration(target, token, confirmation, dependencies, plan.url, plan.method, plan.commands[0]);
 }
 
+/** Slash commands that can be registered alone, without the PUT that replaces the catalogue. */
+export type TargetedCommand = 'draw' | 'admin';
+
 /** Offline preview: the exact POST/PATCH decision requires an authorized GET. */
-export function drawRegistrationPlan(target: Target) {
+export function targetedRegistrationPlan(target: Target, name: TargetedCommand) {
   const plan = registrationPlan(target);
-  if (target.environment !== 'dev') throw new Error('Targeted draw registration is dev-only.');
-  const command = plan.commands.find((entry) => entry.type === 1 && entry.name === 'draw');
-  if (!command) throw new Error('Missing draw command definition.');
+  if (target.environment !== 'dev') throw new Error(`Targeted ${name} registration is dev-only.`);
+  const command = plan.commands.find((entry) => entry.type === 1 && entry.name === name);
+  if (!command) throw new Error(`Missing ${name} command definition.`);
   return {
     url: plan.url, strategy: 'GET_THEN_POST_OR_PATCH' as const,
     commands: [command],
   };
 }
 
+export const drawRegistrationPlan = (target: Target) => targetedRegistrationPlan(target, 'draw');
+export const adminRegistrationPlan = (target: Target) => targetedRegistrationPlan(target, 'admin');
+
 export async function registerDrawCommand(
   target: Target, token: string, confirmation: string,
   dependencies: Dependencies = { fetch: globalThis.fetch, sleep: async (ms) => { await setTimeout(ms); } },
 ): Promise<void> {
-  const plan = drawRegistrationPlan(target);
+  await registerTargetedCommand(target, token, confirmation, 'draw', dependencies);
+}
+
+export async function registerAdminCommand(
+  target: Target, token: string, confirmation: string,
+  dependencies: Dependencies = { fetch: globalThis.fetch, sleep: async (ms) => { await setTimeout(ms); } },
+): Promise<void> {
+  await registerTargetedCommand(target, token, confirmation, 'admin', dependencies);
+}
+
+/** GET the scope, then POST the command if absent or PATCH its validated ID: nothing else changes. */
+export async function registerTargetedCommand(
+  target: Target, token: string, confirmation: string, name: TargetedCommand,
+  dependencies: Dependencies = { fetch: globalThis.fetch, sleep: async (ms) => { await setTimeout(ms); } },
+): Promise<void> {
+  const plan = targetedRegistrationPlan(target, name);
   validateApply(target, token, confirmation);
   const response = await discordRequest(token, dependencies, plan.url, 'GET');
   let catalogue: unknown;
@@ -96,8 +117,8 @@ export async function registerDrawCommand(
       (command.guild_id === undefined || command.guild_id === target.guildId);
   })) throw new Error('Invalid Discord command catalogue.');
   const matches = (catalogue as { id: string; type: number; name: string }[])
-    .filter((command) => (command.type ?? 1) === 1 && command.name === 'draw');
-  if (matches.length > 1) throw new Error('Ambiguous Discord draw command catalogue.');
+    .filter((command) => (command.type ?? 1) === 1 && command.name === name);
+  if (matches.length > 1) throw new Error(`Ambiguous Discord ${name} command catalogue.`);
   if (matches.length === 0) {
     await sendRegistration(target, token, confirmation, dependencies, plan.url, 'POST', plan.commands[0]);
   } else {

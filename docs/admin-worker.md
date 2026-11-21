@@ -7,9 +7,11 @@
 `command-worker` après autorisation, applique la commande dans Firestore, répond
 à l'admin dans Discord, puis purge les anciennes tuiles après un `clear`.
 
-Cette livraison est **locale, non déployée** : ni la fonction, ni le topic
-`admin-requested`, ni son abonnement ne sont déclarés en Terraform. Seule la
-politique TTL de `admin_events` l'est (`infra/serverless/firestore.tf`).
+La fonction, les topics `admin-requested` et `command-rejected` et leurs
+abonnements sont déclarés dans `infra/serverless/admin-path.tf`, la politique TTL de
+`admin_events` dans `firestore.tf` ([déploiement dev](deploy-admin-path.md)).
+Le proxy transmet `/admin` depuis la même livraison, avec une réponse visible par
+son seul auteur.
 
 ## Sous-commandes
 
@@ -146,10 +148,8 @@ accepté après `resume`, `clear` relivré en parallèle appliqué une seule foi
 anciennes tuiles purgées, `size` qui rejette `out_of_bounds`, limite personnelle
 sans remise à zéro du compteur.
 
-## Reste à faire avant la validation dev
+## Profil de déploiement
 
-- Terraform : fonction, compte `datastore.user`, accès au secret de l'allow-list,
-  topics `admin-requested` et `command-rejected`, abonnements push OIDC (dont le
-  troisième abonnement du notifier) et délai d'acquittement supérieur au budget de
-  purge.
-- Initialisation de `config/global` dans chaque environnement.
+Timeout de 180 s et délai d'acquittement de 210 s : la purge a un budget de 120 s,
+plus la transaction et la réponse Discord. `config/global` est créé par Terraform
+(`firestore.tf`) dans chaque environnement.
