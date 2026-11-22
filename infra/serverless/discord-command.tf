@@ -50,8 +50,9 @@ module "command_worker" {
     PIXEL_DRAW_TOPIC             = local.pixel_draw_topic
     ADMIN_REQUESTED_TOPIC        = local.admin_requested_topic
     COMMAND_REJECTED_TOPIC       = local.command_rejected_topic
-    # render-requested and snapshot-requested are added with their workers (BOT-06,
-    # BOT-07); the proxy only forwards /draw and /admin.
+    RENDER_REQUESTED_TOPIC       = local.render_requested_topic
+    # snapshot-requested is added with its worker (BOT-07); the proxy does not forward
+    # /snapshot yet.
   }
   secrets = {
     DISCORD_APPLICATION_ID  = { secret = "discord-application-id", version = var.discord_application_id_version }
@@ -77,6 +78,7 @@ locals {
     draw_worker      = module.draw_worker[0].invoker_service_account_name
     discord_notifier = module.discord_notifier[0].invoker_service_account_name
     admin_worker     = module.admin_worker[0].invoker_service_account_name
+    render_worker    = module.render_worker[0].invoker_service_account_name
   } : {}
 }
 

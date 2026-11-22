@@ -1,5 +1,5 @@
 // Package discordproxy is the Discord interactions proxy in Go (ADR-0016): it verifies the
-// Ed25519 signature, answers PING, publishes /draw and /admin to discord-command and defers
+// Ed25519 signature, answers PING, publishes /draw, /admin and /get to discord-command and defers
 // the answer, within Discord's 3 seconds. Same contract as the TypeScript reference
 // app/functions/discord-proxy, checked by app/testing/golden/discord-proxy.json.
 package discordproxy

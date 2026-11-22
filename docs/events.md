@@ -78,11 +78,11 @@ Les exemples ci-dessous donnent le `payload` seul ; l'enveloppe de la section 1 
 
 ### 3.1 `discord-command`
 
-Contrat v1 implémenté (`app/functions/discord-proxy/src/event.ts`). Le proxy publie `/draw` et `/admin` ; `/get` et `/snapshot` suivront le même schéma, avec leurs propres `options`.
+Contrat v1 implémenté (`app/functions/discord-proxy/src/event.ts`). Le proxy publie `/draw`, `/admin` et `/get` (options `{}`) ; `/snapshot` suivra le même schéma.
 
 | Champ | Type | Obligatoire | Contrainte | Origine |
 |---|---|---|---|---|
-| `command` | string | oui | `draw` ou `admin` (puis `get`, `snapshot`) | BOT-02 ; BOT-04 (routage) |
+| `command` | string | oui | `draw`, `admin` ou `get` (puis `snapshot`) | BOT-02 ; BOT-04 (routage) |
 | `options` | object | oui | Objet aplati. Pour `draw` : exactement `x`, `y`, `color`, entiers, avec les bornes de `pixel-draw` (section 3.2). Pour `admin` : `subcommand` et ses options (section 3.6). | `event.ts` ; le `command-worker` revalide (`docs/discord-commands.md`) |
 | `interaction_id` | string | oui | Snowflake Discord | BOT-04 (idempotence par id d'interaction) |
 | `application_id` | string | oui | Snowflake, égal à l'application de l'environnement | `event.ts` : un callback d'une autre application est refusé |
@@ -213,7 +213,7 @@ Publiés par le `command-worker` pour `/get` et `/snapshot` (après autorisation
 |---|---|---|---|---|
 | `discord` | object | oui | `DiscordContext` de la section 3.1. **Contient le token d'interaction, secret**, valide 15 min. | BOT-04 ; BOT-06 ; BOT-07a |
 
-La zone rendue n'est pas dans le message : elle est lue dans `config/global.bounds` au moment du rendu (DATA-05b). Proposition, à valider avec BOT-06.
+La zone rendue n'est pas dans le message : elle est lue dans `config/global.bounds` au moment du rendu (DATA-05b), avec les tuiles de la `canvas_version` courante. Retenu pour BOT-06 (22/11/2026) : au-delà du budget de lecture (65 536 tuiles), le `render-worker` répond que la zone est trop grande, sans image ; la vue éloignée (DATA-05c) lèvera cette limite.
 
 ```json
 {

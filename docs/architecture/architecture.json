@@ -172,7 +172,7 @@
       "label": "render-requested",
       "view": "application",
       "group": "Pub/Sub · suites",
-      "status": "planned",
+      "status": "deployed",
       "terraform": [
         "serverless:module.render_requested"
       ]
@@ -262,7 +262,7 @@
       "label": "render-worker",
       "view": "application",
       "group": "Workers · étape 2 (ingress interne)",
-      "status": "planned",
+      "status": "deployed",
       "terraform": [
         "serverless:module.render_worker"
       ]
@@ -650,7 +650,7 @@
       "to": "t_render",
       "label": "/get",
       "kind": "event",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "command_worker",
@@ -727,7 +727,21 @@
       "to": "render_worker",
       "label": "push OIDC",
       "kind": "event",
-      "status": "planned"
+      "status": "deployed"
+    },
+    {
+      "from": "render_worker",
+      "to": "firestore",
+      "label": "config/global, tuiles (lecture)",
+      "kind": "request",
+      "status": "deployed"
+    },
+    {
+      "from": "render_worker",
+      "to": "discord_api",
+      "label": "HTTPS PATCH + PNG",
+      "kind": "request",
+      "status": "deployed"
     },
     {
       "from": "t_snapshot",
@@ -797,7 +811,7 @@
       "to": "discord_api",
       "label": "HTTPS (image)",
       "kind": "request",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "snapshot_notifier",
@@ -818,7 +832,7 @@
       "to": "firestore",
       "label": "lecture",
       "kind": "read",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "browser",

@@ -2,6 +2,7 @@ import { pathToFileURL } from 'node:url';
 import {
   readTarget, registrationPlan, registerCommands, helloRegistrationPlan, registerHelloCommand,
   drawRegistrationPlan, registerDrawCommand, adminRegistrationPlan, registerAdminCommand,
+  getRegistrationPlan, registerGetCommand,
 } from './register';
 
 export async function run(
@@ -10,26 +11,28 @@ export async function run(
   registerHello: typeof registerHelloCommand = registerHelloCommand,
   registerDraw: typeof registerDrawCommand = registerDrawCommand,
   registerAdmin: typeof registerAdminCommand = registerAdminCommand,
+  registerGet: typeof registerGetCommand = registerGetCommand,
 ): Promise<void> {
   let apply = false;
-  let mode = 'all' as 'all' | 'hello' | 'draw' | 'admin';
+  let mode = 'all' as 'all' | 'hello' | 'draw' | 'admin' | 'get';
   let confirmation = '';
   for (let index = 0; index < args.length; index++) {
     const argument = args[index];
     if (argument === '--apply' && !apply) apply = true;
-    else if (['--hello', '--draw', '--admin'].includes(argument) && mode === 'all') mode = argument.slice(2) as typeof mode;
+    else if (['--hello', '--draw', '--admin', '--get'].includes(argument) && mode === 'all') mode = argument.slice(2) as typeof mode;
     else if (argument === '--confirm-application-id' && !confirmation && args[index + 1]) confirmation = args[++index];
-    else throw new Error('Usage: discord:commands [--hello | --draw | --admin] [--apply --confirm-application-id ID]');
+    else throw new Error('Usage: discord:commands [--hello | --draw | --admin | --get] [--apply --confirm-application-id ID]');
   }
   const target = readTarget(env);
   const plan = mode === 'draw' ? drawRegistrationPlan(target) : mode === 'admin' ? adminRegistrationPlan(target)
+    : mode === 'get' ? getRegistrationPlan(target)
     : mode === 'hello' ? helloRegistrationPlan(target) : registrationPlan(target);
   if (!apply) {
     if (confirmation) throw new Error('Confirmation requires --apply.');
     print(JSON.stringify({ mode: 'dry-run', ...plan }, null, 2));
     return;
   }
-  const registration = { all: register, hello: registerHello, draw: registerDraw, admin: registerAdmin }[mode];
+  const registration = { all: register, hello: registerHello, draw: registerDraw, admin: registerAdmin, get: registerGet }[mode];
   await registration(target, env.DISCORD_BOT_TOKEN ?? '', confirmation);
   print(`Registered ${plan.commands.length} commands for ${target.environment} application ${target.applicationId}.`);
 }

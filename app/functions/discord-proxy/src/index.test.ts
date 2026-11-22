@@ -103,7 +103,14 @@ describe('Q2 Discord proxy', () => {
     expect(res.status).toHaveBeenCalledWith(400);
     expect(publish).not.toHaveBeenCalled();
   });
-  it.each(['get', 'snapshot', 'hello'])('answers unavailable /%s immediately', async (name) => {
+  it('publishes /get without options and defers a public answer (BOT-06)', async () => {
+    const interaction = drawInteraction() as Record<string, unknown> & { data: Record<string, unknown> };
+    interaction.data = { type: 1, name: 'get' };
+    const { invoke, publish, res } = setup(); await invoke(signedRequest(interaction));
+    expect(res.json).toHaveBeenCalledWith({ type: 5 });
+    expect(publish).toHaveBeenCalledWith(expect.objectContaining({ payload: expect.objectContaining({ command: 'get', options: {} }) }), expect.anything());
+  });
+  it.each(['snapshot', 'hello'])('answers unavailable /%s immediately', async (name) => {
     const interaction = drawInteraction(); interaction.data.name = name;
     const { invoke, publish, res } = setup(); await invoke(signedRequest(interaction));
     expect(res.json).toHaveBeenCalledWith({ type: 4, data: expect.objectContaining({ flags: 64, allowed_mentions: { parse: [] } }) });

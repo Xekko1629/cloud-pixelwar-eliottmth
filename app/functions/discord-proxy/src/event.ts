@@ -10,14 +10,15 @@ function snowflake(value: unknown): value is string {
 }
 
 /** Commands this proxy forwards; the others get an immediate ephemeral answer. */
-export const FORWARDED_COMMANDS = ['draw', 'admin'] as const;
+export const FORWARDED_COMMANDS = ['draw', 'admin', 'get'] as const;
 export type ForwardedCommand = (typeof FORWARDED_COMMANDS)[number];
 
 /** Same names as the command-worker, which validates ranges and the width/height pair. */
 export type AdminOptions = { subcommand: string } & Record<string, string | number>;
 export type CommandPayload =
   | { command: 'draw'; options: { x: number; y: number; color: number } }
-  | { command: 'admin'; options: AdminOptions };
+  | { command: 'admin'; options: AdminOptions }
+  | { command: 'get'; options: Record<string, never> };
 
 /** An interaction the user can fix: answered at once instead of failing in a worker. */
 export class UserInputError extends Error {
@@ -86,6 +87,12 @@ function adminOptions(options: unknown): CommandPayload {
   return { command: 'admin', options: values };
 }
 
+// /get has no option: Discord omits the field (an empty list is accepted too).
+function getOptions(options: unknown): CommandPayload {
+  if (options !== undefined && !(Array.isArray(options) && options.length === 0)) throw new Error('Invalid options');
+  return { command: 'get', options: {} };
+}
+
 export function commandEvent(interaction: Record<string, unknown>, applicationId: string): DiscordCommandEvent {
   const { data, member } = interaction;
   if (!snowflake(interaction.id) || interaction.application_id !== applicationId ||
@@ -97,7 +104,8 @@ export function commandEvent(interaction: Record<string, unknown>, applicationId
       !Array.isArray(member.roles) || !member.roles.every(snowflake)) {
     throw new Error('Invalid interaction');
   }
-  const command = data.name === 'admin' ? adminOptions(data.options) : drawOptions(data.options);
+  const command = data.name === 'admin' ? adminOptions(data.options)
+    : data.name === 'get' ? getOptions(data.options) : drawOptions(data.options);
   // UUID-shaped, namespaced SHA-256 (UUIDv8). Stable across delivery attempts.
   const bytes = createHash('sha256').update(`pixelwar:discord-command:v1:${applicationId}:${interaction.id}`).digest().subarray(0, 16);
   bytes[6] = (bytes[6] & 0x0f) | 0x80;
