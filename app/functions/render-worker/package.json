@@ -1,0 +1,11 @@
+{
+  "name": "@pixelwar/function-render-worker",
+  "private": true,
+  "type": "module",
+  "pixelwar": { "entryPoint": "handleRenderWorker" },
+  "dependencies": {
+    "@google-cloud/functions-framework": "5.0.5",
+    "@google-cloud/firestore": "9.4.0",
+    "@pixelwar/shared": "*"
+  }
+}

@@ -142,7 +142,7 @@ run "delivery_wires_the_draw_path" {
     condition = (
       module.command_worker[0].invoker_service_account_email != module.command_worker[0].service_account_email &&
       module.discord_proxy[0].invoker_service_account_email == null &&
-      toset(keys(google_service_account_iam_member.push_token_creator)) == toset(["command_worker", "draw_worker", "discord_notifier", "admin_worker"]) &&
+      toset(keys(google_service_account_iam_member.push_token_creator)) == toset(["command_worker", "draw_worker", "discord_notifier", "admin_worker", "render_worker"]) &&
       google_service_account_iam_member.push_token_creator["command_worker"].service_account_id == module.command_worker[0].invoker_service_account_name &&
       google_service_account_iam_member.push_token_creator["command_worker"].role == "roles/iam.serviceAccountTokenCreator" &&
       google_service_account_iam_member.push_token_creator["command_worker"].member == "serviceAccount:service-123456789@gcp-sa-pubsub.iam.gserviceaccount.com"
@@ -182,6 +182,39 @@ run "delivery_wires_the_admin_path" {
       google_service_account_iam_member.push_token_creator["admin_worker"].service_account_id == module.admin_worker[0].invoker_service_account_name
     )
     error_message = "The admin-worker writes Firestore and gets pushes through its own invoker."
+  }
+}
+
+run "delivery_wires_the_render_path" {
+  command = apply
+  variables {
+    enable_discord_pipeline = true
+    enable_discord_delivery = true
+    enable_discord_hello    = true
+  }
+
+  assert {
+    condition = (
+      module.render_requested[0].name == "render-requested" &&
+      module.render_worker_subscription[0].path == local.render_worker_subscription &&
+      module.render_worker_subscription[0].name == "render-worker" &&
+      module.command_worker[0].environment_variables["RENDER_REQUESTED_TOPIC"] == "render-requested"
+    )
+    error_message = "/get wires render-requested from the command-worker to the render-worker, with the names each side checks."
+  }
+  assert {
+    condition = (
+      google_project_iam_member.render_worker_firestore[0].role == "roles/datastore.viewer" &&
+      google_service_account_iam_member.push_token_creator["render_worker"].service_account_id == module.render_worker[0].invoker_service_account_name
+    )
+    error_message = "The render-worker only reads Firestore and gets pushes through its own invoker."
+  }
+  assert {
+    condition = (
+      module.render_worker[0].memory == "1Gi" && module.render_worker[0].concurrency == 1 &&
+      module.render_worker[0].timeout_seconds == 300
+    )
+    error_message = "One render per instance, with the memory and time of the largest allowed area."
   }
 }
 

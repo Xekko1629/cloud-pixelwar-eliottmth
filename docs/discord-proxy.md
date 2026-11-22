@@ -9,9 +9,10 @@ contrat : ses tests produisent `app/testing/golden/discord-proxy.json`, que les 
 Go rejouent. Le `command-worker` valide ses messages contre cette référence.
 
 Le proxy vérifie la signature Ed25519 du corps brut (fenêtre de timestamp
-±5 minutes), répond au PING et publie `/draw` dans `discord-command`. Il attend
+±5 minutes), répond au PING et publie `/draw` et `/get` dans `discord-command`. Il attend
 la confirmation Pub/Sub avant de répondre `200 { "type": 5 }`. Aucun traitement
-n'est lancé après la réponse. Les autres commandes reçoivent une réponse
+n'est lancé après la réponse. `/get` n'a pas d'option : le proxy accepte le champ
+`options` absent ou vide et publie `options: {}`. Les autres commandes reçoivent une réponse
 immédiate éphémère « pas encore disponible » sans publication.
 
 `/admin` est aussi publié. Discord envoie la sous-commande comme une option de

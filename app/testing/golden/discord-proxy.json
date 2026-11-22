@@ -495,7 +495,89 @@
       "published": null
     },
     {
-      "name": "get_unavailable",
+      "name": "get",
+      "request": {
+        "method": "POST",
+        "path": "/discord/interactions",
+        "headers": {
+          "X-Signature-Ed25519": "a078d7b5da8d240a9f234e09d6d2c05a9c212736291d4bb9d59b79a51eb24f5947fd987dbf2cfc030c50c4a49a046adf22888ac9f908aaee3f7bcba1d86a5f09",
+          "X-Signature-Timestamp": "1800000000"
+        },
+        "body": "{\"type\":2,\"id\":\"1593540240998400000\",\"application_id\":\"123456789012345678\",\"guild_id\":\"223456789012345678\",\"channel_id\":\"323456789012345678\",\"token\":\"synthetic-interaction-token\",\"member\":{\"user\":{\"id\":\"423456789012345678\",\"username\":\"Synthetic user\"},\"roles\":[\"523456789012345678\"]},\"data\":{\"type\":1,\"name\":\"get\"}}"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "type": 5
+        }
+      },
+      "published": {
+        "schema_version": 1,
+        "event_id": "1fee09aa-76c4-88a5-a42b-feb4e38c3123",
+        "correlation_id": "1fee09aa-76c4-88a5-a42b-feb4e38c3123",
+        "source": "discord",
+        "occurred_at": "2027-01-15T08:00:00.000Z",
+        "actor": {
+          "uid": "423456789012345678",
+          "name": "Synthetic user",
+          "roles": [
+            "523456789012345678"
+          ]
+        },
+        "payload": {
+          "command": "get",
+          "options": {},
+          "interaction_id": "1593540240998400000",
+          "application_id": "123456789012345678",
+          "guild_id": "223456789012345678",
+          "channel_id": "323456789012345678",
+          "interaction_token": "synthetic-interaction-token"
+        }
+      }
+    },
+    {
+      "name": "get_empty_options",
+      "request": {
+        "method": "POST",
+        "path": "/discord/interactions",
+        "headers": {
+          "X-Signature-Ed25519": "454ff551f2abc48a21db01e384ef56621aa59012981eddd9ff3eb285e9a99c64b9d4ac0ceb15dd946cf807b4d83c8e4e7c7b34c3c7a58ee55390d69559a32f02",
+          "X-Signature-Timestamp": "1800000000"
+        },
+        "body": "{\"type\":2,\"id\":\"1593540240998400000\",\"application_id\":\"123456789012345678\",\"guild_id\":\"223456789012345678\",\"channel_id\":\"323456789012345678\",\"token\":\"synthetic-interaction-token\",\"member\":{\"user\":{\"id\":\"423456789012345678\",\"username\":\"Synthetic user\"},\"roles\":[\"523456789012345678\"]},\"data\":{\"type\":1,\"name\":\"get\",\"options\":[]}}"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "type": 5
+        }
+      },
+      "published": {
+        "schema_version": 1,
+        "event_id": "1fee09aa-76c4-88a5-a42b-feb4e38c3123",
+        "correlation_id": "1fee09aa-76c4-88a5-a42b-feb4e38c3123",
+        "source": "discord",
+        "occurred_at": "2027-01-15T08:00:00.000Z",
+        "actor": {
+          "uid": "423456789012345678",
+          "name": "Synthetic user",
+          "roles": [
+            "523456789012345678"
+          ]
+        },
+        "payload": {
+          "command": "get",
+          "options": {},
+          "interaction_id": "1593540240998400000",
+          "application_id": "123456789012345678",
+          "guild_id": "223456789012345678",
+          "channel_id": "323456789012345678",
+          "interaction_token": "synthetic-interaction-token"
+        }
+      }
+    },
+    {
+      "name": "get_with_options",
       "request": {
         "method": "POST",
         "path": "/discord/interactions",
@@ -504,6 +586,25 @@
           "X-Signature-Timestamp": "1800000000"
         },
         "body": "{\"type\":2,\"id\":\"1593540240998400000\",\"application_id\":\"123456789012345678\",\"guild_id\":\"223456789012345678\",\"channel_id\":\"323456789012345678\",\"token\":\"synthetic-interaction-token\",\"member\":{\"user\":{\"id\":\"423456789012345678\",\"username\":\"Synthetic user\"},\"roles\":[\"523456789012345678\"]},\"data\":{\"type\":1,\"name\":\"get\",\"options\":[{\"type\":4,\"name\":\"x\",\"value\":-1},{\"type\":4,\"name\":\"y\",\"value\":64},{\"type\":4,\"name\":\"color\",\"value\":3}]}}"
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "error": "Invalid command interaction."
+        }
+      },
+      "published": null
+    },
+    {
+      "name": "snapshot_unavailable",
+      "request": {
+        "method": "POST",
+        "path": "/discord/interactions",
+        "headers": {
+          "X-Signature-Ed25519": "a89d466faca288a79f7813553b55e9cf1dbcdbd8b06a2d91ba0e338848884d203fb7f595e945121a672c094145657b7e69591fc239c8bff98762d8a0df2d6c00",
+          "X-Signature-Timestamp": "1800000000"
+        },
+        "body": "{\"type\":2,\"id\":\"1593540240998400000\",\"application_id\":\"123456789012345678\",\"guild_id\":\"223456789012345678\",\"channel_id\":\"323456789012345678\",\"token\":\"synthetic-interaction-token\",\"member\":{\"user\":{\"id\":\"423456789012345678\",\"username\":\"Synthetic user\"},\"roles\":[\"523456789012345678\"]},\"data\":{\"type\":1,\"name\":\"snapshot\"}}"
       },
       "response": {
         "status": 200,

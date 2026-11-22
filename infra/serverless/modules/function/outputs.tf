@@ -52,3 +52,18 @@ output "concurrency" {
   description = "Maximum concurrent requests per instance"
   value       = var.concurrency
 }
+
+output "memory" {
+  description = "Memory limit per instance"
+  value       = var.memory
+}
+
+output "timeout_seconds" {
+  description = "Request timeout of the function"
+  value       = var.timeout_seconds
+}
+
+output "environment_variables" {
+  description = "Non-secret environment variables set on the function, FUNCTION_REGION excluded"
+  value       = var.environment_variables
+}

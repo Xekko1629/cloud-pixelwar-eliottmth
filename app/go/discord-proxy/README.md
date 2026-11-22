@@ -1,7 +1,7 @@
 # discord-proxy (Go)
 
 Proxy des interactions Discord, en Go ([ADR-0016](../../../docs/adr/0016-proxy-discord-en-go.md)) :
-vérifie la signature Ed25519, répond au PING, publie `/draw` et `/admin` sur
+vérifie la signature Ed25519, répond au PING, publie `/draw`, `/admin` et `/get` sur
 `discord-command` et diffère la réponse, dans les 3 secondes de Discord. Contrat
 détaillé : [`docs/discord-proxy.md`](../../../docs/discord-proxy.md).
 

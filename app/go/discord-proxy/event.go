@@ -26,7 +26,7 @@ const (
 )
 
 // Commands this proxy forwards; the others get an immediate ephemeral answer.
-var forwardedCommands = map[string]bool{"draw": true, "admin": true}
+var forwardedCommands = map[string]bool{"draw": true, "admin": true, "get": true}
 
 // Discord sends a subcommand as one option of type 1 holding its own options: name → type.
 var adminOptions = map[string]map[string]float64{
@@ -132,6 +132,15 @@ func drawOptions(options any) (map[string]any, error) {
 	return map[string]any{"x": x, "y": y, "color": color}, nil
 }
 
+// /get has no option: Discord omits the field (an empty list is accepted too).
+func getOptions(data map[string]any) (map[string]any, error) {
+	raw, present := data["options"]
+	if list, isList := raw.([]any); present && !(isList && len(list) == 0) {
+		return nil, errInvalid
+	}
+	return map[string]any{}, nil
+}
+
 func adminOptionsOf(options any) (map[string]any, error) {
 	list, ok := options.([]any)
 	if !ok || len(list) != 1 {
@@ -230,9 +239,12 @@ func CommandEvent(interaction map[string]any, applicationID string) (*Event, err
 	command := stringOf(data["name"])
 	var options map[string]any
 	var err error
-	if command == "admin" {
+	switch command {
+	case "admin":
 		options, err = adminOptionsOf(data["options"])
-	} else {
+	case "get":
+		options, err = getOptions(data)
+	default:
 		options, err = drawOptions(data["options"])
 	}
 	if err != nil {

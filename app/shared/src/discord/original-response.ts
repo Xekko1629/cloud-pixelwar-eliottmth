@@ -32,7 +32,13 @@ export interface OriginalResponseBody {
  *   UNKNOWN_INTERACTION_AFTER_MS: the deferred response was never acknowledged in time.
  */
 export type EditOutcome = 'updated' | 'expired' | 'unknown_interaction';
-export type EditOriginalResponse = (target: OriginalResponseTarget, body: OriginalResponseBody) => Promise<EditOutcome>;
+/** One PNG sent with the answer (/get, BOT-06). The edit replaces any previous attachment. */
+export interface ResponseAttachment { filename: string; data: Uint8Array }
+export type EditOriginalResponse = (target: OriginalResponseTarget, body: OriginalResponseBody, file?: ResponseAttachment) => Promise<EditOutcome>;
+
+/** An image upload takes longer than a text edit: up to 9.5 MiB (DISCORD_UPLOAD_LIMIT_BYTES). */
+export const UPLOAD_TIMEOUT_MS = 30_000;
+const FILENAME = /^[a-z0-9][a-z0-9-]{0,62}\.png$/;
 
 export class NotificationFailure extends Error {
   constructor(readonly reason: 'network' | 'http' | 'rate_limited' | 'invalid_clock', readonly status?: number, readonly retryAfterSeconds?: number) {
@@ -63,7 +69,10 @@ export function createOriginalResponseEditor(options: Options = {}): EditOrigina
     if (!Number.isSafeInteger(value) || value < 0) throw new NotificationFailure('invalid_clock');
     return value;
   };
-  return async (target, body) => {
+  return async (target, body, file) => {
+    if (file && (!FILENAME.test(file.filename) || !(file.data instanceof Uint8Array) || file.data.byteLength < 1)) {
+      throw new Error('Invalid attachment');
+    }
     const expires = target.created_at + TOKEN_LIFETIME_MS;
     const start = clock();
     if (start < target.created_at - 5000) throw new NotificationFailure('invalid_clock');
@@ -72,8 +81,8 @@ export function createOriginalResponseEditor(options: Options = {}): EditOrigina
       // Fixed host, encoded token, no redirect: the token can never be sent elsewhere.
       const response = await request(
         `https://discord.com/api/v10/webhooks/${target.application_id}/${encodeURIComponent(target.interaction_token)}/messages/@original`,
-        { method: 'PATCH', redirect: 'error', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body), signal: AbortSignal.timeout(Math.min(timeout, expires - start)) },
+        { method: 'PATCH', redirect: 'error', ...requestBody(body, file),
+          signal: AbortSignal.timeout(Math.min(file ? UPLOAD_TIMEOUT_MS : timeout, expires - start)) },
       );
       // The response may contain message content or credentials: never read or log it.
       try { await response.body?.cancel(); } catch { /* Discarding a body cannot invalidate a successful PATCH. */ }
@@ -90,4 +99,15 @@ export function createOriginalResponseEditor(options: Options = {}): EditOrigina
       throw new NotificationFailure('network');
     }
   };
+}
+
+/** JSON for a text edit; multipart with payload_json and files[0] for an image (Discord API v10). */
+function requestBody(body: OriginalResponseBody, file?: ResponseAttachment): { headers?: Record<string, string>; body: string | FormData } {
+  if (!file) return { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+  const form = new FormData();
+  // Listing only the new file removes the attachment of an earlier delivery: no duplicate image.
+  form.append('payload_json', JSON.stringify({ ...body, attachments: [{ id: 0, filename: file.filename }] }));
+  // Copy into a plain ArrayBuffer: Blob refuses a view over a SharedArrayBuffer.
+  form.append('files[0]', new Blob([Uint8Array.from(file.data)], { type: 'image/png' }), file.filename);
+  return { body: form };
 }
