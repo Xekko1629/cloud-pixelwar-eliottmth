@@ -10,6 +10,7 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"math"
 	"net/http"
@@ -184,8 +185,13 @@ func init() {
 	client := &http.Client{Transport: http.DefaultTransport}
 	tokens := NewMetadataTokens(&http.Client{Timeout: 2 * time.Second})
 	options := TelemetryOptions{ProjectID: project}
+	// Cloud Monitoring rejects every point of an unknown region: export nothing rather than fail each minute.
 	if env := os.Getenv("APP_ENV"); project != "" && (env == "dev" || env == "prd") {
-		options.Export = &http.Client{Transport: bearer{tokens: tokens, base: http.DefaultTransport}}
+		if Region() != "" {
+			options.Export = &http.Client{Transport: bearer{tokens: tokens, base: http.DefaultTransport}}
+		} else {
+			fmt.Printf("{\"severity\":\"WARNING\",\"function\":%q,\"event_type\":\"telemetry.export_not_configured\"}\n", serviceName)
+		}
 	}
 	var publish PublishCommand
 	if topic := os.Getenv("DISCORD_COMMAND_TOPIC"); project != "" && topic != "" {

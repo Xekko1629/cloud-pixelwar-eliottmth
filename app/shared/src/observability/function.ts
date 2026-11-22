@@ -37,9 +37,10 @@ export function createFunctionTelemetry(service: Service, options: Options = {})
     if (options.getRuntime) return options.getRuntime();
     const config = { serviceName: service, projectId: process.env.GOOGLE_CLOUD_PROJECT ?? '',
       environment: process.env.APP_ENV === 'prd' ? 'prd' as const : 'dev' as const,
-      region: process.env.FUNCTION_REGION ?? process.env.GOOGLE_CLOUD_REGION ?? 'unknown',
+      region: process.env.FUNCTION_REGION || process.env.GOOGLE_CLOUD_REGION || 'unknown',
       serviceVersion: process.env.K_REVISION, exportTimeoutMillis: 500, writeLog: write };
-    if (process.env.NODE_ENV !== 'test' && config.projectId && ['dev', 'prd'].includes(process.env.APP_ENV ?? '')) {
+    // Cloud Monitoring rejects every point of an unknown region: export nothing rather than fail each minute.
+    if (process.env.NODE_ENV !== 'test' && config.projectId && config.region !== 'unknown' && ['dev', 'prd'].includes(process.env.APP_ENV ?? '')) {
       const { createGoogleObservability } = await import('./google');
       return createGoogleObservability(config);
     }

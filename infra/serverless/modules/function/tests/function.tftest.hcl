@@ -59,6 +59,18 @@ run "private_http_function" {
     condition     = google_cloudfunctions2_function.main.deletion_policy == "DELETE"
     error_message = "Functions remain disposable by default."
   }
+  assert {
+    condition     = google_cloudfunctions2_function.main.service_config[0].environment_variables["FUNCTION_REGION"] == "europe-west1"
+    error_message = "The telemetry resource needs the function region: Cloud Monitoring rejects an unknown one."
+  }
+}
+
+run "caller_cannot_override_the_region" {
+  command = plan
+  variables {
+    environment_variables = { FUNCTION_REGION = "us-central1" }
+  }
+  expect_failures = [var.environment_variables]
 }
 
 run "pinned_archive_and_separate_builder" {

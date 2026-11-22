@@ -283,10 +283,17 @@ dashboards doivent nommer les séries « tentatives » et « résultats observé
 ### Export configuré et dégradation
 
 L'export Google est sélectionné hors tests lorsque `GOOGLE_CLOUD_PROJECT` et
-`APP_ENV=dev|prd` sont définis. `FUNCTION_REGION` (ou `GOOGLE_CLOUD_REGION`) et
-`K_REVISION` renseignent la ressource ; sans région connue, elle vaut `unknown`.
-Fournir la région dans le futur raccordement Terraform plutôt que supposer sa
-présence. En test, des exporteurs en mémoire sont injectés, sans ADC ni réseau GCP.
+`APP_ENV=dev|prd` sont définis, **et que la région est connue**. Cloud Run
+functions gen2 ne fournit ni `FUNCTION_REGION` ni `GOOGLE_CLOUD_REGION` : le module
+Terraform `function` injecte `FUNCTION_REGION = var.region` dans chaque fonction et
+refuse qu'un appelant la redéfinisse. `K_REVISION` renseigne la version.
+
+Sans région, Cloud Monitoring refuse chaque point (`400 INVALID_ARGUMENT
+"Unrecognized region or location"` pour `cloud.region = "unknown"`) alors que
+Cloud Trace accepte les spans : constaté en dev le 21/11/2026, aucune métrique
+personnalisée ingérée depuis le premier deploy. Le runtime n'exporte donc rien
+sans région et écrit une seule fois `telemetry.export_not_configured`, en Node
+comme en Go. En test, des exporteurs en mémoire sont injectés, sans ADC ni réseau GCP.
 Hors configuration cloud, le runtime local ne revendique pas d'ingestion GCP ;
 un projet présent avec une configuration incomplète produit
 `telemetry.export_not_configured`.

@@ -32,3 +32,11 @@ it('reports missing export configuration rather than claiming cloud telemetry wa
   await telemetry.message('pixel-draw', attributes, async (op) => { op.outcome('published'); });
   expect(mocks.google).not.toHaveBeenCalled(); expect(JSON.stringify(write.mock.calls)).toContain('telemetry.export_not_configured');
 });
+it('does not export to Google without a region, which Cloud Monitoring would reject on every point', async () => {
+  vi.stubEnv('FUNCTION_REGION', ''); vi.stubEnv('GOOGLE_CLOUD_REGION', undefined);
+  const write = vi.fn(); const telemetry = createFunctionTelemetry('draw-worker', { writeLog: write });
+  await telemetry.message('pixel-draw', attributes, async (op) => { op.outcome('published'); });
+  await telemetry.message('pixel-draw', attributes, async (op) => { op.outcome('published'); });
+  expect(mocks.google).not.toHaveBeenCalled();
+  expect(write.mock.calls.filter(([line]) => String(line).includes('telemetry.export_not_configured'))).toHaveLength(1);
+});

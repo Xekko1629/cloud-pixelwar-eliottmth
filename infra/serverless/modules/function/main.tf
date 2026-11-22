@@ -70,7 +70,9 @@ resource "google_cloudfunctions2_function" "main" {
     available_cpu                    = var.cpu
     available_memory                 = var.memory
     all_traffic_on_latest_revision   = true
-    environment_variables            = var.environment_variables
+    # Gen2 sets neither FUNCTION_REGION nor GOOGLE_CLOUD_REGION: without it the telemetry
+    # resource says "unknown" and Cloud Monitoring rejects every metric point (SRV-08).
+    environment_variables = merge(var.environment_variables, { FUNCTION_REGION = var.region })
 
     dynamic "secret_environment_variables" {
       for_each = var.secrets
