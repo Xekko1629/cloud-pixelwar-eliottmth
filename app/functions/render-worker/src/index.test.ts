@@ -97,6 +97,38 @@ describe('render-worker (BOT-06)', () => {
     expect(logs()).toContainEqual(expect.objectContaining({ event_type: 'render.message.invalid', reason: 'invalid_event' }));
   });
 
+  it('writes to stdout by default, with the real clock, without the token', async () => {
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const handler = createRenderWorkerHandler({ applicationId: testApplication, subscription: renderSubscription,
+      render: vi.fn().mockResolvedValue(image), edit: vi.fn().mockResolvedValue('updated') });
+    const res = { status: vi.fn(), json: vi.fn(), send: vi.fn(), set: vi.fn() };
+    res.status.mockReturnValue(res); res.set.mockReturnValue(res);
+    const body = eventPush(routed, renderSubscription);
+    await handler({ path: '/', method: 'POST', body, rawBody: Buffer.from(JSON.stringify(body)) } as unknown as Parameters<HttpFunction>[0],
+      res as unknown as Parameters<HttpFunction>[1]);
+    // Real clock: the outcome depends on the fixture date, a log line is written either way.
+    expect(res.status).toHaveBeenCalledWith(204);
+    expect(stdout.mock.calls.map(([line]) => String(line)).join('')).toMatch(/render\.(image|notification_expired)/);
+    expect(stdout.mock.calls.map(([line]) => String(line)).join('')).not.toContain('synthetic-interaction-token');
+    stdout.mockRestore();
+  });
+
+  it.each([['GET', '/', 405], ['POST', '/other', 404]])('answers %s %s with %i', async (method, path, status) => {
+    const handler = createRenderWorkerHandler({ applicationId: testApplication, subscription: renderSubscription,
+      render: vi.fn(), edit: vi.fn(), write: vi.fn() });
+    const res = { status: vi.fn(), json: vi.fn(), send: vi.fn(), set: vi.fn() };
+    res.status.mockReturnValue(res); res.set.mockReturnValue(res);
+    await handler({ path, method, body: {}, rawBody: Buffer.from('{}') } as unknown as Parameters<HttpFunction>[0],
+      res as unknown as Parameters<HttpFunction>[1]);
+    expect(res.status).toHaveBeenCalledWith(status);
+  });
+
+  it('refuses an oversized push body', async () => {
+    const { invoke } = setup();
+    const body = { padding: 'x'.repeat(130 * 1024) };
+    expect((await invoke(body)).status).toHaveBeenCalledWith(413);
+  });
+
   it('fails closed without configuration and only serves POST /', async () => {
     const unconfigured = await setup({ render: undefined }).invoke();
     expect(unconfigured.status).toHaveBeenCalledWith(503);
