@@ -118,3 +118,16 @@ func TestTelemetryFailureMarksTheSpanWithoutLeakingTheError(t *testing.T) {
 		t.Fatalf("err %v, logs %v", err, logs)
 	}
 }
+
+func TestRegionPrefersTheModuleVariable(t *testing.T) {
+	t.Setenv("FUNCTION_REGION", "")
+	t.Setenv("GOOGLE_CLOUD_REGION", "")
+	if Region() != "" {
+		t.Fatal("no region must stay empty: the export is then disabled")
+	}
+	t.Setenv("GOOGLE_CLOUD_REGION", "europe-west9")
+	t.Setenv("FUNCTION_REGION", "europe-west1")
+	if Region() != "europe-west1" {
+		t.Fatalf("got %q", Region())
+	}
+}

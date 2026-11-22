@@ -103,9 +103,14 @@ variable "labels" {
 }
 
 variable "environment_variables" {
-  description = "Non-secret environment variables (never put secret values here)"
+  description = "Non-secret environment variables (never put secret values here); FUNCTION_REGION is set by the module"
   type        = map(string)
   default     = {}
+
+  validation {
+    condition     = !contains(keys(var.environment_variables), "FUNCTION_REGION")
+    error_message = "FUNCTION_REGION is set by the module from var.region."
+  }
 }
 
 variable "secrets" {

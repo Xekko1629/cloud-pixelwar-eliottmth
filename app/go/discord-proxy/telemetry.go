@@ -89,7 +89,7 @@ func NewTelemetry(options TelemetryOptions) *Telemetry {
 	if version == "" {
 		version = "development"
 	}
-	region := os.Getenv("FUNCTION_REGION")
+	region := Region()
 	if region == "" {
 		region = "unknown"
 	}
@@ -216,6 +216,14 @@ func (t *Telemetry) log(ctx context.Context, severity, message, eventType string
 	if err == nil {
 		t.write(string(line) + "\n")
 	}
+}
+
+// Region of the function, set by the Terraform module (gen2 provides none).
+func Region() string {
+	if region := os.Getenv("FUNCTION_REGION"); region != "" {
+		return region
+	}
+	return os.Getenv("GOOGLE_CLOUD_REGION")
 }
 
 func randomHex(n int) string {
