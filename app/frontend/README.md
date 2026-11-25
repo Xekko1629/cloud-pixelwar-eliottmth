@@ -16,14 +16,14 @@ contrat de [`auth-proxy`](../functions/auth-proxy/README.md) :
    par **cet onglet** et ne pas avoir expiré ; sinon la gateway n'est pas appelée.
    Le code et le `state` sont retirés de la barre d'adresse, puis échangés par
    `POST /auth/exchange`, une seule fois même sous `StrictMode`.
-3. Le JWT de session (une heure) est gardé en mémoire et en `sessionStorage` (il
+3. Le JWT de session (15 min) est gardé en mémoire et en `sessionStorage` (il
    survit à un rechargement, pas à la fermeture de l'onglet). Le token Discord ne
    passe jamais par le navigateur.
 4. Un minuteur appelle `POST /api/session/refresh` cinq minutes avant `expires_at`.
    Un refus (`401`, connexion Discord de plus de 12 h) déconnecte avec un message ;
    une panne réseau garde la session et réessaie une minute plus tard.
 5. « Se déconnecter » efface la session locale. Le JWT est sans état : une copie prise
-   ailleurs resterait valable jusqu'à son expiration (une heure au plus).
+   ailleurs resterait valable jusqu'à son expiration (15 min au plus).
 
 | Fichier | Rôle |
 | --- | --- |

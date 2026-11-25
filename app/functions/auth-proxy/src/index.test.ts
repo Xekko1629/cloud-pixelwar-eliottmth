@@ -103,7 +103,7 @@ describe('POST /auth/exchange', () => {
     expect(exchange).toHaveBeenCalledWith(CODE, `${ORIGIN}/auth/callback`);
     expect(body.user).toEqual({ id: USER, name: 'exemple' });
     const claims = await verifyJwt(body.token, { issuer: ISSUER, audience: AUDIENCE, keys, now: () => now });
-    expect(claims).toMatchObject({ sub: USER, name: 'exemple', auth_time: now / 1000, exp: now / 1000 + 3600 });
+    expect(claims).toMatchObject({ sub: USER, name: 'exemple', auth_time: now / 1000, exp: now / 1000 + 900 });
     expect(log).toHaveBeenCalledWith('INFO', expect.any(String), { event_type: 'auth.exchange.succeeded', user_id: USER });
   });
 
@@ -157,7 +157,7 @@ describe('POST /api/session/refresh', () => {
     expect(response.status).toBe(200);
     const { token } = await response.json() as { token: string };
     expect(await verifyJwt(token, { issuer: ISSUER, audience: AUDIENCE, keys, now: () => now }))
-      .toMatchObject({ sub: USER, auth_time: authTime, exp: now / 1000 + 3600 });
+      .toMatchObject({ sub: USER, auth_time: authTime, exp: now / 1000 + 900 });
   });
 
   it('refuses after twelve hours since the Discord login', async () => {
