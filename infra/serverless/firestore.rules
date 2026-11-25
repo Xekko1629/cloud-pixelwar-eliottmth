@@ -1,0 +1,32 @@
+rules_version = '2';
+
+// Security Rules of the browser (ADR-0015). They only apply to the client library
+// opened by the frontend: the functions use their service account through IAM, which
+// bypasses these rules.
+//
+// The browser has no Firebase identity, so no rule looks at the caller. It may read the
+// realtime deltas (pixels without author) and the global configuration, nothing else,
+// and it never writes. Authors (tile_metadata), users, quotas and deduplication stay
+// reachable only through the functions behind API Gateway.
+//
+// Tested on the emulator: app/testing/firestore-rules.integration.test.ts.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Changed pixels of one transaction and region, without author (ADR-0003, ADR-0014).
+    match /deltas/{delta} {
+      allow get, list: if true;
+      allow write: if false;
+    }
+
+    // Pause, size, bounds and canvas_version of the canvas.
+    match /config/global {
+      allow get: if true;
+      allow list, write: if false;
+    }
+
+    // Everything else: denied, for reads and writes.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

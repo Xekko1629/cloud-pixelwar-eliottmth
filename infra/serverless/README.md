@@ -105,9 +105,12 @@ les politiques TTL sur `expire_at` des collections `deltas` et
 `processed_events`. Les documents `users/{uid}` n'expirent pas : ils portent le
 quota et le dernier rejet.
 
-- Aucune règle de sécurité : aucun client ne parle à Firestore (ADR-0013).
-  Chaque fonction reçoit sur son compte d'exécution `roles/datastore.user`
-  (écriture) ou `roles/datastore.viewer` (lecture), jamais un rôle projet large.
+- Les fonctions passent par IAM : chaque compte d'exécution reçoit
+  `roles/datastore.user` (écriture) ou `roles/datastore.viewer` (lecture), jamais
+  un rôle projet large. Les Security Rules ne s'appliquent pas à elles.
+- Le navigateur lit le temps réel avec la librairie cliente, limité par les
+  Security Rules de `firestore.rules` : lecture de `deltas/{id}` et de
+  `config/global`, aucune écriture (voir « Temps réel du navigateur »).
 - `destroy` supprime la base (`deletion_policy = "DELETE"`). Avec
   `firestore_deletion_protection = true`, GCP refuse la suppression et le destroy
   échoue au lieu de perdre la grille.
@@ -115,6 +118,26 @@ quota et le dernier rejet.
   5 minutes : attendre avant de réappliquer le stack.
 - Le TTL supprime les documents expirés en général sous 24 h ; les requêtes
   filtrent donc toujours sur `created_at` (ADR-0003).
+
+## Temps réel du navigateur
+
+`realtime.tf` (DRAW-03a, [ADR-0015](../../docs/adr/0015-temps-reel-listeners-firestore-navigateur.md)),
+activé par `enable_realtime` (dev aujourd'hui) :
+
+- `firestore.rules`, publié sur la base `(default)` par `google_firebaserules_ruleset`
+  et `google_firebaserules_release`. C'est le même fichier que testent les tests
+  d'intégration (`app/testing/firestore-rules.integration.test.ts`) ;
+- une clé d'API de navigateur, limitée à l'API Firestore et aux pages du frontend
+  (`realtime_extra_referrers` ajoute `http://localhost:5173/*` en dev). Son nom
+  porte un suffixe aléatoire : une clé supprimée reste réservée 30 jours, un nom
+  fixe ferait échouer un `apply` après un `destroy`. Elle est publique par nature
+  (servie dans `/config.js`) et passe au stack `frontend` par l'output
+  `firestore_web_api_key`.
+
+Aucun produit Firebase n'est activé (ni projet Firebase, ni application web, ni
+Auth). Prérequis dans `infra/iam`, appliqué à la main : APIs `firebaserules` et
+`apikeys`, rôles `firebaserules.admin` et `serviceusage.apiKeysAdmin` du deployer,
+et rôles de lecture équivalents du planner. Détails : [temps réel](../../docs/realtime.md).
 
 ## Cloud Storage
 
