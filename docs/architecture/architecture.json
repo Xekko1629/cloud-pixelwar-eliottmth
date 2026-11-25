@@ -312,7 +312,7 @@
       "label": "Security Rules",
       "view": "application",
       "group": "Données",
-      "status": "planned",
+      "status": "deployed",
       "terraform": [
         "serverless:google_firebaserules_release.firestore"
       ]
@@ -839,14 +839,14 @@
       "to": "rules",
       "label": "onSnapshot : deltas, config",
       "kind": "read",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "rules",
       "to": "firestore",
       "label": "lecture seule",
       "kind": "read",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "humans",

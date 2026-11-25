@@ -26,6 +26,7 @@
 - [Déploiement dev du parcours `/get` (image de la toile) et checklist de test — BOT-06](deploy-get-path.md)
 - [Proxy d'écriture web : `POST /api/pixels` — DRAW-01](web-proxy.md)
 - [Lecteur de la grille pour le web : tuiles, métadonnées et état — SRV-11](tile-reader.md)
+- [Temps réel du navigateur : listeners Firestore et Security Rules — DRAW-03a](realtime.md)
 - [Command worker : routage, autorisation et relivraisons](command-worker.md)
 - [Contrat du calcul des quotas utilisateur](rate-limits.md)
 - [Écriture transactionnelle et idempotence — DATA-02](drawing-transactions.md)
