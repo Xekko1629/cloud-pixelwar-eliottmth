@@ -50,6 +50,15 @@ export class TileImageCache<Image> {
     if (this.images.size > this.capacity) this.images.delete(this.images.keys().next().value!);
     return image;
   }
+
+  /** Drops the image of a tile whose colours changed: the next get() rebuilds it. */
+  invalidate(tx: number, ty: number): void {
+    this.images.delete(`${tx},${ty}`);
+  }
+
+  clear(): void {
+    this.images.clear();
+  }
 }
 
 // Fake data until tile-reader exists (WEB-03a may start without the backend): a pattern

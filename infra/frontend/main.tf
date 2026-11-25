@@ -10,6 +10,10 @@ locals {
   # null while the gateway publishes no proxy (prd today): the page then says the API is not published.
   gateway_url = try(data.terraform_remote_state.gateway.outputs.gateway_url, null)
 
+  # Browser key of the Firestore listeners (ADR-0015), created by infra/serverless when
+  # enable_realtime is set. Public by design: it is served in /config.js.
+  firestore_api_key = try(data.terraform_remote_state.serverless.outputs.firestore_web_api_key, null)
+
   image_repository = "${var.region}-docker.pkg.dev/${var.project_id}/pixelwar/frontend"
   # Deterministic Cloud Run URL (https://<service>-<project number>.<region>.run.app). The
   # auth-proxy computes the same one for CORS and the Discord redirect URI: users must use this
@@ -32,6 +36,19 @@ data "terraform_remote_state" "gateway" {
   # Gateway applied without any published proxy: no gateway_url yet.
   defaults = {
     gateway_url = null
+  }
+}
+
+data "terraform_remote_state" "serverless" {
+  backend = "gcs"
+  config = {
+    bucket = var.state_bucket
+    prefix = "serverless"
+  }
+
+  # Realtime disabled (prd until P0-1): no key, the page then says realtime is not configured.
+  defaults = {
+    firestore_web_api_key = null
   }
 }
 
@@ -92,7 +109,7 @@ resource "google_cloud_run_v2_service" "frontend" {
       }
       env {
         name  = "FIRESTORE_API_KEY"
-        value = var.firestore_api_key
+        value = local.firestore_api_key == null ? "" : local.firestore_api_key
       }
       env {
         name  = "DISCORD_CLIENT_ID"
@@ -105,6 +122,10 @@ resource "google_cloud_run_v2_service" "frontend" {
     precondition {
       condition     = startswith(var.image, "${local.image_repository}@sha256:")
       error_message = "The image must come from the pixelwar repository of this project and region."
+    }
+    precondition {
+      condition     = local.firestore_api_key == null || can(regex("^AIza[0-9A-Za-z_-]{35}$", local.firestore_api_key))
+      error_message = "The firestore_web_api_key output of infra/serverless must be a Google API key."
     }
   }
 }

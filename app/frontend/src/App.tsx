@@ -1,12 +1,14 @@
-import { useMemo } from 'react';
+import { useSyncExternalStore } from 'react';
 import { PixelCanvas } from './canvas/PixelCanvas';
-import { createFakeTileSource } from './canvas/tiles';
 import type { FrontendConfig } from './config';
+import type { LiveCanvas } from './realtime/live';
+import { REALTIME_LABELS } from './realtime/setup';
 
 // Shell of the application (WEB-01). The canvas shows fake tiles until tile-reader is
-// wired (WEB-03b); the Discord login (WEB-02b) mounts in the header.
-export function App({ config }: { config: FrontendConfig }) {
-  const source = useMemo(() => createFakeTileSource(), []);
+// wired (WEB-03b), with the realtime deltas painted over them (DRAW-03a); the Discord
+// login (WEB-02b) mounts in the header.
+export function App({ config, live }: { config: FrontendConfig; live: LiveCanvas }) {
+  const realtime = useSyncExternalStore(live.subscribeState, live.getState);
 
   return (
     <main className="app">
@@ -17,9 +19,10 @@ export function App({ config }: { config: FrontendConfig }) {
       </header>
       <section className="app__status" aria-label="État des services">
         <p>API : {config.gatewayUrl ? 'disponible' : 'pas encore publiée'}</p>
-        <p>Temps réel : {config.firestore ? 'disponible' : 'pas encore configuré'}</p>
+        <p>Temps réel : {REALTIME_LABELS[realtime.status]}</p>
+        {realtime.config?.paused && <p className="app__paused" role="status">Toile en pause</p>}
       </section>
-      <PixelCanvas source={source} />
+      <PixelCanvas live={live} />
     </main>
   );
 }

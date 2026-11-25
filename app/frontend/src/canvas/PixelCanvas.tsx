@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { pixelAt, type Viewport } from './camera';
+import type { CanvasUpdates } from '../realtime/live';
+import { pixelAt, visiblePixels, type Viewport } from './camera';
 import { CanvasController } from './controller';
 import { drawViewport } from './renderer';
-import { TileImageCache, type TileColorsSource } from './tiles';
+import { TileImageCache } from './tiles';
 
 // One 64×64 canvas per painted tile, drawn scaled with drawImage: never a DOM element per pixel.
 function createTileImage(rgba: Uint8ClampedArray<ArrayBuffer>): HTMLCanvasElement {
@@ -15,9 +16,9 @@ function createTileImage(rgba: Uint8ClampedArray<ArrayBuffer>): HTMLCanvasElemen
 
 const formatZoom = (zoom: number) => (zoom >= 10 ? zoom.toFixed(0) : zoom.toFixed(1));
 
-// Full-size canvas of the grid. Redraws only when the camera or the size changes, in the
-// next animation frame: no render loop and no polling.
-export function PixelCanvas({ source }: { source: TileColorsSource }) {
+// Full-size canvas of the grid. Redraws only when the camera, the size or a realtime delta
+// changes something, in the next animation frame: no render loop and no polling.
+export function PixelCanvas({ live }: { live: CanvasUpdates }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const statusRef = useRef<HTMLOutputElement>(null);
 
@@ -27,7 +28,7 @@ export function PixelCanvas({ source }: { source: TileColorsSource }) {
     const context = canvas?.getContext('2d');
     if (!canvas || !status || !context) return undefined;
 
-    const images = new TileImageCache(source, createTileImage);
+    const images = new TileImageCache(live.source, createTileImage);
     let viewport: Viewport = { width: canvas.clientWidth, height: canvas.clientHeight };
     let pixelRatio = window.devicePixelRatio || 1;
     let frame = 0;
@@ -42,11 +43,19 @@ export function PixelCanvas({ source }: { source: TileColorsSource }) {
       frame = 0;
       drawViewport(context, controller.current, viewport, pixelRatio, (tx, ty) => images.get(tx, ty));
       showStatus();
+      // The deltas listener follows the visible regions (it ignores an unchanged set).
+      live.viewportChanged(visiblePixels(controller.current, viewport));
     };
     const schedule = () => {
       if (frame === 0) frame = requestAnimationFrame(render);
     };
     const controller = new CanvasController(() => viewport, schedule);
+    // A delta repaints only the tiles it touches; a new canvas version repaints everything.
+    const unsubscribe = live.subscribe((change) => {
+      if (change === 'all') images.clear();
+      else for (const { tx, ty } of change) images.invalidate(tx, ty);
+      schedule();
+    });
 
     const resize = () => {
       pixelRatio = window.devicePixelRatio || 1;
@@ -96,6 +105,7 @@ export function PixelCanvas({ source }: { source: TileColorsSource }) {
     canvas.addEventListener('keydown', onKeyDown);
     return () => {
       if (frame !== 0) cancelAnimationFrame(frame);
+      unsubscribe();
       observer.disconnect();
       canvas.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('pointermove', onPointerMove);
@@ -105,7 +115,7 @@ export function PixelCanvas({ source }: { source: TileColorsSource }) {
       canvas.removeEventListener('wheel', onWheel);
       canvas.removeEventListener('keydown', onKeyDown);
     };
-  }, [source]);
+  }, [live]);
 
   return (
     <div className="pixel-canvas">

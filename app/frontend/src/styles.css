@@ -99,3 +99,8 @@ section.app__status p {
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
+
+section.app__status .app__paused {
+  color: var(--accent);
+  font-weight: 600;
+}

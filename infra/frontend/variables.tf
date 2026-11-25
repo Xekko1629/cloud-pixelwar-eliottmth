@@ -50,17 +50,6 @@ variable "max_instances" {
   }
 }
 
-variable "firestore_api_key" {
-  description = "Public API key of the Firestore web app, for the listeners (ADR-0015); empty until DRAW-03a"
-  type        = string
-  default     = ""
-
-  validation {
-    condition     = var.firestore_api_key == "" || can(regex("^AIza[0-9A-Za-z_-]{35}$", var.firestore_api_key))
-    error_message = "firestore_api_key must be a Google API key."
-  }
-}
-
 variable "discord_client_id" {
   description = "Public Discord OAuth2 client id of this environment; empty until WEB-02b"
   type        = string
