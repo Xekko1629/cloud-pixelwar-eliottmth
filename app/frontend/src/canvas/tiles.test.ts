@@ -1,6 +1,6 @@
-import { TILE_PIXELS, TILE_SIDE, locatePixel } from '@pixelwar/shared/grid';
+import { TILE_PIXELS } from '@pixelwar/shared/grid';
 import { describe, expect, it, vi } from 'vitest';
-import { FAR_MARKER, TileImageCache, createFakeTileSource, tileRgba, type TileColorsSource } from './tiles';
+import { TileImageCache, tileRgba, type TileColorsSource } from './tiles';
 
 describe('tileRgba', () => {
   it('paints untouched pixels white and painted ones at their palette colour', () => {
@@ -55,28 +55,5 @@ describe('TileImageCache', () => {
   it('requires a positive capacity', () => {
     const { source, createImage } = cache();
     expect(() => new TileImageCache(source, createImage, 0)).toThrow(RangeError);
-  });
-});
-
-describe('createFakeTileSource', () => {
-  const source = createFakeTileSource();
-  const colorAt = (x: number, y: number) => {
-    const { tx, ty, index } = locatePixel(x, y);
-    return source.get(tx, ty)?.[index] ?? 0;
-  };
-
-  it('paints rings around the origin and leaves the rest empty', () => {
-    expect(colorAt(0, 0)).toBe(1);
-    expect(colorAt(10, 0)).toBe(2);
-    expect(colorAt(-150, 0)).not.toBe(0);
-    expect(source.get(10, 10)).toBeNull();
-  });
-
-  it('paints a framed marker near 10⁹', () => {
-    expect(colorAt(FAR_MARKER.x, FAR_MARKER.y)).toBe(4);
-    expect(colorAt(FAR_MARKER.x + 5, FAR_MARKER.y + 5)).toBe(6);
-    expect(colorAt(FAR_MARKER.x + 32, FAR_MARKER.y)).toBe(0);
-    const { tx, ty } = locatePixel(FAR_MARKER.x, FAR_MARKER.y);
-    expect(source.get(tx, ty)).toHaveLength(TILE_SIDE * TILE_SIDE);
   });
 });

@@ -1,4 +1,5 @@
 import { TILE_PIXELS, locatePixel } from '@pixelwar/shared/grid';
+import { TILES_PER_REGION_SIDE } from './region-tiles';
 import type { TileColorsSource } from './tiles';
 
 export interface TileKey {
@@ -6,12 +7,12 @@ export interface TileKey {
   ty: number;
 }
 
-// Tiles of the base source with the realtime pixels painted over them (DRAW-03a). A
-// changed tile is copied once, then updated in place. WEB-03c replaces the base with the
-// tiles of tile-reader and ignores the deltas older than a loaded tile.
+// Tiles of the base source (tile-reader, WEB-03b) with the realtime pixels painted over
+// them (DRAW-03a). A changed tile is copied once, then updated in place. When its region
+// is loaded again, the copy is dropped: the new tiles already hold those pixels.
 //
 // Bounded: past `capacity` changed tiles, the least recently changed one goes back to
-// the base source (with tile-reader, a fresh load of that tile).
+// the base source.
 export class LiveTileSource implements TileColorsSource {
   private readonly changed = new Map<string, Uint8Array>();
 
@@ -50,6 +51,14 @@ export class LiveTileSource implements TileColorsSource {
       touched.set(oldest, { tx, ty });
     }
     return [...touched.values()];
+  }
+
+  /** Forgets the realtime pixels of a region: tile-reader just answered with newer tiles. */
+  forgetRegion(rx: number, ry: number): void {
+    for (const key of [...this.changed.keys()]) {
+      const [tx, ty] = key.split(',').map(Number) as [number, number];
+      if (Math.floor(tx / TILES_PER_REGION_SIDE) === rx && Math.floor(ty / TILES_PER_REGION_SIDE) === ry) this.changed.delete(key);
+    }
   }
 
   /** Forgets every realtime pixel (new canvas version after /admin clear). */

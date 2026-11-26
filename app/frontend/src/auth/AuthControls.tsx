@@ -1,6 +1,12 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { AUTH_ERRORS, CALLBACK_PATH, type Auth } from './auth';
 
+/** Asks the gateway for the Discord authorization URL, then leaves for Discord. */
+export async function redirectToLogin(auth: Auth): Promise<void> {
+  const url = await auth.startLogin();
+  if (url) window.location.assign(url);
+}
+
 // Header block of the Discord login (WEB-02b): button, current user, sign-out, errors.
 export function AuthControls({ auth }: { auth: Auth }) {
   const state = useSyncExternalStore(auth.subscribe, auth.getState);
@@ -12,11 +18,6 @@ export function AuthControls({ auth }: { auth: Auth }) {
     window.history.replaceState(null, '', '/');
     void auth.completeLogin(search);
   }, [auth]);
-
-  async function login() {
-    const url = await auth.startLogin();
-    if (url) window.location.assign(url);
-  }
 
   if (state.status === 'signed-in') {
     return (
@@ -33,7 +34,7 @@ export function AuthControls({ auth }: { auth: Auth }) {
       {state.status === 'signed-out' && state.error && (
         <span className="auth__error" role="alert">{AUTH_ERRORS[state.error]}</span>
       )}
-      <button type="button" className="auth__button" disabled={pending} onClick={() => void login()}>
+      <button type="button" className="auth__button" disabled={pending} onClick={() => void redirectToLogin(auth)}>
         {pending ? 'Connexion…' : 'Se connecter avec Discord'}
       </button>
     </div>

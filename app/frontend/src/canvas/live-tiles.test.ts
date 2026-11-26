@@ -70,3 +70,13 @@ describe('TileImageCache invalidation', () => {
     expect(cache.size).toBe(0);
   });
 });
+
+describe('LiveTileSource.forgetRegion', () => {
+  it('goes back to the base tiles of that region only', () => {
+    const live = new LiveTileSource(base());
+    live.apply([{ x: 0, y: 0, color: 9 }, { x: 1023, y: 1023, color: 9 }, { x: -1, y: 0, color: 9 }]);
+    live.forgetRegion(0, 0);
+    expect(live.size).toBe(1);
+    expect(live.get(-1, 0)?.[63]).toBe(9);
+  });
+});

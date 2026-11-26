@@ -35,6 +35,35 @@ contrat de [`auth-proxy`](../functions/auth-proxy/README.md) :
 Les tuiles (WEB-03b), l'inspection (WEB-04) et le brush (WEB-05) passent par
 `services.api` (`src/auth/setup.ts`), jamais par `fetch` directement.
 
+## Tuiles (WEB-03b)
+
+Contrat : [`tile-reader`](../../docs/tile-reader.md). La toile est découpée en régions
+de 1024 × 1024 pixels (16 × 16 tuiles), chargées par `GET /api/regions/{rx}/{ry}/tiles`.
+
+- **Seules les régions visibles sont demandées**, une fois chacune, dès qu'elles entrent
+  dans l'écran (`src/canvas/region-tiles.ts`). Au plus 48 régions restent en mémoire :
+  au-delà, la région affichée le moins récemment et sortie de l'écran est libérée.
+- **La toile demande une connexion.** Ses tuiles viennent de l'API, et le sujet exige
+  que tout appel du frontend à l'API soit authentifié (§3.4). Sans session, la toile
+  ne montrerait que les pixels posés depuis l'ouverture de la page, pas l'état à jour :
+  elle est remplacée par une invitation à se connecter. Les tuiles se chargent à la
+  connexion et sont oubliées à la déconnexion. Pour l'ouvrir aux visiteurs plus tard,
+  il suffirait d'un autre `RegionFetcher` (par exemple une lecture Firestore de
+  `tile_colors` autorisée par les Security Rules, ce qui amenderait ADR-0015).
+- **Cache HTTP** : `cache: 'no-cache'` laisse le navigateur garder la réponse et la
+  revalider avec son `ETag`. Une région inchangée coûte un `304` sans corps. Le
+  frontend n'envoie pas `If-None-Match` lui-même : cet en-tête n'est pas « sûr » pour
+  CORS, et le preflight de `tile-reader` n'autorise que `Authorization`.
+- **Deltas pendant le chargement** : la réponse peut être plus ancienne qu'un pixel
+  reçu en temps réel pendant la requête. Ces pixels sont gardés, puis repeints sur
+  les tuiles chargées, dans l'ordre (`src/realtime/live.ts`).
+- Une région en échec est redemandée 10 s plus tard si elle est toujours visible ;
+  après une coupure du temps réel, les régions visibles sont redemandées.
+- Au-delà de 30 régions visibles (vue éloignée, WEB-03d), rien n'est chargé. Avec le
+  zoom minimal actuel (×1), un écran 2560 × 1440 en montre au plus 12.
+- `/admin clear` (nouvelle `canvas_version`) oublie toutes les régions et recharge
+  celles qui sont visibles.
+
 ## Développement local
 
 ```sh
