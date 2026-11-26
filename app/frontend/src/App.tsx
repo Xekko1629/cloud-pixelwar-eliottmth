@@ -1,11 +1,13 @@
 import { useMemo } from 'react';
+import { AuthControls } from './auth/AuthControls';
+import type { AuthServices } from './auth/setup';
 import { PixelCanvas } from './canvas/PixelCanvas';
 import { createFakeTileSource } from './canvas/tiles';
 import type { FrontendConfig } from './config';
 
 // Shell of the application (WEB-01). The canvas shows fake tiles until tile-reader is
-// wired (WEB-03b); the Discord login (WEB-02b) mounts in the header.
-export function App({ config }: { config: FrontendConfig }) {
+// wired (WEB-03b); the Discord login (WEB-02b) sits in the header.
+export function App({ config, services }: { config: FrontendConfig; services: AuthServices }) {
   const source = useMemo(() => createFakeTileSource(), []);
 
   return (
@@ -14,6 +16,7 @@ export function App({ config }: { config: FrontendConfig }) {
         <h1>Pixel War</h1>
         <span className="app__environment" data-environment={config.environment}>{config.environment}</span>
         <span className="app__status">Données factices</span>
+        <AuthControls auth={services.auth} />
       </header>
       <section className="app__status" aria-label="État des services">
         <p>API : {config.gatewayUrl ? 'disponible' : 'pas encore publiée'}</p>

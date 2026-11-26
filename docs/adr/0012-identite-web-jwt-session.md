@@ -49,7 +49,7 @@
    | `aud` | id du projet GCP (un token de dev est refusé en prd) |
    | `sub` | id Discord |
    | `name` | pseudo Discord |
-   | `iat`, `exp` | durée de vie de 1 h |
+   | `iat`, `exp` | durée de vie de 15 min (1 h jusqu'au 25/11/2026, voir « Conséquences ») |
    | `auth_time` | date de la connexion Discord |
 
 5. Le frontend garde le JWT en mémoire (et en `sessionStorage` pour survivre à un
@@ -74,11 +74,16 @@
 ## Conséquences
 
 - Aucun produit Firebase ni API `identitytoolkit` à activer (`infra/iam/apis.tf`).
-- Pas de révocation individuelle avant expiration : la durée de vie courte (1 h)
-  limite l'exposition. Une révocation d'urgence se fait en supprimant les clés du
+- Pas de révocation individuelle avant expiration : la durée de vie courte limite
+  l'exposition. Elle passe de 1 h à 15 min le 25/11/2026 (WEB-02b) : après une
+  déconnexion, une copie du JWT ne reste valable que 15 min au plus. Le frontend
+  renouvelle la session cinq minutes avant l'expiration, sans action de
+  l'utilisateur. Une vraie liste de révocation imposerait une lecture Firestore à
+  chaque requête, qu'API Gateway ne sait pas faire : elle est écartée. Une révocation d'urgence se fait en supprimant les clés du
   compte `session-signer`, ce qui invalide toutes les sessions.
 - `signJwt` a un quota par projet : un appel par connexion et par
-  renouvellement, très en dessous pour la démonstration.
+  renouvellement, soit environ six par heure et par utilisateur connecté, très
+  en dessous pour la démonstration.
 - Le service temps réel (ADR-0013) valide le même JWT avec les mêmes clés
   publiques, dans son code.
 - Tests à écrire (WEB-02a) : `state` absent, expiré ou modifié refusé ; claims

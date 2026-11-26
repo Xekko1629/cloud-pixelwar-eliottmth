@@ -99,3 +99,31 @@ section.app__status p {
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
+
+.auth {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin-left: auto;
+  font-size: 14px;
+}
+
+.auth__error {
+  color: var(--accent);
+}
+
+.auth__button {
+  padding: 4px 12px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.auth__button:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
