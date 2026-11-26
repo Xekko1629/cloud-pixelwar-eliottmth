@@ -143,6 +143,30 @@ section.app__status p {
   outline-offset: 1px;
 }
 
+.pixel-panel__tools {
+  display: flex;
+  gap: 6px;
+}
+
+.pixel-panel__tool {
+  flex: 1;
+}
+
+.pixel-panel__tool[aria-checked="true"] {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.pixel-panel__size {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pixel-canvas__surface[data-tool="brush"] {
+  cursor: cell;
+}
+
 .pixel-panel__draw:disabled {
   cursor: not-allowed;
   opacity: 0.5;

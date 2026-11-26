@@ -20,15 +20,27 @@ const formatZoom = (zoom: number) => (zoom >= 10 ? zoom.toFixed(0) : zoom.toFixe
 // changes something, in the next animation frame: no render loop and no polling. Deltas
 // received in the same frame are drawn together, and only their tiles are redrawn while
 // the camera stays still (WEB-03c).
+export interface StrokeHandlers {
+  begin(pixel: Point | null): void;
+  extend(pixel: Point | null): void;
+  end(): void;
+}
+
+export type CanvasTool = 'inspect' | 'brush';
+
 export interface PixelCanvasProps {
   live: CanvasUpdates;
+  // inspect: a tap selects a pixel. brush: the main button or one finger paints (WEB-05);
+  // the other mouse buttons, two fingers and the keyboard still move the camera.
+  tool?: CanvasTool;
+  stroke?: StrokeHandlers;
   // The selected pixel, outlined on the canvas (WEB-04).
   selected?: Point | null;
   // A tap, Enter (centre pixel) or Escape (null).
   onSelect?: (pixel: Point | null) => void;
 }
 
-export function PixelCanvas({ live, selected = null, onSelect }: PixelCanvasProps) {
+export function PixelCanvas({ live, tool = 'inspect', stroke, selected = null, onSelect }: PixelCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const statusRef = useRef<HTMLOutputElement>(null);
   const markerRef = useRef<HTMLDivElement>(null);
@@ -37,6 +49,10 @@ export function PixelCanvas({ live, selected = null, onSelect }: PixelCanvasProp
   const onSelectRef = useRef(onSelect);
   const placeMarkerRef = useRef<() => void>(() => {});
   onSelectRef.current = onSelect;
+  const toolRef = useRef(tool);
+  toolRef.current = tool;
+  const strokeRef = useRef(stroke);
+  strokeRef.current = stroke;
 
   useEffect(() => {
     selectedRef.current = selected;
@@ -55,6 +71,8 @@ export function PixelCanvas({ live, selected = null, onSelect }: PixelCanvasProp
     let pixelRatio = window.devicePixelRatio || 1;
     let frame = 0;
     let hovered: { x: number; y: number } | null = null;
+    // Pointer that paints the current brush stroke.
+    let painting: number | null = null;
     // What the next frame must redraw: everything, or only these tiles.
     let dirty: Map<string, TileRef> | 'all' = 'all';
 
@@ -128,21 +146,51 @@ export function PixelCanvas({ live, selected = null, onSelect }: PixelCanvasProp
       const rect = canvas.getBoundingClientRect();
       return { x: event.clientX - rect.left, y: event.clientY - rect.top };
     };
+    const endStroke = () => {
+      if (painting === null) return;
+      painting = null;
+      strokeRef.current?.end();
+    };
     const onPointerDown = (event: PointerEvent) => {
       canvas.setPointerCapture(event.pointerId);
+      const paints = toolRef.current === 'brush' && strokeRef.current && painting === null && !controller.dragging &&
+        (event.pointerType !== 'mouse' || event.button === 0);
+      if (paints) {
+        painting = event.pointerId;
+        strokeRef.current!.begin(pixelAt(controller.current, viewport, local(event)));
+        return;
+      }
+      // A second finger turns the stroke into a pan or a pinch.
+      if (painting !== null && event.pointerType === 'touch') endStroke();
       controller.pointerDown(event.pointerId, local(event));
     };
     const onPointerMove = (event: PointerEvent) => {
       const point = local(event);
-      controller.pointerMove(event.pointerId, point);
       hovered = pixelAt(controller.current, viewport, point);
+      if (event.pointerId === painting) {
+        // Coalesced events keep a fast stroke precise; the stroke fills the gaps anyway.
+        const events = event.getCoalescedEvents?.() ?? [];
+        for (const sample of events.length > 0 ? events : [event]) {
+          strokeRef.current?.extend(pixelAt(controller.current, viewport, local(sample)));
+        }
+      } else {
+        controller.pointerMove(event.pointerId, point);
+      }
       showStatus();
     };
     const onPointerUp = (event: PointerEvent) => {
+      if (event.pointerId === painting) return endStroke();
       const tap = controller.pointerUp(event.pointerId);
-      if (tap) onSelectRef.current?.(pixelAt(controller.current, viewport, tap));
+      if (tap && toolRef.current === 'inspect') onSelectRef.current?.(pixelAt(controller.current, viewport, tap));
     };
-    const onPointerCancel = (event: PointerEvent) => controller.pointerCancel(event.pointerId);
+    const onPointerCancel = (event: PointerEvent) => {
+      if (event.pointerId === painting) return endStroke();
+      controller.pointerCancel(event.pointerId);
+    };
+    // The right button pans in brush mode: no context menu on the grid.
+    const onContextMenu = (event: MouseEvent) => {
+      if (toolRef.current === 'brush') event.preventDefault();
+    };
     const onPointerLeave = () => {
       hovered = null;
       showStatus();
@@ -168,6 +216,7 @@ export function PixelCanvas({ live, selected = null, onSelect }: PixelCanvasProp
     canvas.addEventListener('pointercancel', onPointerCancel);
     canvas.addEventListener('pointerleave', onPointerLeave);
     canvas.addEventListener('wheel', onWheel, { passive: false });
+    canvas.addEventListener('contextmenu', onContextMenu);
     canvas.addEventListener('keydown', onKeyDown);
     return () => {
       if (frame !== 0) cancelAnimationFrame(frame);
@@ -180,6 +229,8 @@ export function PixelCanvas({ live, selected = null, onSelect }: PixelCanvasProp
       placeMarkerRef.current = () => {};
       canvas.removeEventListener('pointerleave', onPointerLeave);
       canvas.removeEventListener('wheel', onWheel);
+      canvas.removeEventListener('contextmenu', onContextMenu);
+      endStroke();
       canvas.removeEventListener('keydown', onKeyDown);
     };
   }, [live]);
@@ -189,8 +240,9 @@ export function PixelCanvas({ live, selected = null, onSelect }: PixelCanvasProp
       <canvas
         ref={canvasRef}
         className="pixel-canvas__surface"
+        data-tool={tool}
         tabIndex={0}
-        aria-label="Grille de pixels. Glisser pour se déplacer, molette ou pincement pour zoomer, flèches et +/− au clavier, 0 pour revenir à l'origine. Cliquer, ou Entrée au centre, pour sélectionner un pixel ; Échap pour désélectionner."
+        aria-label="Grille de pixels. Glisser pour se déplacer, molette ou pincement pour zoomer, flèches et +/− au clavier, 0 pour revenir à l'origine. Cliquer, ou Entrée au centre, pour sélectionner un pixel ; Échap pour désélectionner. En mode pinceau, glisser pour peindre ; clic droit, molette enfoncée ou deux doigts pour se déplacer."
       />
       <div ref={markerRef} className="pixel-canvas__marker" hidden aria-hidden="true" />
       <output ref={statusRef} className="pixel-canvas__status" aria-live="off" />

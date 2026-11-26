@@ -90,6 +90,31 @@ de 1024 × 1024 pixels (16 × 16 tuiles), chargées par `GET /api/regions/{rx}/{
 | `src/inspect/inspector.ts` | Sélection, auteur, quota, envoi et confirmation, sans React |
 | `src/inspect/PixelPanel.tsx`, `Workspace.tsx` | Panneau du pixel et assemblage avec le canvas |
 
+## Pinceau (WEB-05)
+
+- Outil « Pinceau » du panneau : taille de **1 à 100** pixels de côté (slider), carré ou
+  rond, couleur de la palette. Glisser sur la toile peint ; le clic droit, la molette
+  enfoncée, deux doigts ou les flèches déplacent la vue.
+- **Pixels d'un trait** (`src/brush/stroke.ts`) : le pinceau est appliqué en chaque point
+  du chemin (Bresenham entre deux événements pointeur, plus les événements regroupés
+  par le navigateur), donc un trait rapide n'a pas de trou. Entre deux points voisins,
+  seul le bord avant du tampon est ajouté (≈ 100 pixels par pas à la taille 100, au lieu
+  de 10 000). Chaque pixel n'apparaît qu'une fois par trait, donc jamais deux fois dans
+  une requête (`400 duplicate_pixel`). Hors de la grille bornée (`size`) ou de ±10⁹, il
+  est ignoré.
+- **Envoi** (`src/brush/brush.ts`) : le **même pipeline qu'un pixel seul**, sans endpoint
+  ni événement propre au pinceau (ADR-0014). Les pixels partent au fil du trait par
+  requêtes `POST /api/pixels` de 500 au plus, quatre en parallèle au maximum, et le
+  reste au relâchement. La toile n'affiche que ce que les deltas apportent.
+- **Quota et refus** : le trait s'arrête au quota restant connu (le serveur décide quand
+  même). Un seul message par trait : 3 s après la fin, `/api/state` dit si le dernier
+  refus appartient à l'un de ses événements. Après un échec d'envoi, le reste du trait
+  est abandonné, jamais renvoyé automatiquement. En pause, le pinceau ne démarre pas.
+- **Démo de charge** : un admin relève la limite d'un compte avec `/admin ratelimit`
+  (par exemple 1 000 000 pixels par minute), puis un trait à la taille 100 envoie
+  plusieurs milliers de pixels par seconde. Le débit par instance du `draw-worker` se lit
+  sur le dashboard (DRAW-05).
+
 ## Développement local
 
 ```sh

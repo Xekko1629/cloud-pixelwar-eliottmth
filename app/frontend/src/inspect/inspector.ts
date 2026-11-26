@@ -196,6 +196,11 @@ export class PixelInspector {
     }
   }
 
+  /** Reads /api/state again (after a brush stroke). */
+  reloadQuota(): Promise<UserQuota | null> {
+    return this.refreshQuota();
+  }
+
   private async refreshQuota(): Promise<UserQuota | null> {
     try {
       const quota = await fetchUserQuota(this.api);
