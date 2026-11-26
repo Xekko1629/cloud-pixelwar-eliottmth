@@ -54,7 +54,11 @@ Les fonctions ne sont pas concernées : elles passent par IAM avec leur compte d
 - Le listener est recréé quand l'ensemble des régions visibles change, 250 ms après
   la fin du déplacement, ou quand la version change. Un snapshot tardif d'un listener
   remplacé est ignoré.
-- Chaque delta ne redessine que les tuiles qu'il touche.
+- Chaque delta ne redessine que les tuiles qu'il touche (WEB-03c) : les deltas reçus
+  pendant une même frame sont regroupés (`requestAnimationFrame`), et tant que la caméra
+  ne bouge pas, seules ces tuiles sont effacées et repeintes, chacune dans son rectangle
+  (`drawTiles`, `src/canvas/renderer.ts`). Un déplacement, un zoom ou `/admin clear`
+  redessinent tout l'écran.
 
 Les deltas sont peints sur les tuiles chargées par `tile-reader` (WEB-03b, voir le
 [README du frontend](../app/frontend/README.md#tuiles-web-03b)). Les pixels reçus pendant
