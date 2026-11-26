@@ -118,3 +118,24 @@ describe('Brush', () => {
     expect(brush.getState().size).toBe(100);
   });
 });
+
+describe('Brush and the quota', () => {
+  it('counts the covered pixels at once, and takes back the preview of a refused stroke', async () => {
+    const { brush, context, timers, setQuota } = setup();
+    const consume = vi.fn();
+    const forget = vi.fn();
+    context.consume = consume;
+    context.forget = forget;
+    brush.setSize(2);
+    brush.begin({ x: 0, y: 0 });
+    brush.extend({ x: 1, y: 0 });
+    expect(consume.mock.calls.map(([n]) => n)).toEqual([4, 2]);
+    brush.end();
+    await flush();
+    setQuota({ limitPerMinute: 20, usedPixels: 20, remainingPixels: 0, resetAt: new Date(), lastRejection: { eventId: 'e-0', reason: 'rate_limit', at: new Date() } });
+    timers[0]!();
+    await flush();
+    expect(forget).toHaveBeenCalledTimes(1);
+    expect(forget.mock.calls[0]![0]).toHaveLength(6);
+  });
+});

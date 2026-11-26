@@ -33,6 +33,10 @@ export interface BrushContext {
   reloadQuota(): Promise<UserQuota | null>;
   // Shows the pixels of the stroke at once, on the preview layer.
   preview?(pixels: readonly DrawPixel[]): void;
+  // Takes back the preview of a refused stroke.
+  forget?(pixels: readonly DrawPixel[]): void;
+  // Counts the pixels sent against the known quota, before /api/state sees them.
+  consume?(count: number): void;
 }
 
 export interface BrushOptions {
@@ -57,6 +61,7 @@ export class Brush {
   private ended = false;
   private failed: string | null = null;
   private eventIds = new Set<string>();
+  private sentPixels: DrawPixel[] = [];
 
   constructor(private readonly api: ApiClient, private readonly context: BrushContext, options: BrushOptions = {}) {
     this.concurrency = options.concurrency ?? 4;
@@ -103,12 +108,15 @@ export class Brush {
     this.ended = false;
     this.failed = null;
     this.eventIds = new Set();
+    this.sentPixels = [];
     this.extend(point);
   }
 
   extend(point: Point | null): void {
     if (!this.stroke || this.ended || point === null) return;
     const added = this.stroke.moveTo(point);
+    // Counted as soon as covered, so that a next stroke never starts on a stale quota.
+    this.context.consume?.(added);
     this.context.preview?.(this.stroke.recent(added));
     this.pump();
     this.report();
@@ -141,6 +149,7 @@ export class Brush {
       if (id !== this.strokeId) return;
       for (const eventId of accepted.eventIds) this.eventIds.add(eventId);
       this.sent += pixels.length;
+      this.sentPixels.push(...pixels);
     } catch (error) {
       if (id !== this.strokeId) return;
       // The rest of the stroke is dropped, never sent again automatically: the outcome
@@ -166,16 +175,17 @@ export class Brush {
     this.setStroke({ status: 'done', sent: this.sent, limited: stroke.exhausted });
     if (this.sent === 0) return;
     const events = this.eventIds;
-    this.setTimer(() => void this.confirm(id, events), this.confirmAfterMs);
+    const pixels = this.sentPixels;
+    this.setTimer(() => void this.confirm(id, events, pixels), this.confirmAfterMs);
   }
 
-  private async confirm(id: number, events: Set<string>): Promise<void> {
+  private async confirm(id: number, events: Set<string>, pixels: DrawPixel[]): Promise<void> {
     const quota = await this.context.reloadQuota();
-    if (id !== this.strokeId) return;
     const rejection = quota?.lastRejection;
-    if (rejection && events.has(rejection.eventId)) {
-      this.setStroke({ status: 'rejected', sent: this.sent, reason: rejection.reason });
-    }
+    if (!rejection || !events.has(rejection.eventId)) return;
+    // Part of the stroke was refused: what is not on the canvas by now will not come.
+    this.context.forget?.(pixels);
+    if (id === this.strokeId) this.setStroke({ status: 'rejected', sent: this.sent, reason: rejection.reason });
   }
 
   private report(): void {

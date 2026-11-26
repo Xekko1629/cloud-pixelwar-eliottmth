@@ -12,7 +12,10 @@ import { PixelPanel } from './PixelPanel';
 // on a preview layer over the canvas, until its delta arrives.
 export function Workspace({ api, live }: { api: ApiClient; live: LiveCanvas }) {
   const [preview] = useState(() => new PreviewLayer());
-  const [inspector] = useState(() => new PixelInspector(api, live, { preview: (pixels) => preview.add(pixels) }));
+  const [inspector] = useState(() => new PixelInspector(api, live, {
+    preview: (pixels) => preview.add(pixels),
+    forget: (pixels) => preview.forget(pixels),
+  }));
   const [brush] = useState(() => new Brush(api, {
     color: () => inspector.getState().brushColor,
     config: () => live.getState().config,
@@ -22,6 +25,8 @@ export function Workspace({ api, live }: { api: ApiClient; live: LiveCanvas }) {
     },
     reloadQuota: () => inspector.reloadQuota(),
     preview: (pixels) => preview.add(pixels),
+    forget: (pixels) => preview.forget(pixels),
+    consume: (count) => inspector.consume(count),
   }));
   const [tool, setTool] = useState<CanvasTool>('inspect');
   const { selected } = useSyncExternalStore(inspector.subscribe, inspector.getState);

@@ -52,8 +52,9 @@ export interface InspectorOptions {
   confirmAfterMs?: number;
   // Coalesces the author reloads of a busy tile.
   metaDebounceMs?: number;
-  // Shows the pixel at once on the preview layer (WEB-05).
+  // Shows the pixel at once on the preview layer (WEB-05), and takes it back when refused.
   preview?: (pixels: readonly DrawPixel[]) => void;
+  forget?: (pixels: readonly DrawPixel[]) => void;
 }
 
 export type DrawBlock = 'paused' | 'outside' | 'quota' | 'busy' | 'no_selection';
@@ -69,6 +70,8 @@ export class PixelInspector {
   private readonly confirmAfterMs: number;
   private readonly metaDebounceMs: number;
   private readonly preview: (pixels: readonly DrawPixel[]) => void;
+  private readonly forget: (pixels: readonly DrawPixel[]) => void;
+  private lastSent: DrawPixel | null = null;
   private metaToken = 0;
   private metaTimer: unknown = null;
   private confirmTimer: unknown = null;
@@ -83,6 +86,7 @@ export class PixelInspector {
     this.confirmAfterMs = options.confirmAfterMs ?? 3000;
     this.metaDebounceMs = options.metaDebounceMs ?? 300;
     this.preview = options.preview ?? (() => {});
+    this.forget = options.forget ?? (() => {});
   }
 
   getState = (): InspectorState => this.state;
@@ -139,7 +143,9 @@ export class PixelInspector {
     if (this.confirmTimer !== null) this.clearTimer(this.confirmTimer);
     this.confirmTimer = null;
     this.update({ feedback: { status: 'sending' } });
-    this.preview([{ x: selected.x, y: selected.y, color }]);
+    this.lastSent = { x: selected.x, y: selected.y, color };
+    this.consume(1);
+    this.preview([this.lastSent]);
     try {
       const accepted = await postPixels(this.api, [{ x: selected.x, y: selected.y, color }]);
       const eventId = accepted.eventIds[0]!;
@@ -160,8 +166,12 @@ export class PixelInspector {
     const quota = await this.refreshQuota();
     const current = this.state.feedback;
     if (current.status !== 'waiting' || current.eventId !== eventId) return;
-    if (quota?.lastRejection?.eventId === eventId) this.update({ feedback: { status: 'rejected', reason: quota.lastRejection.reason } });
-    else this.update({ feedback: { status: 'pending' } });
+    if (quota?.lastRejection?.eventId === eventId) {
+      this.update({ feedback: { status: 'rejected', reason: quota.lastRejection.reason } });
+      if (this.lastSent) this.forget([this.lastSent]);
+    } else {
+      this.update({ feedback: { status: 'pending' } });
+    }
   }
 
   private onCanvasChange(change: TileChange): void {
@@ -206,20 +216,39 @@ export class PixelInspector {
     return this.refreshQuota();
   }
 
+  /**
+   * Counts pixels just sent against the known quota, at once: /api/state only sees them
+   * once the worker has processed them, so two quick strokes would both believe the
+   * whole quota is left. The next /api/state read sets the server's figure back.
+   */
+  consume(count: number): void {
+    const quota = this.state.quota;
+    if (!quota || count <= 0) return;
+    const now = this.now();
+    // A new calendar minute: the whole limit is back, until the next one.
+    const resetAt = now >= quota.resetAt.getTime() ? new Date((Math.floor(now / 60_000) + 1) * 60_000) : quota.resetAt;
+    const remaining = Math.max(0, remainingPixels(quota, now) - count);
+    this.setQuota({ ...quota, remainingPixels: remaining, usedPixels: quota.limitPerMinute - remaining, resetAt });
+  }
+
   private async refreshQuota(): Promise<UserQuota | null> {
     try {
       const quota = await fetchUserQuota(this.api);
-      this.update({ quota });
-      // Redraw the panel when the minute ends: the quota is full again.
-      if (this.resetTimer !== null) this.clearTimer(this.resetTimer);
-      const wait = quota.resetAt.getTime() - this.now();
-      this.resetTimer = wait > 0 && quota.remainingPixels === 0
-        ? this.setTimer(() => { this.resetTimer = null; this.update({}); }, wait)
-        : null;
+      this.setQuota(quota);
       return quota;
     } catch {
       return null;
     }
+  }
+
+  private setQuota(quota: UserQuota): void {
+    this.update({ quota });
+    // Redraw the panel when the minute ends: the quota is full again.
+    if (this.resetTimer !== null) this.clearTimer(this.resetTimer);
+    const wait = quota.resetAt.getTime() - this.now();
+    this.resetTimer = wait > 0 && quota.remainingPixels === 0
+      ? this.setTimer(() => { this.resetTimer = null; this.update({}); }, wait)
+      : null;
   }
 
   private colorAt(point: Point): number {

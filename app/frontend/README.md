@@ -112,10 +112,16 @@ de 1024 × 1024 pixels (16 × 16 tuiles), chargées par `GET /api/regions/{rx}/{
   qu'avec les deltas. Un pixel de l'aperçu disparaît quand la toile montre sa couleur
   (son delta est arrivé), sinon au bout de 10 s (refusé ou perdu) ; un `/admin clear`
   vide l'aperçu.
-- **Quota et refus** : le trait s'arrête au quota restant connu (le serveur décide quand
-  même). Un seul message par trait : 3 s après la fin, `/api/state` dit si le dernier
-  refus appartient à l'un de ses événements. Après un échec d'envoi, le reste du trait
-  est abandonné, jamais renvoyé automatiquement. En pause, le pinceau ne démarre pas.
+- **Quota et refus** : chaque pixel couvert est **décompté tout de suite** du quota
+  affiché (`PixelInspector.consume`), car `/api/state` ne le voit qu'une fois traité par
+  le worker : deux traits rapides ne croient donc pas avoir tout le quota. Le trait
+  s'arrête au quota restant, et rien n'est dessiné ni envoyé au-delà. Chaque lecture de
+  `/api/state` recale sur le chiffre du serveur (dessins faits depuis Discord compris),
+  et c'est lui qui décide.
+- Un seul message par trait : 3 s après la fin, `/api/state` dit si le dernier refus
+  appartient à l'un de ses événements ; l'aperçu du trait est alors retiré tout de
+  suite. Après un échec d'envoi, le reste du trait est abandonné, jamais renvoyé
+  automatiquement. En pause, le pinceau ne démarre pas.
 - **Démo de charge** : un admin relève la limite d'un compte avec `/admin ratelimit`
   (par exemple 1 000 000 pixels par minute), puis un trait à la taille 100 envoie
   plusieurs milliers de pixels par seconde. Le débit par instance du `draw-worker` se lit

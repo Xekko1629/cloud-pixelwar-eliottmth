@@ -107,6 +107,11 @@ export class PreviewLayer implements TileColorsSource {
     this.notify('all');
   }
 
+  /** Takes back these pixels (refused), if they still show the colour sent. */
+  forget(pixels: readonly DrawPixel[]): void {
+    this.remove(pixels);
+  }
+
   // Expiry: only the pixels still showing the colour this call added.
   private remove(pixels: readonly DrawPixel[]): void {
     const touched = new Map<string, TileKey>();
