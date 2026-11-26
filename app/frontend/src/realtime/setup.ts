@@ -24,8 +24,7 @@ export function createRegionFetcher(api: ApiClient): RegionFetcher {
 /**
  * Builds the canvas data once per page load. The Firebase SDK is only downloaded when the
  * environment publishes a Firestore configuration. The tiles of tile-reader need a
- * session: they load on sign-in and are dropped on sign-out, while the realtime pixels
- * keep coming without an account (ADR-0015).
+ * session: they load on sign-in and are dropped on sign-out (App hides the canvas then).
  */
 export function createLiveCanvas(config: FrontendConfig, services: AuthServices): LiveCanvas {
   const firestore = config.firestore;
@@ -51,7 +50,7 @@ export const REALTIME_LABELS = {
 } as const;
 
 export const TILE_LABELS: Record<TileStatus, string> = {
-  'signed-out': 'connecte-toi pour voir les pixels déjà posés',
+  'signed-out': 'connexion requise',
   loading: 'chargement…',
   ready: 'à jour',
   far: 'zoome pour charger les pixels',

@@ -54,7 +54,7 @@ Les fonctions ne sont pas concernées : elles passent par IAM avec leur compte d
 Les deltas sont peints sur les tuiles chargées par `tile-reader` (WEB-03b, voir le
 [README du frontend](../app/frontend/README.md#tuiles-web-03b)). Les pixels reçus pendant
 le chargement d'une région sont repeints sur la réponse, qui peut être plus ancienne.
-Sans session, il n'y a pas de tuiles : seuls les deltas s'affichent. WEB-03c ignorera
+Sans session, la toile est masquée : elle ne montrerait que les deltas, pas l'état à jour. WEB-03c ignorera
 un delta plus ancien que la tuile chargée.
 
 ## Tests

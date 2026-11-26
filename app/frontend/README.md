@@ -43,9 +43,13 @@ de 1024 × 1024 pixels (16 × 16 tuiles), chargées par `GET /api/regions/{rx}/{
 - **Seules les régions visibles sont demandées**, une fois chacune, dès qu'elles entrent
   dans l'écran (`src/canvas/region-tiles.ts`). Au plus 48 régions restent en mémoire :
   au-delà, la région affichée le moins récemment et sortie de l'écran est libérée.
-- Les tuiles demandent une **session** (ADR-0015) : elles se chargent à la connexion et
-  sont oubliées à la déconnexion. Sans compte, la toile n'affiche que les pixels reçus
-  en temps réel, et l'en-tête invite à se connecter.
+- **La toile demande une connexion.** Ses tuiles viennent de l'API, et le sujet exige
+  que tout appel du frontend à l'API soit authentifié (§3.4). Sans session, la toile
+  ne montrerait que les pixels posés depuis l'ouverture de la page, pas l'état à jour :
+  elle est remplacée par une invitation à se connecter. Les tuiles se chargent à la
+  connexion et sont oubliées à la déconnexion. Pour l'ouvrir aux visiteurs plus tard,
+  il suffirait d'un autre `RegionFetcher` (par exemple une lecture Firestore de
+  `tile_colors` autorisée par les Security Rules, ce qui amenderait ADR-0015).
 - **Cache HTTP** : `cache: 'no-cache'` laisse le navigateur garder la réponse et la
   revalider avec son `ETag`. Une région inchangée coûte un `304` sans corps. Le
   frontend n'envoie pas `If-None-Match` lui-même : cet en-tête n'est pas « sûr » pour
