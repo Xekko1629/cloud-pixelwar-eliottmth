@@ -16,6 +16,11 @@ terraform {
       source  = "hashicorp/archive"
       version = "~> 2.7"
     }
+    # Suffix of the browser API key, whose name stays reserved 30 days after deletion.
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.9"
+    }
   }
 
   backend "gcs" {}

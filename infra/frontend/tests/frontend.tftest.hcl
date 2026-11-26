@@ -21,6 +21,13 @@ override_data {
   }
 }
 
+override_data {
+  target = data.terraform_remote_state.serverless
+  values = {
+    outputs = { firestore_web_api_key = "AIza${join("", [for i in range(35) : "A"])}" }
+  }
+}
+
 run "service_from_image_digest" {
   command = apply
 
@@ -58,7 +65,7 @@ run "runtime_configuration" {
       APP_ENV              = "dev"
       GATEWAY_URL          = "https://pixelwar-abc.ew.gateway.dev"
       FIRESTORE_PROJECT_ID = "pixelwar-test"
-      FIRESTORE_API_KEY    = ""
+      FIRESTORE_API_KEY    = "AIza${join("", [for i in range(35) : "A"])}"
       DISCORD_CLIENT_ID    = "1234567890123456789"
     }
     error_message = "The container gets the public configuration of its environment, and nothing else."
@@ -125,12 +132,27 @@ run "reject_image_of_another_project" {
   expect_failures = [google_cloud_run_v2_service.frontend]
 }
 
+run "no_realtime_yet" {
+  command = plan
+
+  override_data {
+    target = data.terraform_remote_state.serverless
+    values = { outputs = { firestore_web_api_key = null } }
+  }
+
+  assert {
+    condition     = [for env in google_cloud_run_v2_service.frontend[0].template[0].containers[0].env : env.value if env.name == "FIRESTORE_API_KEY"] == [""]
+    error_message = "Without the realtime of infra/serverless, the frontend starts without a Firestore key."
+  }
+}
+
 run "reject_malformed_firestore_api_key" {
   command = plan
 
-  variables {
-    firestore_api_key = "AIza-not-a-key\"; alert(1)"
+  override_data {
+    target = data.terraform_remote_state.serverless
+    values = { outputs = { firestore_web_api_key = "AIza-not-a-key\"; alert(1)" } }
   }
 
-  expect_failures = [var.firestore_api_key]
+  expect_failures = [google_cloud_run_v2_service.frontend]
 }

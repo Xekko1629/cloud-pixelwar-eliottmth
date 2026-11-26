@@ -100,6 +100,11 @@ section.app__status p {
   pointer-events: none;
 }
 
+section.app__status .app__paused {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .auth {
   display: flex;
   flex-wrap: wrap;
