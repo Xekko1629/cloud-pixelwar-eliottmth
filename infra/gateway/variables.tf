@@ -26,6 +26,6 @@ variable "state_bucket" {
 variable "warmup_schedule" {
   description = "Cron (UTC) of the gateway warm-up call; null disables it. API Gateway adds 3 to 5 s to the first requests after 15 to 20 min without traffic, beyond Discord's 3 s."
   type        = string
-  default     = "*/5 * * * *"
+  default     = "* * * * *"
   nullable    = true
 }

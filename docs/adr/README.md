@@ -38,6 +38,7 @@ contexte, contraintes techniques, choix retenu, alternatives et conséquences.
 | [0014](0014-un-evenement-par-pixel.md) | Dessin : un événement Pub/Sub par pixel, la requête web restant une liste | Proposé |
 | [0015](0015-temps-reel-listeners-firestore-navigateur.md) | Temps réel : listeners Firestore dans le navigateur, lecture seule des deltas et de la config | Accepté |
 | [0016](0016-proxy-discord-en-go.md) | Proxy Discord en Go (runtime `go126`), publication REST et équivalence vérifiée avec la version TypeScript | Proposé |
+| [0017](0017-garder-les-fonctions-chaudes.md) | Garder les fonctions chaudes : un job Cloud Scheduler par fonction sur `GET /health`, chaque minute | Proposé |
 
 Le build des sources est décrit par l'ADR-0009. Pour les procédures exécutables,
 consulter [Installation et déploiement](../deployment.md).

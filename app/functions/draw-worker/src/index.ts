@@ -4,6 +4,7 @@ import { InvalidDrawMessage, MAX_PUSH_BYTES, isInvalidInput, parseDrawPush, snow
 import { createLazyDrawProcessor, type ProcessDraw } from './processor';
 import { createResultPublisher, type PublishResult } from './publisher';
 import { resultEvent } from './result';
+import { answerHealth } from '@pixelwar/shared/health';
 
 interface Options {
   subscription?: string;
@@ -18,6 +19,8 @@ export function createDrawWorkerHandler(options: Options): HttpFunction {
   const write = options.write ?? ((line: string) => { process.stdout.write(line); });
   const telemetry = options.telemetry ?? createFunctionTelemetry('draw-worker', { writeLog: write });
   return async (req, res): Promise<void> => {
+    // Warmer (ADR-0017): before any configuration check, without log or side effect.
+    if (answerHealth(req, res)) return;
     if (!options.subscription || !/^projects\/[a-z][a-z0-9-]+\/subscriptions\/[a-zA-Z][a-zA-Z0-9._~+%-]{2,254}$/.test(options.subscription) ||
         options.applicationId !== undefined && !snowflake(options.applicationId) || !options.process || !options.publish) {
       res.status(503).json({ error: 'Draw worker unavailable.' }); return;

@@ -6,6 +6,7 @@ import {
 } from '@pixelwar/shared/auth';
 import { createLogger } from '@pixelwar/shared/observability/logger';
 import { authorizeUrl, DiscordError, discordIdentityExchange, type IdentityExchange } from './discord';
+import { answerHealth } from '@pixelwar/shared/health';
 
 // auth-proxy (WEB-02a, ADR-0012), behind API Gateway:
 //   GET  /auth/login            Discord authorization URL and a signed, short-lived state
@@ -71,6 +72,8 @@ export function createAuthProxyHandler(options: AuthProxyOptions): HttpFunction 
   }
 
   return async (req, res): Promise<void> => {
+    // Warmer (ADR-0017): before any configuration check, without log or side effect.
+    if (answerHealth(req, res)) return;
     res.set('Cache-Control', 'no-store');
     const method = ROUTES[req.path];
     if (!method) { fail(res, 404, 'not_found'); return; }

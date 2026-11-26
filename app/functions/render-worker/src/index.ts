@@ -7,6 +7,7 @@ import { createFunctionTelemetry, type FunctionTelemetry } from '@pixelwar/share
 import { IMAGE_FILENAME, renderResponse } from './content';
 import { InvalidRenderMessage, MAX_PUSH_BYTES, parseRenderPush, snowflake } from './message';
 import { StoredDataError, createFirestoreRenderStore, renderCanvas, type RenderResult } from './render';
+import { answerHealth } from '@pixelwar/shared/health';
 
 export type RenderCanvas = () => Promise<RenderResult>;
 
@@ -27,6 +28,8 @@ export function createRenderWorkerHandler(options: Options): HttpFunction {
   const now = options.now ?? Date.now;
   const subscription = options.subscription;
   return async (req, res): Promise<void> => {
+    // Warmer (ADR-0017): before any configuration check, without log or side effect.
+    if (answerHealth(req, res)) return;
     if (!snowflake(options.applicationId) || !subscription || !options.render || !options.edit) {
       res.status(503).json({ error: 'Render worker unavailable.' }); return;
     }

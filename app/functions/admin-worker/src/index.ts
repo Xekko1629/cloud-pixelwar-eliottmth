@@ -7,6 +7,7 @@ import { AdminProcessingError, createAdminProcessor, type AdminOutcome } from '.
 import { adminResponse } from './content';
 import { InvalidAdminMessage, MAX_PUSH_BYTES, isAdmin, parseAdminPush, parsePermissions, snowflake, type Permissions } from './message';
 import { purgeOldVersions, type PurgeReport } from './purge';
+import { answerHealth } from '@pixelwar/shared/health';
 
 export type ApplyAdmin = (eventId: string, command: AdminCommand, actorUid: string) => Promise<AdminOutcome>;
 export type PurgeTiles = (currentVersion: number) => Promise<PurgeReport>;
@@ -32,6 +33,8 @@ export function createAdminWorkerHandler(options: Options): HttpFunction {
   const telemetry = options.telemetry ?? createFunctionTelemetry('admin-worker', { writeLog: write });
   const subscription = options.subscription;
   return async (req, res): Promise<void> => {
+    // Warmer (ADR-0017): before any configuration check, without log or side effect.
+    if (answerHealth(req, res)) return;
     if (!snowflake(options.applicationId) || !subscription || !options.permissions || !options.apply || !options.edit || !options.purge) {
       res.status(503).json({ error: 'Admin worker unavailable.' }); return;
     }

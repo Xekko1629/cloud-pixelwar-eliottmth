@@ -52,7 +52,8 @@
       "group": "Entrée publique",
       "status": "deployed",
       "terraform": [
-        "gateway:google_cloud_scheduler_job.gateway_warmup"
+        "gateway:google_cloud_scheduler_job.gateway_warmup",
+        "serverless:google_cloud_scheduler_job.warmup"
       ]
     },
     {

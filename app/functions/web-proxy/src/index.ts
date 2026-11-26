@@ -4,6 +4,7 @@ import { createLogger } from '@pixelwar/shared/observability/logger';
 import { createFunctionTelemetry, type FunctionTelemetry } from '@pixelwar/shared/observability/function';
 import { InvalidDrawRequest, MAX_BODY_BYTES, parseDrawBody, webDrawEvents } from './request';
 import { createDrawPublisher, type PublishDraw } from './publisher';
+import { answerHealth } from '@pixelwar/shared/health';
 
 const ROUTE = '/api/pixels';
 
@@ -31,6 +32,8 @@ export function createWebProxyHandler(options: Options): HttpFunction {
   const refuse = (reason: string) => log('WARNING', 'Web draw request refused.', { event_type: `web.proxy.refused.${reason}` });
 
   return async (req, res): Promise<void> => {
+    // Warmer (ADR-0017): before any configuration check, without log or side effect.
+    if (answerHealth(req, res)) return;
     res.set('Cache-Control', 'no-store');
     if (req.path !== ROUTE) { res.status(404).json({ error: 'not_found' }); return; }
     // CORS: the browser only reads answers addressed to the frontend origin.

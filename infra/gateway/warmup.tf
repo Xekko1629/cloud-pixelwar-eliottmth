@@ -1,6 +1,6 @@
 # API Gateway is cold after 15 to 20 minutes without traffic: the first requests then take
 # 3 to 5 s more (API Gateway troubleshooting docs), measured at 3.75 s in dev on 21/11, beyond
-# the 3 s Discord gives an interaction. A GET every 5 minutes on /discord/health keeps the
+# the 3 s Discord gives an interaction. A GET every minute on /discord/health (ADR-0017) keeps the
 # gateway and the Discord proxy instance warm, for a few cents a month. Best effort only:
 # the platform may still start a new instance.
 resource "google_cloud_scheduler_job" "gateway_warmup" {
@@ -14,7 +14,7 @@ resource "google_cloud_scheduler_job" "gateway_warmup" {
   time_zone        = "Etc/UTC"
   attempt_deadline = "30s"
 
-  # A missed warm-up is not worth retrying: the next one comes 5 minutes later.
+  # A missed warm-up is not worth retrying: the next one comes a minute later.
   retry_config {
     retry_count = 0
   }

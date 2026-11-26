@@ -7,6 +7,7 @@ import { createLogger } from '@pixelwar/shared/observability/logger';
 import { createFunctionTelemetry, type FunctionTelemetry } from '@pixelwar/shared/observability/function';
 import { InvalidRoute, etagOf, matchesEtag, metaBody, parseRoute, regionBody, stateBody, type Route } from './responses';
 import { createFirestoreTileStore, type TileStore } from './store';
+import { answerHealth } from '@pixelwar/shared/health';
 
 interface Options {
   /** https://frontend-<project number>.<region>.run.app, the only origin allowed by CORS. */
@@ -35,6 +36,8 @@ export function createTileReaderHandler(options: Options): HttpFunction {
   const refuse = (reason: string) => log('WARNING', 'Read request refused.', { event_type: `tile_reader.refused.${reason}` });
 
   return async (req, res): Promise<void> => {
+    // Warmer (ADR-0017): before any configuration check, without log or side effect.
+    if (answerHealth(req, res)) return;
     // Error answers are never cached; successful reads are revalidated with their ETag.
     res.set('Cache-Control', 'no-store');
     let route: Route | undefined;

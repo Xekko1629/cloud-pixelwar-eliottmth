@@ -143,3 +143,10 @@ variable "realtime_extra_referrers" {
     error_message = "Each referrer is https://<host>/* or a local http://localhost:<port>/*."
   }
 }
+
+variable "warmup_schedule" {
+  description = "Cron (UTC) of the function warm-up jobs (ADR-0017); null disables them. A Node cold start adds 2 to 3 s to the first command after about 15 min without traffic."
+  type        = string
+  default     = "* * * * *"
+  nullable    = true
+}

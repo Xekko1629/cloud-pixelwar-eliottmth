@@ -13,7 +13,8 @@
     "./discord": "./src/discord/index.ts",
     "./gateway": "./src/gateway/index.ts",
     "./render": "./src/render/index.ts",
-    "./auth": "./src/auth/index.ts"
+    "./auth": "./src/auth/index.ts",
+    "./health": "./src/health/index.ts"
   },
   "dependencies": {
     "@google-cloud/firestore": "9.4.0",

@@ -107,7 +107,8 @@ après 15 à 20 minutes sans trafic. Les logs montrent le même schéma : 1,8 s 
 4 min, 6 s après 7 min (proxy froid en plus), 3,75 s après 15 min.
 
 Correctif : un job Cloud Scheduler (`infra/gateway/warmup.tf`) appelle
-`GET /discord/health` toutes les 5 minutes. La route est publique ; le proxy répond
+`GET /discord/health` toutes les minutes depuis l'[ADR-0017](adr/0017-garder-les-fonctions-chaudes.md)
+(toutes les 5 minutes avant). La route est publique ; le proxy répond
 `204` sans signature, sans publication et sans log. La gateway et l'instance du proxy
 restent chaudes pour quelques centimes par mois. C'est une protection de bon effort :
 la plateforme peut encore démarrer une nouvelle instance. `warmup_schedule = null`
@@ -149,7 +150,7 @@ Les logs sont dans Cloud Logging, filtrés par `resource.labels.service_name`.
 | 12 | Coordonnée hors limites (`x:2000000000`) | Discord refuse la valeur avant l'envoi (bornes de la définition `/draw`) | Discord | |
 | 13 | DLQ après les essais | Toujours vides | Console Pub/Sub | |
 | 14 | Temps de réponse | Réponse différée sous 3 s à froid et à chaud | Logs de la gateway (`apigateway.googleapis.com/Gateway`) | |
-| 15 | Warm-up | Job `gateway-warmup` exécuté toutes les 5 min, `204` dans les logs de la gateway ; premier `/draw` après 30 min d'inactivité sous 3 s | Cloud Scheduler, logs de la gateway | |
+| 15 | Warm-up | Job `gateway-warmup` exécuté toutes les minutes, `204` dans les logs de la gateway ; premier `/draw` après 30 min d'inactivité sous 3 s | Cloud Scheduler, logs de la gateway | |
 
 Hors de cette étape : routes web, `/admin` (le `command-worker` n'a pas encore de
 topic admin, `/admin` n'est d'ailleurs pas transmis par le proxy), `/get`,

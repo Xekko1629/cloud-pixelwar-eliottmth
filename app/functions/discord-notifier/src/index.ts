@@ -2,6 +2,7 @@ import type { HttpFunction } from '@google-cloud/functions-framework';
 import { createFunctionTelemetry, type FunctionTelemetry } from '@pixelwar/shared/observability/function';
 import { createOriginalResponseUpdater, NotificationFailure, type UpdateOriginal } from './discord';
 import { InvalidNotice, MAX_PUSH_BYTES, parseNoticePush, snowflake, validSubscriptions, type Subscriptions } from './message';
+import { answerHealth } from '@pixelwar/shared/health';
 
 interface Options {
   applicationId?: string;
@@ -15,6 +16,8 @@ export function createDiscordNotifierHandler(options: Options): HttpFunction {
   const telemetry = options.telemetry ?? createFunctionTelemetry('discord-notifier', { writeLog: write });
   const subscriptions = validSubscriptions(options.subscriptions) ? { ...options.subscriptions } : undefined;
   return async (req, res): Promise<void> => {
+    // Warmer (ADR-0017): before any configuration check, without log or side effect.
+    if (answerHealth(req, res)) return;
     if (!snowflake(options.applicationId) || !subscriptions || !options.update) {
       res.status(503).json({ error: 'Discord notifier unavailable.' }); return;
     }

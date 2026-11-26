@@ -46,13 +46,13 @@ run "warmup_calls_the_public_health_route" {
 
   assert {
     condition = (
-      google_cloud_scheduler_job.gateway_warmup[0].schedule == "*/5 * * * *" &&
+      google_cloud_scheduler_job.gateway_warmup[0].schedule == "* * * * *" &&
       google_cloud_scheduler_job.gateway_warmup[0].http_target[0].http_method == "GET" &&
       google_cloud_scheduler_job.gateway_warmup[0].http_target[0].uri == "https://pixelwar-test.ew.gateway.dev/discord/health" &&
       length(google_cloud_scheduler_job.gateway_warmup[0].http_target[0].oidc_token) == 0 &&
       google_cloud_scheduler_job.gateway_warmup[0].retry_config[0].retry_count == 0
     )
-    error_message = "Every 5 minutes, one unauthenticated GET on the public health route, without retry."
+    error_message = "Every minute (ADR-0017), one unauthenticated GET on the public health route, without retry."
   }
 }
 

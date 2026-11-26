@@ -3,6 +3,7 @@ import { createFunctionTelemetry, type FunctionTelemetry } from '@pixelwar/share
 import { InvalidCommand, MAX_PUSH_BYTES, parsePush, record, snowflake } from './message';
 import { createEventPublisher, type PublishEvent } from './publisher';
 import { routeCommand, validPermissions, type Permissions } from './route';
+import { answerHealth } from '@pixelwar/shared/health';
 
 interface Options {
   applicationId?: string;
@@ -20,6 +21,8 @@ export function createCommandWorkerHandler(options: Options): HttpFunction {
   const permissions = options.permissions && validPermissions(options.permissions)
     ? { user_ids: [...options.permissions.user_ids], role_ids: [...options.permissions.role_ids] } : undefined;
   return async (req, res): Promise<void> => {
+    // Warmer (ADR-0017): before any configuration check, without log or side effect.
+    if (answerHealth(req, res)) return;
     if (!snowflake(options.applicationId) || !options.subscription ||
         !/^projects\/[a-z][a-z0-9-]+\/subscriptions\/[a-zA-Z][a-zA-Z0-9._~+%-]{2,254}$/.test(options.subscription) ||
         !options.publish || !permissions) {

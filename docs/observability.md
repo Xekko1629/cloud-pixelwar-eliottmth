@@ -168,6 +168,14 @@ Avec l'ingestion OTLP Google, les métriques apparaissent normalement sous
 Les noms sont convertis par Google ; vérifier les types réels dans Metrics Explorer
 avant d'écrire les dashboards/alertes DRAW-05 et OBS-02.
 
+### Appels du warmer
+
+`GET /health` (warmer, [ADR-0017](adr/0017-garder-les-fonctions-chaudes.md)) répond
+avant toute télémétrie : ni span, ni log applicatif, ni métrique `pixelwar.function.*`.
+Il laisse seulement une ligne de log de requête Cloud Run par minute et par fonction,
+à exclure des dashboards et alertes construits sur ces logs ou sur les métriques
+`run.googleapis.com` ([docs/warmup.md](warmup.md#dashboards-et-alertes-obs)).
+
 ## Cloud Run : exporter avant de répondre
 
 Le contrat des Cloud Run functions impose de terminer le travail avant la réponse.

@@ -35,6 +35,7 @@
 - [Worker d'administration : `/admin`, pause, effacement et quotas — BOT-08, DATA-04](admin-worker.md)
 - [Catalogue des événements Pub/Sub](events.md)
 - [Instrumentation et validation de l'observabilité](observability.md)
+- [Warm-up des fonctions (ADR-0017)](warmup.md)
 
 ## Architecture et modules
 
