@@ -62,10 +62,10 @@
 
 ### Configuration du frontend
 
-- La config web Firestore vient de `google_firebase_project` et
-  `google_firebase_web_app` (provider `google-beta`), sur le même projet GCP.
-  Il faut vérifier en dev si l'activation de Firebase est strictement nécessaire.
-  La clé d'API est restreinte à l'API Firestore.
+- La config web Firestore se limite à l'id du projet GCP et à une clé d'API
+  (`google_apikeys_key`), restreinte à l'API Firestore et aux pages du frontend.
+  Vérifié en dev le 26/11/2026 (DRAW-03a) : aucun produit Firebase n'est nécessaire,
+  ni `google_firebase_project` ni `google_firebase_web_app`.
 - `/config.js` expose `firestoreProjectId` et `firestoreApiKey`, deux valeurs
   publiques, à la place de `realtimeUrl` (ADR-0011). La CSP autorise
   `https://firestore.googleapis.com` dans `connect-src`.
@@ -92,8 +92,11 @@
 - Il ne reste qu'un service public hors gateway : le `frontend` (ADR-0011).
   SEC-01 vérifie en plus que les règles Firestore n'ouvrent que les deux chemins
   en lecture.
-- Quiconque possède la config publique peut lire les deltas et la config : c'est
-  l'information de la toile visible, sans les auteurs.
+- N'importe qui peut lire les deltas et la config, même sans la clé : Firestore
+  accepte une requête sans identité sans vérifier de clé, et seules les Security
+  Rules filtrent (vérifié en dev le 26/11/2026). C'est l'information de la toile
+  visible, sans les auteurs. Le coût de ces lectures n'est pas protégé : App Check le
+  limiterait, mais c'est un produit Firebase, exclu par la revue intermédiaire.
 - Chaque delta reçu compte comme une lecture Firestore, par client abonné
   (ADR-0003). Le regroupement des écritures (ADR-0014) limite le nombre de deltas.
 - La variable `REALTIME_URL` du frontend est remplacée par `FIRESTORE_PROJECT_ID`
