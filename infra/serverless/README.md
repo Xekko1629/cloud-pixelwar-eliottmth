@@ -127,8 +127,10 @@ activé par `enable_realtime` (dev aujourd'hui) :
 - `firestore.rules`, publié sur la base `(default)` par `google_firebaserules_ruleset`
   et `google_firebaserules_release`. C'est le même fichier que testent les tests
   d'intégration (`app/testing/firestore-rules.integration.test.ts`) ;
-- une clé d'API de navigateur, limitée à l'API Firestore et aux pages du frontend
-  (`realtime_extra_referrers` ajoute `http://localhost:5173/*` en dev). Son nom
+- une clé d'API de navigateur pour le SDK, dont l'usage est limité à l'API Firestore
+  et aux pages du frontend (`realtime_extra_referrers` ajoute `http://localhost:5173/*`
+  en dev). Ce n'est pas une protection : Firestore accepte une requête sans identité
+  même sans clé, et seules les Security Rules filtrent. Son nom
   porte un suffixe aléatoire : une clé supprimée reste réservée 30 jours, un nom
   fixe ferait échouer un `apply` après un `destroy`. Elle est publique par nature
   (servie dans `/config.js`) et passe au stack `frontend` par l'output

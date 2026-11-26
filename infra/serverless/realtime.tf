@@ -1,9 +1,10 @@
 # Realtime of the browser (DRAW-03a, ADR-0015): the frontend opens Firestore listeners
 # with the client library only (no Firebase Auth, Hosting nor web app). Two pieces:
 #   - the Security Rules (firestore.rules): read-only deltas and config/global, no write;
-#   - a browser API key, limited to the Firestore API and to the frontend pages.
-# The key only identifies the project: what it can read is decided by the rules. It is
-# public by design (served in /config.js) and passed to infra/frontend by remote state.
+#   - a browser API key for the SDK, usable only for the Firestore API from the frontend.
+# The key protects nothing: Firestore serves an unauthenticated request without any key,
+# so the rules alone decide what is readable. It is public by design (served in
+# /config.js) and passed to infra/frontend by remote state.
 # APIs firebaserules and apikeys, and the deployer roles, come from infra/iam.
 locals {
   realtime_enabled = var.enable_realtime

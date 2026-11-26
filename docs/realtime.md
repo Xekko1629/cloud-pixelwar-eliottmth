@@ -24,9 +24,14 @@ Les fonctions ne sont pas concernées : elles passent par IAM avec leur compte d
 
 ## Configuration
 
-- `infra/serverless/realtime.tf` publie les règles et crée une clé d'API de
-  navigateur limitée à l'API Firestore et aux pages du frontend. La clé n'ouvre
-  aucun droit par elle-même : elle identifie le projet, les règles décident.
+- `infra/serverless/realtime.tf` publie les règles et crée la clé d'API passée au
+  SDK, limitée à l'API Firestore et aux pages du frontend. La clé ne protège pas les données : Firestore n'exige aucune clé pour une requête
+  sans identité (vérifié en dev le 26/11/2026 : lecture de `config/global` acceptée
+  sans clé ou avec un autre referrer, lecture de `users` refusée dans tous les cas).
+  Seules les Security Rules décident. La restriction limite seulement l'usage de
+  cette clé : elle ne peut servir qu'à l'API Firestore, depuis les pages du frontend.
+- Aucun produit Firebase n'est nécessaire : le SDK ouvre les listeners sur le projet
+  GCP seul (vérifié en dev le 26/11/2026).
 - `infra/frontend` lit la clé dans le state `serverless` et l'écrit dans
   `/config.js` (`firestoreProjectId`, `firestoreApiKey`). La CSP autorise déjà
   `https://firestore.googleapis.com`.
@@ -60,7 +65,7 @@ plus ancien que la tuile.
 | Niveau | Fichier | Ce qui est vérifié |
 | --- | --- | --- |
 | Règles, émulateur | `app/testing/firestore-rules.integration.test.ts` | lectures autorisées, lectures refusées, toute écriture refusée, avec et sans identité |
-| Terraform | `infra/serverless/tests/realtime.tftest.hcl` | règles publiées depuis le fichier testé, clé limitée à Firestore et au frontend, rien sans `enable_realtime` |
+| Terraform | `infra/serverless/tests/realtime.tftest.hcl` | règles publiées depuis le fichier testé, usage de la clé limité à Firestore et au frontend, rien sans `enable_realtime` |
 | Terraform | `infra/frontend/tests/frontend.tftest.hcl` | clé lue dans le state `serverless`, format vérifié |
 | Unitaires | `app/frontend/src/realtime/*.test.ts`, `canvas/live-tiles.test.ts` | lecture des documents, régions visibles, recréation du listener, `/admin clear` |
 
