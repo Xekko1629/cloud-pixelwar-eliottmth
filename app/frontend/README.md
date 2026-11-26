@@ -106,6 +106,12 @@ de 1024 × 1024 pixels (16 × 16 tuiles), chargées par `GET /api/regions/{rx}/{
   ni événement propre au pinceau (ADR-0014). Les pixels partent au fil du trait par
   requêtes `POST /api/pixels` de 500 au plus, quatre en parallèle au maximum, et le
   reste au relâchement. La toile n'affiche que ce que les deltas apportent.
+- **Aperçu** (`src/brush/preview.ts`) : ce qui vient d'être envoyé (trait ou « Poser le
+  pixel ») s'affiche tout de suite sur un **calque distinct**, un second canvas
+  transparent posé sur la toile, que le ticket autorise. La toile elle-même ne change
+  qu'avec les deltas. Un pixel de l'aperçu disparaît quand la toile montre sa couleur
+  (son delta est arrivé), sinon au bout de 10 s (refusé ou perdu) ; un `/admin clear`
+  vide l'aperçu.
 - **Quota et refus** : le trait s'arrête au quota restant connu (le serveur décide quand
   même). Un seul message par trait : 3 s après la fin, `/api/state` dit si le dernier
   refus appartient à l'un de ses événements. Après un échec d'envoi, le reste du trait

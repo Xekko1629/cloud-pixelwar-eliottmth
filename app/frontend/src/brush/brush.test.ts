@@ -28,6 +28,7 @@ function setup(options: { config?: Partial<CanvasConfig>; remaining?: number | n
     config: () => ({ paused: false, canvasVersion: 1, size: null, bounds: null, ...options.config }),
     remaining: () => (options.remaining === undefined ? 1_000_000 : options.remaining),
     reloadQuota: vi.fn(async () => quota),
+    preview: vi.fn(),
   };
   const timers: Array<() => void> = [];
   const brush = new Brush(api, context, { setTimer: (callback) => timers.push(callback) });
@@ -51,6 +52,16 @@ describe('Brush', () => {
     expect(bodies[0]!.pixels[0]!.color).toBe(7);
     expect(brush.getState().stroke).toEqual({ status: 'done', sent: 900, limited: false });
     expect(strokeText(brush.getState().stroke)).toBe('Trait envoyé : 900 pixels.');
+  });
+
+  it('shows every covered pixel at once on the preview, before any answer', () => {
+    const { brush, context } = setup();
+    brush.setSize(3);
+    brush.begin({ x: 0, y: 0 });
+    brush.extend({ x: 1, y: 0 });
+    const shown = vi.mocked(context.preview!).mock.calls.flatMap(([pixels]) => pixels);
+    expect(shown).toHaveLength(12);
+    expect(shown.every((p) => p.color === 7)).toBe(true);
   });
 
   it('groups the refusals of a stroke in one message', async () => {

@@ -110,6 +110,11 @@ export class Stroke {
     return this.added - before;
   }
 
+  /** The last `count` pixels covered, still waiting to be sent (call right after moveTo). */
+  recent(count: number): DrawPixel[] {
+    return count > 0 ? this.queue.slice(-count) : [];
+  }
+
   /** Up to `max` pixels to send now, in the order they were covered. */
   take(max = DEFAULT_MAX_BATCH_PIXELS): DrawPixel[] {
     return this.queue.splice(0, max);

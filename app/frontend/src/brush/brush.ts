@@ -1,4 +1,4 @@
-import { DEFAULT_MAX_BATCH_PIXELS } from '@pixelwar/shared/grid';
+import { DEFAULT_MAX_BATCH_PIXELS, type DrawPixel } from '@pixelwar/shared/grid';
 import type { ApiClient } from '../api/client';
 import { postPixels, type UserQuota } from '../api/grid';
 import type { CanvasConfig } from '../realtime/feed';
@@ -31,6 +31,8 @@ export interface BrushContext {
   remaining(): number | null;
   // Reads /api/state again; resolves with the new quota, or null.
   reloadQuota(): Promise<UserQuota | null>;
+  // Shows the pixels of the stroke at once, on the preview layer.
+  preview?(pixels: readonly DrawPixel[]): void;
 }
 
 export interface BrushOptions {
@@ -106,7 +108,8 @@ export class Brush {
 
   extend(point: Point | null): void {
     if (!this.stroke || this.ended || point === null) return;
-    this.stroke.moveTo(point);
+    const added = this.stroke.moveTo(point);
+    this.context.preview?.(this.stroke.recent(added));
     this.pump();
     this.report();
   }

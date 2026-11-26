@@ -1,4 +1,4 @@
-import { isInsideGrid, locatePixel } from '@pixelwar/shared/grid';
+import { isInsideGrid, locatePixel, type DrawPixel } from '@pixelwar/shared/grid';
 import type { ApiClient } from '../api/client';
 import { fetchTileMeta, fetchUserQuota, postPixels, type PixelAuthor, type UserQuota } from '../api/grid';
 import type { TileColorsSource } from '../canvas/tiles';
@@ -52,6 +52,8 @@ export interface InspectorOptions {
   confirmAfterMs?: number;
   // Coalesces the author reloads of a busy tile.
   metaDebounceMs?: number;
+  // Shows the pixel at once on the preview layer (WEB-05).
+  preview?: (pixels: readonly DrawPixel[]) => void;
 }
 
 export type DrawBlock = 'paused' | 'outside' | 'quota' | 'busy' | 'no_selection';
@@ -66,6 +68,7 @@ export class PixelInspector {
   private readonly clearTimer: (timer: unknown) => void;
   private readonly confirmAfterMs: number;
   private readonly metaDebounceMs: number;
+  private readonly preview: (pixels: readonly DrawPixel[]) => void;
   private metaToken = 0;
   private metaTimer: unknown = null;
   private confirmTimer: unknown = null;
@@ -79,6 +82,7 @@ export class PixelInspector {
     this.clearTimer = options.clearTimer ?? ((timer) => clearTimeout(timer as ReturnType<typeof setTimeout>));
     this.confirmAfterMs = options.confirmAfterMs ?? 3000;
     this.metaDebounceMs = options.metaDebounceMs ?? 300;
+    this.preview = options.preview ?? (() => {});
   }
 
   getState = (): InspectorState => this.state;
@@ -135,6 +139,7 @@ export class PixelInspector {
     if (this.confirmTimer !== null) this.clearTimer(this.confirmTimer);
     this.confirmTimer = null;
     this.update({ feedback: { status: 'sending' } });
+    this.preview([{ x: selected.x, y: selected.y, color }]);
     try {
       const accepted = await postPixels(this.api, [{ x: selected.x, y: selected.y, color }]);
       const eventId = accepted.eventIds[0]!;

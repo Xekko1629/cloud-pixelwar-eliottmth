@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import type { ApiClient } from '../api/client';
 import { Brush } from '../brush/brush';
+import { PreviewLayer } from '../brush/preview';
 import { PixelCanvas, type CanvasTool, type StrokeHandlers } from '../canvas/PixelCanvas';
 import type { LiveCanvas } from '../realtime/live';
 import { PixelInspector, remainingPixels } from './inspector';
 import { PixelPanel } from './PixelPanel';
 
 // The canvas and its side panel, for a signed-in user: inspection of a pixel (WEB-04) and
-// the brush (WEB-05) share the palette and the quota.
+// the brush (WEB-05) share the palette and the quota. What was just sent shows at once
+// on a preview layer over the canvas, until its delta arrives.
 export function Workspace({ api, live }: { api: ApiClient; live: LiveCanvas }) {
-  const [inspector] = useState(() => new PixelInspector(api, live));
+  const [preview] = useState(() => new PreviewLayer());
+  const [inspector] = useState(() => new PixelInspector(api, live, { preview: (pixels) => preview.add(pixels) }));
   const [brush] = useState(() => new Brush(api, {
     color: () => inspector.getState().brushColor,
     config: () => live.getState().config,
@@ -18,6 +21,7 @@ export function Workspace({ api, live }: { api: ApiClient; live: LiveCanvas }) {
       return quota ? remainingPixels(quota, Date.now()) : null;
     },
     reloadQuota: () => inspector.reloadQuota(),
+    preview: (pixels) => preview.add(pixels),
   }));
   const [tool, setTool] = useState<CanvasTool>('inspect');
   const { selected } = useSyncExternalStore(inspector.subscribe, inspector.getState);
@@ -26,6 +30,9 @@ export function Workspace({ api, live }: { api: ApiClient; live: LiveCanvas }) {
     inspector.start();
     return () => inspector.stop();
   }, [inspector]);
+
+  // A preview pixel goes away when the canvas shows its colour (its delta arrived).
+  useEffect(() => live.subscribe((change) => preview.settle(change, live.source)), [live, preview]);
 
   const stroke = useMemo<StrokeHandlers>(() => ({
     begin: (pixel) => brush.begin(pixel),
@@ -44,6 +51,7 @@ export function Workspace({ api, live }: { api: ApiClient; live: LiveCanvas }) {
         live={live}
         tool={tool}
         stroke={stroke}
+        preview={preview}
         selected={tool === 'inspect' ? selected : null}
         onSelect={(pixel) => inspector.select(pixel)}
       />
