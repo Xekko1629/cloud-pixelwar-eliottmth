@@ -13,7 +13,7 @@ if (!root) throw new Error('Missing #root element');
 // or open the listeners twice.
 const config = loadConfig();
 const services = createAuthServices(config);
-const live = createLiveCanvas(config);
+const live = createLiveCanvas(config, services);
 void live.start();
 
 createRoot(root).render(

@@ -116,6 +116,11 @@ exact même pour `/api/state`, dont le quota dépend de l'heure.
 
 Les erreurs portent `Cache-Control: no-store`.
 
+Le frontend (WEB-03b) laisse le cache HTTP du navigateur revalider les régions
+(`fetch` avec `cache: 'no-cache'`) au lieu d'envoyer `If-None-Match` lui-même : cet
+en-tête déclencherait un preflight que `Access-Control-Allow-Headers: Authorization`
+refuse.
+
 ## Réponses d'erreur
 
 | Situation | Réponse |
