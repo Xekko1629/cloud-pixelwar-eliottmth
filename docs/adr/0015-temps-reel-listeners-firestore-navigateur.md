@@ -1,6 +1,6 @@
 # ADR-0015 · Temps réel : listeners Firestore dans le navigateur, en lecture seule
 
-- **Statut** : Proposé
+- **Statut** : Accepté (25/11/2026)
 - **Date** : 2026-11-20
 - **Tickets** : DRAW-03a (#61), DRAW-03b (#62), DRAW-04 (#63), DRAW-06 (#133, abandonné), WEB-03c (#68), WEB-03d (#69), SRV-11 (#132), SEC-01 (#83), WEB-01 (#65). Remplace la partie « Temps réel » d'[ADR-0013](0013-lectures-temps-reel-sans-firebase.md) ; reprend le côté lecture d'[ADR-0003](0003-temps-reel-listeners-firestore.md), sans Firebase Auth.
 - **Références** : Sujet §3.1, §3.4 · C06 §7 (« Real-time updates », « Entry point ») · C07 §3.3 · séance du 20/11/2026 (frontend) · [Listeners temps réel Firestore](https://firebase.google.com/docs/firestore/query-data/listen) · [Security Rules Firestore](https://firebase.google.com/docs/firestore/security/get-started)

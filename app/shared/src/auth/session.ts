@@ -3,7 +3,9 @@ import type { JwtClaims } from './jwt';
 // Contract of the web session JWT (ADR-0012), checked by API Gateway (definition "session")
 // and by the realtime service. iss = session-signer e-mail, aud = GCP project id.
 
-export const SESSION_TTL_SECONDS = 3600;
+// 15 min: no individual revocation, so a short lifetime bounds a leaked or signed-out token.
+// The frontend renews it before expiry (ADR-0012).
+export const SESSION_TTL_SECONDS = 900;
 // After this age of the Discord login, /api/session/refresh refuses and the user logs in again.
 export const MAX_SESSION_AGE_SECONDS = 12 * 3600;
 
