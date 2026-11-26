@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from 'react';
 import { AuthControls, redirectToLogin } from './auth/AuthControls';
 import type { AuthServices } from './auth/setup';
-import { PixelCanvas } from './canvas/PixelCanvas';
 import type { FrontendConfig } from './config';
+import { Workspace } from './inspect/Workspace';
 import type { LiveCanvas } from './realtime/live';
 import { REALTIME_LABELS, TILE_LABELS } from './realtime/setup';
 
@@ -10,7 +10,8 @@ import { REALTIME_LABELS, TILE_LABELS } from './realtime/setup';
 // canvas needs a session: its tiles come from the API, and every API call must be
 // authenticated (subject §3.4). Without a session it would only show the pixels drawn since
 // the page opened, not the up-to-date canvas, so it stays hidden. Signed in, it shows the
-// tiles of tile-reader (WEB-03b) with the realtime deltas over them (DRAW-03a).
+// tiles of tile-reader (WEB-03b) with the realtime deltas over them (DRAW-03a), and the
+// panel of the selected pixel (WEB-04).
 export function App({ config, services, live }: { config: FrontendConfig; services: AuthServices; live: LiveCanvas }) {
   const realtime = useSyncExternalStore(live.subscribeState, live.getState);
   const auth = useSyncExternalStore(services.auth.subscribe, services.auth.getState);
@@ -29,7 +30,7 @@ export function App({ config, services, live }: { config: FrontendConfig; servic
         <p>Temps réel : {REALTIME_LABELS[realtime.status]}</p>
         {realtime.config?.paused && <p className="app__paused" role="status">Toile en pause</p>}
       </section>
-      {signedIn ? <PixelCanvas live={live} /> : (
+      {signedIn && services.api ? <Workspace api={services.api} live={live} /> : (
         <section className="app__locked" aria-label="Connexion requise">
           <p>Connecte-toi avec Discord pour voir la toile et dessiner.</p>
           <button

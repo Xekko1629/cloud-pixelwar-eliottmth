@@ -64,6 +64,32 @@ de 1024 × 1024 pixels (16 × 16 tuiles), chargées par `GET /api/regions/{rx}/{
 - `/admin clear` (nouvelle `canvas_version`) oublie toutes les régions et recharge
   celles qui sont visibles.
 
+## Inspection et dessin d'un pixel (WEB-04)
+
+- **Sélection** : un clic sans glisser (moins de 6 px de déplacement), ou `Entrée` pour
+  le pixel au centre ; `Échap` désélectionne. Le pixel est entouré par un seul élément
+  posé sur le canvas, déplacé avec la caméra.
+- **Auteur et date** : `GET /api/tiles/{tx}/{ty}/meta` à la sélection, puis de nouveau
+  quand un delta temps réel touche la tuile (une seule lecture par rafale, 300 ms après
+  le dernier delta). Pas de lecture en boucle.
+- **Dessin** : palette de 16 couleurs, « Poser le pixel » envoie `POST /api/pixels`. Le
+  `202` veut dire « accepté », pas « dessiné » :
+  - le pixel est « posé » quand son delta arrive avec la couleur envoyée ;
+  - sinon, 3 s plus tard, une lecture de `/api/state` dit si le worker l'a refusé
+    (`last_rejection` avec le même `event_id` : pause, quota, hors de la grille…) ;
+  - un échec d'envoi n'est jamais renvoyé automatiquement : un `202` perdu ferait un
+    second trait (voir [`web-proxy`](../../docs/web-proxy.md)).
+- **Avant l'envoi**, le bouton est désactivé si la toile est en pause (listener de
+  `config/global`), si le pixel est hors de la grille (`size`), ou si le quota est épuisé.
+  Le quota vient de `/api/state`, lu au démarrage et après chaque dessin ; il redevient
+  plein à `reset_at`. C'est toujours le serveur qui décide.
+
+| Fichier | Rôle |
+| --- | --- |
+| `src/api/grid.ts` | Appels `meta`, `state` et `pixels`, réponses validées |
+| `src/inspect/inspector.ts` | Sélection, auteur, quota, envoi et confirmation, sans React |
+| `src/inspect/PixelPanel.tsx`, `Workspace.tsx` | Panneau du pixel et assemblage avec le canvas |
+
 ## Développement local
 
 ```sh
