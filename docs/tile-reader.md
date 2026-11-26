@@ -100,8 +100,9 @@ limite personnelle de l'admin, sinon limite par défaut, et compteur remis à z�
 Cette réponse est une photo à l'instant de la lecture ; les mises à jour arrivent
 ensuite par le flux `realtime` (DRAW-04).
 
-`last_rejection` n'existe que si `users/{uid}` existe déjà : DATA-02 n'écrit pas
-de refus pour un utilisateur qui n'a jamais dessiné.
+`last_rejection` est le dernier refus depuis le dernier dessin accepté, ou `null`.
+Il est présent dès la première action d'un utilisateur, même refusée : DATA-02 crée
+alors `users/{uid}` sans rien consommer (`docs/drawing-transactions.md`).
 
 ## Cache
 

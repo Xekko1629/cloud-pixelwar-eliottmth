@@ -99,7 +99,7 @@ describe('draw-worker with real local Firestore and Pub/Sub', () => {
     await ref('config/global').update({ paused: true });
     expect((await invoke(paused)).status).toHaveBeenCalledWith(204);
     expect((await resultsFor(paused))[0].event).toMatchObject({ type: 'pixel-rejected', payload: { result: { reason: 'paused' } } });
-    expect((await ref(`users/${paused.actor.uid}`).get()).exists).toBe(false);
+    expect((await ref(`users/${paused.actor.uid}`).get()).data()).toMatchObject({ used_pixels: 0, last_rejection: { reason: 'paused' } });
     await ref('config/global').update({ paused: false });
     const fresh = command(); expect((await invoke(fresh)).status).toHaveBeenCalledWith(204);
     expect((await resultsFor(fresh))[0].event.type).toBe('pixel-processed');
