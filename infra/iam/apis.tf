@@ -28,8 +28,12 @@ locals {
     "servicemanagement.googleapis.com",
     "servicecontrol.googleapis.com",
     "storage.googleapis.com",
-    # No Firebase product (intermediate review): the frontend is a Cloud Run service
-    # (ADR-0011) and web sessions are JWTs signed with IAM Credentials (ADR-0012).
+    # Realtime of the browser (ADR-0015, DRAW-03a): Security Rules of Firestore and a
+    # browser API key limited to the Firestore API. Still no Firebase product (intermediate
+    # review): the frontend is a Cloud Run service (ADR-0011) and web sessions are JWTs
+    # signed with IAM Credentials (ADR-0012).
+    "firebaserules.googleapis.com",
+    "apikeys.googleapis.com",
     # Observability
     "logging.googleapis.com",
     "monitoring.googleapis.com",

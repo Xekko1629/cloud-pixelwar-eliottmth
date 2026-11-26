@@ -39,6 +39,9 @@ variable "deployer_roles" {
     "roles/run.admin",
     "roles/pubsub.admin",
     "roles/datastore.owner", # Firestore database, indexes and TTL policies
+    # infra/serverless realtime.tf (ADR-0015): Firestore Security Rules and the browser API key
+    "roles/firebaserules.admin",
+    "roles/serviceusage.apiKeysAdmin",
     "roles/cloudscheduler.admin",
     # infra/gateway: API, configs, gateway, and the managed service it enables
     "roles/apigateway.admin",
@@ -84,6 +87,10 @@ variable "planner_roles" {
   type        = set(string)
   default = [
     "roles/viewer",
+    # Refresh of infra/serverless realtime.tf during PR plans: viewer cannot read the
+    # key string of an API key, and the Security Rules have their own read role.
+    "roles/firebaserules.viewer",
+    "roles/serviceusage.apiKeysViewer",
   ]
 }
 
