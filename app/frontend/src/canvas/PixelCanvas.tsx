@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { CanvasUpdates } from '../realtime/live';
 import { pixelAt, visiblePixels, type Viewport } from './camera';
 import { CanvasController } from './controller';
-import { drawViewport } from './renderer';
+import { drawTiles, drawViewport, type TileRef } from './renderer';
 import { TileImageCache } from './tiles';
 
 // One 64×64 canvas per painted tile, drawn scaled with drawImage: never a DOM element per pixel.
@@ -17,7 +17,9 @@ function createTileImage(rgba: Uint8ClampedArray<ArrayBuffer>): HTMLCanvasElemen
 const formatZoom = (zoom: number) => (zoom >= 10 ? zoom.toFixed(0) : zoom.toFixed(1));
 
 // Full-size canvas of the grid. Redraws only when the camera, the size or a realtime delta
-// changes something, in the next animation frame: no render loop and no polling.
+// changes something, in the next animation frame: no render loop and no polling. Deltas
+// received in the same frame are drawn together, and only their tiles are redrawn while
+// the camera stays still (WEB-03c).
 export function PixelCanvas({ live }: { live: CanvasUpdates }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const statusRef = useRef<HTMLOutputElement>(null);
@@ -33,6 +35,8 @@ export function PixelCanvas({ live }: { live: CanvasUpdates }) {
     let pixelRatio = window.devicePixelRatio || 1;
     let frame = 0;
     let hovered: { x: number; y: number } | null = null;
+    // What the next frame must redraw: everything, or only these tiles.
+    let dirty: Map<string, TileRef> | 'all' = 'all';
 
     const showStatus = () => {
       const camera = controller.current;
@@ -41,20 +45,39 @@ export function PixelCanvas({ live }: { live: CanvasUpdates }) {
     };
     const render = () => {
       frame = 0;
-      drawViewport(context, controller.current, viewport, pixelRatio, (tx, ty) => images.get(tx, ty));
-      showStatus();
-      // The deltas listener follows the visible regions (it ignores an unchanged set).
-      live.viewportChanged(visiblePixels(controller.current, viewport));
+      const lookup = (tx: number, ty: number) => images.get(tx, ty);
+      const redraw = dirty;
+      dirty = new Map();
+      if (redraw === 'all') {
+        drawViewport(context, controller.current, viewport, pixelRatio, lookup);
+        showStatus();
+        // The deltas listener follows the visible regions (it ignores an unchanged set).
+        live.viewportChanged(visiblePixels(controller.current, viewport));
+      } else {
+        drawTiles(context, controller.current, viewport, pixelRatio, redraw.values(), lookup);
+      }
     };
-    const schedule = () => {
+    const request = () => {
       if (frame === 0) frame = requestAnimationFrame(render);
+    };
+    // Camera, size or canvas version: the whole viewport.
+    const schedule = () => {
+      dirty = 'all';
+      request();
     };
     const controller = new CanvasController(() => viewport, schedule);
     // A delta repaints only the tiles it touches; a new canvas version repaints everything.
     const unsubscribe = live.subscribe((change) => {
-      if (change === 'all') images.clear();
-      else for (const { tx, ty } of change) images.invalidate(tx, ty);
-      schedule();
+      if (change === 'all') {
+        images.clear();
+        schedule();
+        return;
+      }
+      for (const tile of change) {
+        images.invalidate(tile.tx, tile.ty);
+        if (dirty !== 'all') dirty.set(`${tile.tx},${tile.ty}`, tile);
+      }
+      request();
     });
 
     const resize = () => {
