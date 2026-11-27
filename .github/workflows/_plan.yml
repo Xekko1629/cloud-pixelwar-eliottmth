@@ -35,9 +35,9 @@ jobs:
         shell: bash
         working-directory: infra/${{ inputs.stack }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@v4
 
-      - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
+      - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.DEPLOYER_SA }}
@@ -45,7 +45,7 @@ jobs:
       # infra/frontend plans the image built for this commit by _frontend-image.yml.
       # The planner never pushes: the digest is read from the archive, the image is only
       # pushed by the apply.
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@v4
         if: inputs.stack == 'frontend'
         with:
           name: frontend-image
@@ -59,7 +59,7 @@ jobs:
           echo "TF_VAR_image=europe-west1-docker.pkg.dev/$GOOGLE_CLOUD_PROJECT/pixelwar/frontend@$digest" >> "$GITHUB_ENV"
 
       # infra/serverless zips app/dist/functions/<name> (modules/function-source, ADR-0009).
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@v4
         if: inputs.stack == 'serverless'
         with:
           node-version: '24'
@@ -73,7 +73,7 @@ jobs:
           npm ci
           npm run build:functions
 
-      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+      - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false

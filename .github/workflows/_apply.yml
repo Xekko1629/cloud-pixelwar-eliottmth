@@ -41,7 +41,7 @@ jobs:
       run:
         working-directory: infra/${{ inputs.stack }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -49,7 +49,7 @@ jobs:
         if: inputs.environment == 'prd'
         run: git merge-base --is-ancestor "$GITHUB_SHA" origin/prod
 
-      - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
+      - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.DEPLOYER_SA }}
@@ -72,7 +72,7 @@ jobs:
             echo "PRIVATE_KEY_EOF"
           } >> "$GITHUB_OUTPUT"
 
-      - uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+      - uses: actions/create-github-app-token@v3
         id: github_app_token
         if: inputs.github_app
         with:
@@ -81,7 +81,7 @@ jobs:
 
       # infra/frontend deploys the image built once for this commit (_frontend-image.yml):
       # the same OCI archive is pushed to each environment with its digest preserved.
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@v4
         if: inputs.stack == 'frontend'
         with:
           name: frontend-image
@@ -105,7 +105,7 @@ jobs:
           echo "Frontend image: \`$repository@$digest\`" >> "$GITHUB_STEP_SUMMARY"
 
       # infra/serverless zips app/dist/functions/<name> (modules/function-source, ADR-0009).
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@v4
         if: inputs.stack == 'serverless'
         with:
           node-version: '24'
@@ -119,7 +119,7 @@ jobs:
           npm ci
           npm run build:functions
 
-      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+      - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false

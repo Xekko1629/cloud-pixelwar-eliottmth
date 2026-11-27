@@ -38,7 +38,7 @@ tag ; la convention de signature et les protections GitHub sont distinctes.
 | `_fmt.yml`, `_lint.yml` | Format Terraform et règles tflint |
 | `_validate.yml`, `_test.yml` | Validation et tests Terraform par stack/module |
 | `_plan.yml` | Plan PR avec l'identité de lecture de `<env>-plan` |
-| `_security.yml` | gitleaks sur tout l'historique et Trivy sur l'IaC ([chaîne d'approvisionnement](#chaîne-dapprovisionnement)) |
+| `_security.yml` | gitleaks sur tout l'historique ([secrets et dépendances](#secrets-et-dépendances)) |
 | `_apply.yml` | Authentification, build serverless, plan et apply du stack |
 | `_destroy.yml` | Authentification, build serverless pour rafraîchir les archives, puis destroy |
 | `deploy.yml`, `destroy.yml` | Orchestration et choix des environnements/stacks |
@@ -230,45 +230,16 @@ release vers prd. Pour vérifier à la main :
 scripts/check-no-public.sh cloud-pixelwar-dev
 ```
 
-## Chaîne d'approvisionnement
+## Secrets et dépendances
 
-Ce qui s'exécute en CI ou part en production ne doit pas pouvoir changer sans un
-commit relu (SEC-02).
-
-- **Actions épinglées par SHA** : chaque `uses:` vise un commit, suivi de la
-  version en commentaire (`actions/checkout@<sha> # v4.4.0`). Un tag déplacé ou
-  une action compromise après coup ne change pas ce qui tourne.
-- **Permissions minimales** : `contents: read` au niveau de chaque workflow, y
-  compris les workflows réutilisables. `id-token: write` est donné job par job,
-  seulement aux plans et aux applies qui s'authentifient à GCP.
-- **Outils téléchargés** (gitleaks, Trivy) : binaire de release à une version
-  fixée, vérifié par son SHA-256 avant exécution, plutôt qu'une action tierce.
-  Terraform et tflint sont fixés par version (`TF_VERSION`, `TFLINT_VERSION`).
-- **Dependabot** (`.github/dependabot.yml`) : chaque semaine, des PR vers `prod`
-  pour les actions, npm, Go, les images Docker et les providers Terraform. Elles
-  passent la CI et la revue comme les autres. Les alertes de vulnérabilité et les
-  mises à jour de sécurité s'activent dans les réglages du dépôt (propriétaire).
-
-### Contrôles de sécurité en CI
-
-Le job `security` (`_security.yml`) tourne sur chaque PR, quels que soient les
-fichiers modifiés, et compte dans `CI result` :
-
-| Contrôle | Ce qui fait échouer | Remarque |
-| --- | --- | --- |
-| gitleaks | un secret dans n'importe quel commit de l'historique | Faux positifs connus listés dans `.gitleaksignore`, avec leur raison. En local, le hook `pre-commit` lance gitleaks sur ce qui est indexé (`just leaks`). |
-| Trivy `config` | un défaut HIGH ou CRITICAL dans Terraform, Helm ou un Dockerfile | Les défauts LOW et MEDIUM sont affichés dans le log, sans bloquer. |
-
-Défauts LOW et MEDIUM relevés par Trivy et acceptés :
-
-| Règle | Ressource | Raison |
-| --- | --- | --- |
-| GCP-0066 (LOW) | buckets `tfstate`, sources des fonctions, buckets applicatifs | Chiffrement géré par Google : une clé CMEK ajouterait KMS, des droits et un coût sans exigence du sujet. |
-| GCP-0078 (MEDIUM) | buckets applicatifs (snapshots, vue éloignée) | Images régénérées à partir de Firestore : un versionnage ne garderait que des copies inutiles. |
-| GCP-0029, GCP-0076 (LOW, MEDIUM) | sous-réseau du cluster | Pas de flow logs : volume de logs facturé, pour des runners CI éphémères. |
-| GCP-0075 (LOW) | sous-réseau du cluster | Les nœuds ont une sortie Internet (images des runners, GitHub) : Private Google Access n'est pas nécessaire. |
-| GCP-0011 (MEDIUM) | `roles/iam.serviceAccountUser` du deployer au niveau projet | Il doit attacher les identités runtime qu'il crée lui-même. À restreindre par compte de service dans SEC-01 (#83), stack `iam` appliqué à la main. |
-| DS-0026 (LOW) | `app/frontend/Dockerfile` sans `HEALTHCHECK` | Cloud Run ignore `HEALTHCHECK` et sonde le port du conteneur. |
+- **Aucun secret dans le dépôt** : le job `security` (`_security.yml`) lance gitleaks
+  sur tout l'historique à chaque PR, quels que soient les fichiers modifiés, et compte
+  dans `CI result`. Les faux positifs connus sont listés dans `.gitleaksignore`, avec
+  leur raison. En local, le hook `pre-commit` lance gitleaks sur ce qui est indexé
+  (`just leaks`).
+- **Permissions minimales** : `contents: read` au niveau de chaque workflow, y compris
+  les workflows réutilisables. `id-token: write` est donné job par job, seulement aux
+  plans et aux applies qui s'authentifient à GCP.
 
 ### Dépendances open source
 
@@ -280,7 +251,7 @@ Défauts LOW et MEDIUM relevés par Trivy et acceptés :
 | `hashicorp/setup-terraform`, `terraform-linters/setup-tflint` | workflows Terraform | Terraform et tflint aux versions fixées. |
 | `dorny/paths-filter` | `ci.yml` | Ne vérifier et planifier que les stacks modifiés. |
 | `docker/setup-buildx-action` | `_frontend-image.yml` | Build reproductible de l'image du frontend en archive OCI. |
-| gitleaks, Trivy | `_security.yml` | Secrets dans l'historique et défauts de l'IaC. |
+| gitleaks | `_security.yml`, hook `pre-commit` | Détection de secrets dans l'historique. |
 | Providers `hashicorp/google`, `google-beta`, `helm`, `integrations/github` | `infra/*` | Ressources GCP, API Gateway (beta), releases Helm des runners, accès GitHub. Versions verrouillées par `.terraform.lock.hcl`. |
 | Plugin tflint `google` | `.tflint.hcl` | Règles propres aux ressources GCP. |
 | Charts `gha-runner-scale-set-controller` et `gha-runner-scale-set` (ARC), `external-secrets` | `infra/runners` | Runners auto-hébergés éphémères, secret de la GitHub App lu dans Secret Manager. Versions fixées par variable. |

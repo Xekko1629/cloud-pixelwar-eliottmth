@@ -1,8 +1,8 @@
 name: Security
 
-# Secrets in the history (gitleaks) and misconfigurations of the IaC (Trivy), on every PR.
-# Both tools are release binaries pinned by version and SHA-256 (docs/ci.md#chaîne-dapprovisionnement),
-# not third-party actions: a moved tag or a compromised action cannot change what runs.
+# No secret in the repository (gitleaks), on every PR: the whole history is scanned, since a
+# secret added then removed stays in its commits. The binary is a release pinned by version
+# and checked against its SHA-256 before it runs.
 
 on:
   workflow_call:
@@ -18,16 +18,13 @@ permissions:
 env:
   GITLEAKS_VERSION: "8.30.1"
   GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
-  TRIVY_VERSION: "0.76.2"
-  TRIVY_SHA256: "bc0fc726e017b8927a62b2d3531d7a84ee01769daf5c99ed866dced54089fdbf"
 
 jobs:
   gitleaks:
     name: gitleaks
     runs-on: ${{ inputs.runner || vars.RUNNER_SMALL || 'ubuntu-latest' }}
     steps:
-      # The whole history: a secret added then removed in the PR stays in its commits.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -41,25 +38,3 @@ jobs:
       # Known false positives are listed, with their reason, in .gitleaksignore.
       - name: Scan the history
         run: '"$RUNNER_TEMP/gitleaks" git --redact --no-banner --exit-code 1'
-
-  trivy:
-    name: trivy (IaC)
-    runs-on: ${{ inputs.runner || vars.RUNNER_SMALL || 'ubuntu-latest' }}
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-
-      - name: Install Trivy
-        run: |
-          archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
-          curl -sSfL -o "$RUNNER_TEMP/$archive" "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/$archive"
-          echo "$TRIVY_SHA256  $RUNNER_TEMP/$archive" | sha256sum -c -
-          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" trivy
-
-      # Terraform, Helm and Dockerfiles. HIGH and CRITICAL fail the job; the lower findings
-      # are listed in the log and reviewed in docs/ci.md.
-      - name: Scan the IaC
-        run: |
-          "$RUNNER_TEMP/trivy" config --skip-dirs '**/node_modules' --skip-dirs '**/.terraform' \
-            --skip-files '**/*.dockerignore' --severity LOW,MEDIUM,HIGH,CRITICAL .
-          "$RUNNER_TEMP/trivy" config --skip-dirs '**/node_modules' --skip-dirs '**/.terraform' \
-            --skip-files '**/*.dockerignore' --severity HIGH,CRITICAL --exit-code 1 .

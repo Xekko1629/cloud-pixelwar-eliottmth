@@ -1,4 +1,4 @@
-# Known gitleaks false positives (docs/ci.md#chaîne-dapprovisionnement), one fingerprint per line.
+# Known gitleaks false positives (docs/ci.md#secrets-et-dépendances), one fingerprint per line.
 # Fake Discord IDs (123456789012345678, 234567890123456789) in the tests and an old doc example:
 # application and guild IDs are public identifiers, and these are not even real ones.
 fcfb685d192e693b00b6a043e63d807d1286024b:app/tools/discord-commands/src/cli.test.ts:discord-client-id:6
