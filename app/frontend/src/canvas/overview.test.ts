@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { IMAGE_LAG_MS, OverviewImages, RecentPixels, cellArea, overviewLevel, visibleCells } from './overview';
+import { IMAGE_LAG_MS, OverviewImages, RecentPixels, cellArea, isFarView, overviewLevel, visibleCells } from './overview';
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 const picture = (id: string) => ({ id }) as unknown as CanvasImageSource;
@@ -11,6 +11,16 @@ describe('far view geometry', () => {
     expect(overviewLevel(0.2)).toBe(2);
     expect(overviewLevel(1 / 16)).toBe(2);
     expect(overviewLevel(1 / 64)).toBe(3);
+  });
+
+  it('keeps the tiles down to zoom 1/2 while at most 30 regions show', () => {
+    const laptop = { width: 2560, height: 1440 };
+    expect(isFarView({ x: 0, y: 0, zoom: 1 }, laptop)).toBe(false);
+    // 5120 × 2880 grid pixels: about 15 regions, the tiles still load.
+    expect(isFarView({ x: 0, y: 0, zoom: 1 / 2 }, laptop)).toBe(false);
+    expect(isFarView({ x: 0, y: 0, zoom: 0.49 }, laptop)).toBe(true);
+    // A very wide screen at 1/2 shows more than 30 regions: images instead.
+    expect(isFarView({ x: 0, y: 0, zoom: 1 / 2 }, { width: 7680, height: 4320 })).toBe(true);
   });
 
   it('lists the visible cells of a level, negative ones included', () => {

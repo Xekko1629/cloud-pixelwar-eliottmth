@@ -76,18 +76,22 @@ de 1024 × 1024 pixels (16 × 16 tuiles), chargées par `GET /api/regions/{rx}/{
 - Une région en échec est redemandée 10 s plus tard si elle est toujours visible ;
   après une coupure du temps réel ou du réseau, les régions visibles sont redemandées
   ([coupure et reprise](../../docs/realtime.md#coupure-et-reprise-draw-03b)).
-- Sous le zoom ×1, la [vue éloignée](#vue-éloignée-web-03d) remplace les tuiles : aucune
-  région n'est chargée. Au zoom ×1, un écran 2560 × 1440 montre au plus 12 régions.
+- Sous le zoom ×1/2, ou dès que plus de 30 régions sont visibles, la
+  [vue éloignée](#vue-éloignée-web-03d) remplace les tuiles : aucune région n'est chargée.
+  À ×1/2, un écran 2560 × 1440 montre une quinzaine de régions, avec les vraies tuiles.
 - `/admin clear` (nouvelle `canvas_version`) oublie toutes les régions et recharge
   celles qui sont visibles.
 
 ## Vue éloignée (WEB-03d)
 
-Sous le zoom ×1, la toile affiche les images de la pyramide (DATA-05c,
-[docs/overview.md](../../docs/overview.md)) au lieu des tuiles (`src/canvas/overview.ts`) :
+Sous le zoom ×1/2, ou dès que l'écran montre plus de 30 régions (la limite du chargement
+des tuiles), la toile affiche les images de la pyramide (DATA-05c,
+[docs/overview.md](../../docs/overview.md)) au lieu des tuiles (`src/canvas/overview.ts`).
+Les tuiles restent tant que possible : elles sont exactes et à jour, alors que les images
+ont jusqu'à une minute de retard et regroupent les détails (4 × 4 pixels au niveau 1).
 
 - **Niveau selon le zoom** : le niveau le plus grossier dont un pixel d'image couvre encore
-  au moins un pixel d'écran. Niveau 1 de ×1 à ×1/4, niveau 2 jusqu'à ×1/16, niveau 3 jusqu'à
+  au moins un pixel d'écran. Niveau 1 jusqu'à ×1/4, niveau 2 jusqu'à ×1/16, niveau 3 jusqu'à
   ×1/64, le dézoom minimal : la grille est infinie, on s'y déplace sans fin mais sans tout
   voir d'un coup.
 - **Images** : `GET /api/overview/{niveau}/{cx}/{cy}` (session) donne une URL signée de

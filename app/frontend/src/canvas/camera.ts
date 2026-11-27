@@ -30,7 +30,7 @@ export interface PixelRect {
   max_y: number;
 }
 
-// Below zoom 1 the far view takes over (WEB-03d, canvas/overview.ts). MIN_ZOOM stops at the
+// Below zoom 1/2 the far view takes over (WEB-03d, canvas/overview.ts). MIN_ZOOM stops at the
 // last level of the pyramid, where one image pixel covers 64 × 64 grid pixels: the grid is
 // infinite, one moves across it but never sees all of it at once. MAX_ZOOM shows one pixel
 // as a large square.

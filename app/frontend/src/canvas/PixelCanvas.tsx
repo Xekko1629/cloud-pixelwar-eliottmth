@@ -4,7 +4,7 @@ import type { CanvasUpdates, TileChange } from '../realtime/live';
 import { fitCamera, pixelAt, screenX, screenY, visiblePixels, type Camera, type Point, type Viewport } from './camera';
 import { FrameIcon } from '../ui/icons';
 import { CanvasController } from './controller';
-import { FAR_ZOOM, RecentPixels, overviewLevel, visibleCells, type OverviewImages } from './overview';
+import { RecentPixels, isFarView, overviewLevel, visibleCells, type OverviewImages } from './overview';
 import { drawLayer, drawOverview, drawTiles, drawViewport, type TileRef } from './renderer';
 import { TileImageCache, type TileColorsSource } from './tiles';
 
@@ -111,7 +111,7 @@ export function PixelCanvas({
     let dirty: Map<string, TileRef> | 'all' = 'all';
     // Realtime pixels the far view paints over its images, which lag behind (WEB-03d).
     const recent = new RecentPixels();
-    const isFar = () => overview !== undefined && controller.current.zoom < FAR_ZOOM;
+    const isFar = () => overview !== undefined && isFarView(controller.current, viewport);
 
     const showStatus = () => {
       const camera = controller.current;
