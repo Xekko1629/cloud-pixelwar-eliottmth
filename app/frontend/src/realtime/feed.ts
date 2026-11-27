@@ -44,12 +44,14 @@ export interface DeltaQuery {
 export type Unsubscribe = () => void;
 
 // Raw Firestore data: Timestamp exposes toMillis(), Bytes exposes toUint8Array().
+// fromCache: the snapshot comes from the local cache, not the server (connection lost).
 export interface FirestoreBackend {
-  watchConfig(next: (data: unknown) => void, error: (error: unknown) => void): Unsubscribe;
-  watchDeltas(query: DeltaQuery, added: (documents: unknown[]) => void, error: (error: unknown) => void): Unsubscribe;
+  watchConfig(next: (data: unknown, fromCache?: boolean) => void, error: (error: unknown) => void): Unsubscribe;
+  watchDeltas(query: DeltaQuery, added: (documents: unknown[], fromCache?: boolean) => void, error: (error: unknown) => void): Unsubscribe;
 }
 
-export type RealtimeStatus = 'connecting' | 'live' | 'error';
+// offline: network cut, the SDK reconnects by itself; error: a listener was refused.
+export type RealtimeStatus = 'connecting' | 'live' | 'offline' | 'error';
 
 export interface RealtimeHandlers {
   config?: (config: CanvasConfig) => void;
@@ -197,7 +199,7 @@ export class RealtimeFeed {
   start(): void {
     if (this.stopConfig) return;
     this.setStatus('connecting');
-    this.stopConfig = this.backend.watchConfig((data) => this.onConfig(data), () => this.setStatus('error'));
+    this.stopConfig = this.backend.watchConfig((data, fromCache) => this.onConfig(data, fromCache), () => this.setStatus('error'));
   }
 
   /** Visible pixels of the canvas; the deltas listener follows their regions. */
@@ -223,7 +225,10 @@ export class RealtimeFeed {
     this.listening = null;
   }
 
-  private onConfig(data: unknown): void {
+  private onConfig(data: unknown, fromCache = false): void {
+    // From the cache: the connection is lost. The known config stays; the SDK resyncs by
+    // itself and the next server snapshot brings the status back to live.
+    if (fromCache) { this.setStatus('offline'); return; }
     const config = parseCanvasConfig(data);
     if (!config) { this.setStatus('error'); return; }
     const previous = this.config;
@@ -247,9 +252,9 @@ export class RealtimeFeed {
     const token = {};
     const listening = { key, version, token, stop: (() => undefined) as Unsubscribe };
     this.listening = listening;
-    listening.stop = this.backend.watchDeltas(query, (documents) => {
+    listening.stop = this.backend.watchDeltas(query, (documents, fromCache = false) => {
       if (this.listening?.token !== token) return;
-      this.setStatus('live');
+      if (!fromCache) this.setStatus('live');
       const deltas = documents.map(parseDelta)
         .filter((delta): delta is RegionDelta => delta !== null && delta.canvasVersion === version)
         .sort((a, b) => a.createdAt - b.createdAt);
