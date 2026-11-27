@@ -2,8 +2,9 @@ import { useEffect, useRef } from 'react';
 import type { Bounds, GridSize } from '@pixelwar/shared/grid';
 import type { CanvasUpdates, TileChange } from '../realtime/live';
 import { fitCamera, pixelAt, screenX, screenY, visiblePixels, type Camera, type Point, type Viewport } from './camera';
+import { FrameIcon } from '../ui/icons';
 import { CanvasController } from './controller';
-import { FAR_ZOOM, RecentPixels, overviewLevel, visibleCells, type OverviewImages } from './overview';
+import { RecentPixels, isFarView, overviewLevel, visibleCells, type OverviewImages } from './overview';
 import { drawLayer, drawOverview, drawTiles, drawViewport, type TileRef } from './renderer';
 import { TileImageCache, type TileColorsSource } from './tiles';
 
@@ -110,7 +111,7 @@ export function PixelCanvas({
     let dirty: Map<string, TileRef> | 'all' = 'all';
     // Realtime pixels the far view paints over its images, which lag behind (WEB-03d).
     const recent = new RecentPixels();
-    const isFar = () => overview !== undefined && controller.current.zoom < FAR_ZOOM;
+    const isFar = () => overview !== undefined && isFarView(controller.current, viewport);
 
     const showStatus = () => {
       const camera = controller.current;
@@ -332,8 +333,14 @@ export function PixelCanvas({
       <div ref={markerRef} className="pixel-canvas__marker" hidden aria-hidden="true" />
       <output ref={statusRef} className="pixel-canvas__status" aria-live="off" />
       {bounds && (
-        <button type="button" className="auth__button pixel-canvas__fit" onClick={() => fitRef.current()}>
-          Voir tout le dessin
+        <button
+          type="button"
+          className="pill pixel-canvas__fit"
+          onClick={() => fitRef.current()}
+          title="Cadrer toute la zone dessinée"
+        >
+          <FrameIcon width={16} height={16} />
+          Tout le dessin
         </button>
       )}
     </div>

@@ -35,6 +35,22 @@ contrat de [`auth-proxy`](../functions/auth-proxy/README.md) :
 Les tuiles (WEB-03b), l'inspection (WEB-04) et le brush (WEB-05) passent par
 `services.api` (`src/auth/setup.ts`), jamais par `fetch` directement.
 
+## Interface
+
+La toile occupe toute la fenêtre ; les commandes flottent dessus, sur un fond translucide
+(`src/styles.css`) :
+
+- **Barre d'outils** à gauche : Inspecter, Pinceau, et l'aperçu de l'envoi (œil).
+- **Palette** en bas, avec le quota : pixels restants sur la limite par minute, et le
+  compte à rebours jusqu'à la remise à zéro (calculé localement, sans requête).
+- **Carte** à droite : le pixel sélectionné (auteur, date, « Poser ») ou les réglages du
+  pinceau. Sur un écran étroit, elle passe au-dessus de la palette.
+- **En-tête** : l'état du temps réel (« En direct », « Hors ligne »…) et le pseudo Discord.
+- **« Tout le dessin »** en haut à droite cadre la zone peinte.
+- Icônes en SVG intégré (`src/ui/icons.tsx`), sans police ni ressource tierce (CSP).
+- Thèmes clair et sombre selon le système ; `prefers-reduced-motion`,
+  `prefers-reduced-transparency` et `prefers-contrast` sont respectés.
+
 ## Tuiles (WEB-03b)
 
 Contrat : [`tile-reader`](../../docs/tile-reader.md). La toile est découpée en régions
@@ -60,18 +76,22 @@ de 1024 × 1024 pixels (16 × 16 tuiles), chargées par `GET /api/regions/{rx}/{
 - Une région en échec est redemandée 10 s plus tard si elle est toujours visible ;
   après une coupure du temps réel ou du réseau, les régions visibles sont redemandées
   ([coupure et reprise](../../docs/realtime.md#coupure-et-reprise-draw-03b)).
-- Sous le zoom ×1, la [vue éloignée](#vue-éloignée-web-03d) remplace les tuiles : aucune
-  région n'est chargée. Au zoom ×1, un écran 2560 × 1440 montre au plus 12 régions.
+- Sous le zoom ×1/2, ou dès que plus de 30 régions sont visibles, la
+  [vue éloignée](#vue-éloignée-web-03d) remplace les tuiles : aucune région n'est chargée.
+  À ×1/2, un écran 2560 × 1440 montre une quinzaine de régions, avec les vraies tuiles.
 - `/admin clear` (nouvelle `canvas_version`) oublie toutes les régions et recharge
   celles qui sont visibles.
 
 ## Vue éloignée (WEB-03d)
 
-Sous le zoom ×1, la toile affiche les images de la pyramide (DATA-05c,
-[docs/overview.md](../../docs/overview.md)) au lieu des tuiles (`src/canvas/overview.ts`) :
+Sous le zoom ×1/2, ou dès que l'écran montre plus de 30 régions (la limite du chargement
+des tuiles), la toile affiche les images de la pyramide (DATA-05c,
+[docs/overview.md](../../docs/overview.md)) au lieu des tuiles (`src/canvas/overview.ts`).
+Les tuiles restent tant que possible : elles sont exactes et à jour, alors que les images
+ont jusqu'à une minute de retard et regroupent les détails (4 × 4 pixels au niveau 1).
 
 - **Niveau selon le zoom** : le niveau le plus grossier dont un pixel d'image couvre encore
-  au moins un pixel d'écran. Niveau 1 de ×1 à ×1/4, niveau 2 jusqu'à ×1/16, niveau 3 jusqu'à
+  au moins un pixel d'écran. Niveau 1 jusqu'à ×1/4, niveau 2 jusqu'à ×1/16, niveau 3 jusqu'à
   ×1/64, le dézoom minimal : la grille est infinie, on s'y déplace sans fin mais sans tout
   voir d'un coup.
 - **Images** : `GET /api/overview/{niveau}/{cx}/{cy}` (session) donne une URL signée de
@@ -82,7 +102,7 @@ Sous le zoom ×1, la toile affiche les images de la pyramide (DATA-05c,
   minute : une image affichée depuis plus de 2 minutes est redemandée au prochain dessin de
   la toile (déplacement ou delta), jamais par minuterie. Un pixel reçu cesse d'être peint
   par-dessus quand une image demandée au moins 3 minutes après lui est arrivée.
-- **« Voir tout le dessin »** : le bouton cadre la zone peinte (`config/global.bounds`),
+- **« Tout le dessin »** : le bouton en haut à droite de la toile cadre la zone peinte (`config/global.bounds`),
   avec une marge, dans les limites du zoom.
 
 ## Pause et grille bornée en temps réel (DRAW-04)
@@ -94,7 +114,7 @@ la page :
   hauteur − 1) est grisé, avec un trait sur le bord (`drawEdge`, `src/canvas/renderer.ts`).
   Le centre de l'écran reste sur la grille (`clampCamera`) : on ne peut pas s'en éloigner.
   Quand la taille change, la caméra y est ramenée. Grille infinie : rien de tout ça.
-- **Dessin hors de la grille** : « Poser le pixel » est désactivé et le pinceau ignore les
+- **Dessin hors de la grille** : « Poser » est désactivé et le pinceau ignore les
   pixels hors de la grille (WEB-04, WEB-05). Le worker refuse de toute façon (`out_of_bounds`).
 - **Pause** : le bandeau affiche « Toile en pause », le bouton et le pinceau sont bloqués.
 - Le quota restant et le dernier refus ne sont pas en temps réel : les règles Firestore
@@ -109,7 +129,7 @@ la page :
 - **Auteur et date** : `GET /api/tiles/{tx}/{ty}/meta` à la sélection, puis de nouveau
   quand un delta temps réel touche la tuile (une seule lecture par rafale, 300 ms après
   le dernier delta). Pas de lecture en boucle.
-- **Dessin** : palette de 16 couleurs, « Poser le pixel » envoie `POST /api/pixels`. Le
+- **Dessin** : palette de 16 couleurs en bas de la toile, « Poser » (carte du pixel sélectionné) envoie `POST /api/pixels`. Le
   `202` veut dire « accepté », pas « dessiné » :
   - le pixel est « posé » quand son delta arrive avec la couleur envoyée ;
   - sinon, 3 s plus tard, une lecture de `/api/state` dit si le worker l'a refusé
@@ -129,7 +149,7 @@ la page :
 
 ## Pinceau (WEB-05)
 
-- Outil « Pinceau » du panneau : taille de **1 à 100** pixels de côté (slider), carré ou
+- Outil « Pinceau » (barre d'outils à gauche de la toile) : taille de **1 à 100** pixels de côté (slider), carré ou
   rond, couleur de la palette. Glisser sur la toile peint ; le clic droit, la molette
   enfoncée, deux doigts ou les flèches déplacent la vue.
 - **Pixels d'un trait** (`src/brush/stroke.ts`) : le pinceau est appliqué en chaque point
@@ -148,17 +168,25 @@ la page :
   second canvas posé sur la toile. Ce n'est pas l'état : la toile, elle, ne change
   qu'avec les deltas et montre toujours l'état réel (sujet §3.3), et l'aperçu ne fait
   que marquer ce qui est en cours d'envoi, sans jamais passer pour un pixel posé. Un
-  pixel de l'aperçu disparaît quand la toile montre sa couleur (son delta est arrivé),
-  dès que son refus est connu, sinon au bout de 5 s ; un `/admin clear` vide l'aperçu.
-  La case « Aperçu de l'envoi » du panneau le désactive : seule la toile reste, mise à
-  jour par les deltas. Le choix est gardé dans le `localStorage` du navigateur
-  (`pixelwar.preview`).
+  pixel de l'aperçu reste jusqu'à ce que la toile montre sa couleur (son delta est
+  arrivé) ou que son refus soit connu, même si un gros trait met plusieurs secondes à
+  être traité. Au-delà de 60 s (pixel perdu), il disparaît ; un `/admin clear` vide
+  l'aperçu.
+  Le bouton « Aperçu de l'envoi » (œil, barre d'outils) masque le calque : seule la toile
+  reste, mise à jour par les deltas. Le choix est gardé dans le `localStorage` du
+  navigateur (`pixelwar.preview`).
+- **En attente** : la palette affiche le nombre de pixels envoyés dont le delta n'est pas
+  encore arrivé (« 1 240 en attente »), aperçu affiché ou masqué. Il descend au fil des
+  deltas et disparaît à zéro.
 - **Quota et refus** : chaque pixel couvert est **décompté tout de suite** du quota
   affiché (`PixelInspector.consume`), car `/api/state` ne le voit qu'une fois traité par
   le worker : deux traits rapides ne croient donc pas avoir tout le quota. Le trait
   s'arrête au quota restant, et rien n'est dessiné ni envoyé au-delà. Chaque lecture de
   `/api/state` recale sur le chiffre du serveur (dessins faits depuis Discord compris),
-  et c'est lui qui décide.
+  et c'est lui qui décide. Quand le quota connu est à 0, chaque nouvel essai (clic sur
+  « Poser le pixel » ou début de trait) et chaque retour sur l'onglet relisent
+  `/api/state`, au plus une fois toutes les 2 s : une limite relevée par
+  `/admin ratelimit` est prise en compte sans recharger la page. Jamais sur minuterie.
 - Un seul message par trait : 3 s après la fin, `/api/state` dit si le dernier refus
   appartient à l'un de ses événements ; l'aperçu du trait est alors retiré tout de
   suite. Après un échec d'envoi, le reste du trait est abandonné, jamais renvoyé

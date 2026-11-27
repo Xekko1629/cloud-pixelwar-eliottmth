@@ -31,6 +31,8 @@ export interface BrushContext {
   remaining(): number | null;
   // Reads /api/state again; resolves with the new quota, or null.
   reloadQuota(): Promise<UserQuota | null>;
+  // Out of quota as far as we know: asks the server again, on this try only.
+  recheckQuota?(): Promise<void>;
   // Shows the pixels of the stroke at once, on the preview layer.
   preview?(pixels: readonly DrawPixel[]): void;
   // Takes back the preview of a refused stroke.
@@ -93,7 +95,10 @@ export class Brush {
   }
 
   begin(point: Point | null): void {
-    if (point === null || this.block() !== null) return;
+    if (point === null) return;
+    // The server may allow more (new minute, /admin ratelimit): the next try will know.
+    if (this.block() === 'quota') void this.context.recheckQuota?.();
+    if (this.block() !== null) return;
     this.strokeId += 1;
     this.stroke = new Stroke({
       color: this.context.color(),

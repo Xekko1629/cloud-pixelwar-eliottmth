@@ -99,7 +99,14 @@ describe('Brush', () => {
     expect(paused.brush.block()).toBe('paused');
     expect(paused.fetch).not.toHaveBeenCalled();
 
-    expect(setup({ remaining: 0 }).brush.block()).toBe('quota');
+    const empty = setup({ remaining: 0 });
+    const recheck = vi.fn(async () => {});
+    empty.context.recheckQuota = recheck;
+    expect(empty.brush.block()).toBe('quota');
+    // A try while out of quota asks the server again (the limit may have changed).
+    empty.brush.begin({ x: 0, y: 0 });
+    expect(recheck).toHaveBeenCalledTimes(1);
+    expect(empty.fetch).not.toHaveBeenCalled();
 
     const limited = setup({ remaining: 3 });
     limited.brush.setSize(5);

@@ -49,24 +49,28 @@ describe('PreviewLayer', () => {
     expect(preview.size).toBe(0);
   });
 
-  it('keeps a pixel 5 s at most by default', () => {
+  it('keeps a pixel until its delta or its refusal, 60 s at most', () => {
     const delays: number[] = [];
     const preview = new PreviewLayer({ setTimer: (_callback, ms) => delays.push(ms) });
     preview.add([{ x: 1, y: 0, color: 4 }]);
-    expect(delays).toEqual([5_000]);
+    expect(delays).toEqual([60_000]);
   });
 
-  it('shows nothing while turned off, and clears what was shown', () => {
-    const { preview, changes } = setup();
+  it('draws nothing while turned off, but still counts what is pending', () => {
+    const { preview, changes, canvas, source } = setup();
     preview.add([{ x: 1, y: 0, color: 4 }]);
     preview.setEnabled(false);
-    expect(preview.size).toBe(0);
     expect(changes).toHaveBeenLastCalledWith('all');
+    expect(preview.get(0, 0)).toBeNull();
+    expect(preview.keys()).toEqual([]);
     preview.add([{ x: 2, y: 0, color: 4 }]);
-    expect(preview.size).toBe(0);
-    preview.setEnabled(true);
-    preview.add([{ x: 2, y: 0, color: 4 }]);
+    expect(preview.size).toBe(2);
+    // A delta still settles the hidden pixels.
+    canvas[1] = 4;
+    preview.settle([{ tx: 0, ty: 0 }], source);
     expect(preview.size).toBe(1);
+    preview.setEnabled(true);
+    expect(preview.get(0, 0)?.[2]).toBe(4);
   });
 
   it('is cleared by a new canvas version', () => {

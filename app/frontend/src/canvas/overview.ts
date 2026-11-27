@@ -1,14 +1,24 @@
 import { overviewSpan, type OverviewLevel } from '@pixelwar/shared/overview';
 import type { Bounds } from '@pixelwar/shared/grid';
+import { visibleRegions } from '../realtime/feed';
 import { visiblePixels, type Camera, type PixelRect, type Viewport } from './camera';
 
-// Far view (WEB-03d): below FAR_ZOOM, the canvas shows the 256×256 images of the pyramid
-// (DATA-05c, docs/overview.md) instead of the tiles, and paints the realtime pixels over
-// them. The worker rebuilds the changed images every minute; in between, the deltas keep
-// the far view live.
+// Far view (WEB-03d): when the tiles cannot be shown, the canvas shows the 256×256 images of
+// the pyramid (DATA-05c, docs/overview.md) instead, and paints the realtime pixels over them.
+// The worker rebuilds the changed images every minute; in between, the deltas keep the far
+// view live. The tiles stay as long as possible: they are exact and up to date, the images
+// lag behind and merge the details.
 
 /** Below this zoom (CSS pixels per grid pixel), the far view replaces the tiles. */
-export const FAR_ZOOM = 1;
+export const FAR_ZOOM = 1 / 2;
+
+/**
+ * The far view is shown below FAR_ZOOM, or sooner when the screen shows more regions than
+ * one view may load (30, the Firestore `in` limit of the deltas listener).
+ */
+export function isFarView(camera: Camera, viewport: Viewport): boolean {
+  return camera.zoom < FAR_ZOOM || visibleRegions(visiblePixels(camera, viewport)) === null;
+}
 // A shown image older than this is asked again: the worker rebuilds the changed images
 // every minute. Only when the canvas is redrawn (a move or a delta), never on a timer.
 const STALE_MS = 2 * 60_000;

@@ -7,9 +7,9 @@ import type { TileChange } from '../realtime/live';
 // drawn over the canvas, never mixed with its tiles. The canvas itself only changes with
 // the deltas: it always shows the real state, the preview only marks what is pending.
 //
-// A preview pixel disappears when the canvas shows its colour (its delta arrived), or
-// after `ttlMs` (refused, lost, or drawn over by someone else meanwhile). A refusal is known
-// about 3 s after the send (Brush, PixelInspector), so 5 s is enough and keeps it short.
+// A preview pixel stays until the canvas shows its colour (its delta arrived) or its refusal
+// is known (Brush, PixelInspector): a large stroke may take the workers several seconds.
+// `ttlMs` is only a safety net for a pixel lost, or drawn over by someone else meanwhile.
 
 export interface PreviewOptions {
   ttlMs?: number;
@@ -26,7 +26,7 @@ export class PreviewLayer implements TileColorsSource {
   private on = true;
 
   constructor(options: PreviewOptions = {}) {
-    this.ttlMs = options.ttlMs ?? 5_000;
+    this.ttlMs = options.ttlMs ?? 60_000;
     this.setTimer = options.setTimer ?? ((callback, ms) => setTimeout(callback, ms));
   }
 
@@ -34,12 +34,17 @@ export class PreviewLayer implements TileColorsSource {
     return this.on;
   }
 
-  /** Turned off, the layer stays empty: only the canvas state is shown, nothing pending. */
+  /**
+   * Turned off, the layer is not drawn: only the canvas state shows. What is pending is
+   * still followed, so the count of pixels waiting for their delta stays right.
+   */
   setEnabled(enabled: boolean): void {
+    if (enabled === this.on) return;
     this.on = enabled;
-    if (!enabled) this.clear();
+    this.notify('all');
   }
 
+  /** Pixels sent and not yet shown by the canvas (their delta has not arrived). */
   get size(): number {
     let total = 0;
     for (const tile of this.tiles.values()) total += tile.count;
@@ -47,11 +52,12 @@ export class PreviewLayer implements TileColorsSource {
   }
 
   get(tx: number, ty: number): Uint8Array | null {
-    return this.tiles.get(`${tx},${ty}`)?.colors ?? null;
+    return this.on ? this.tiles.get(`${tx},${ty}`)?.colors ?? null : null;
   }
 
   /** Tiles that hold preview pixels, to draw the layer without scanning the viewport. */
   keys(): TileKey[] {
+    if (!this.on) return [];
     return [...this.tiles.keys()].map((key) => {
       const [tx, ty] = key.split(',').map(Number) as [number, number];
       return { tx, ty };
@@ -65,7 +71,7 @@ export class PreviewLayer implements TileColorsSource {
 
   /** Shows the pixels just sent, until their delta arrives or `ttlMs` passes. */
   add(pixels: readonly DrawPixel[]): void {
-    if (!this.on || pixels.length === 0) return;
+    if (pixels.length === 0) return;
     const touched = new Map<string, TileKey>();
     for (const { x, y, color } of pixels) {
       const { tx, ty, index } = locatePixel(x, y);

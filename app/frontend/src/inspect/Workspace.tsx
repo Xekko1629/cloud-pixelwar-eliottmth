@@ -62,17 +62,36 @@ export function Workspace({ api, live }: { api: ApiClient; live: LiveCanvas }) {
       return quota ? remainingPixels(quota, Date.now()) : null;
     },
     reloadQuota: () => inspector.reloadQuota(),
+    recheckQuota: () => inspector.recheckQuota(),
     preview: (pixels) => preview.add(pixels),
     forget: (pixels) => preview.forget(pixels),
     consume: (count) => inspector.consume(count),
   }));
   const [tool, setTool] = useState<CanvasTool>('inspect');
   const { selected } = useSyncExternalStore(inspector.subscribe, inspector.getState);
-  const { config } = useSyncExternalStore(live.subscribeState, live.getState);
+  const { config, tiles } = useSyncExternalStore(live.subscribeState, live.getState);
+  // Pixels sent whose delta has not arrived yet, shown or not on the preview layer.
+  const subscribePending = useMemo(() => (listener: () => void) => preview.subscribe(() => listener()), [preview]);
+  const pending = useSyncExternalStore(subscribePending, () => preview.size);
+  const note = config?.paused ? 'Toile en pause' : tiles === 'loading' ? 'Chargement…'
+    : tiles === 'error' ? 'Chargement impossible, nouvel essai dans 10 s' : null;
 
   useEffect(() => {
     inspector.start();
     return () => inspector.stop();
+  }, [inspector]);
+
+  // Back on the tab: the quota may have changed meanwhile (a new minute, /admin ratelimit).
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void inspector.recheckQuota();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
   }, [inspector]);
 
   useEffect(() => {
@@ -96,6 +115,7 @@ export function Workspace({ api, live }: { api: ApiClient; live: LiveCanvas }) {
 
   return (
     <div className="workspace">
+      {note && <p className="toast toast--top" data-warn={config?.paused === true} role="status">{note}</p>}
       <PixelCanvas
         live={live}
         tool={tool}
@@ -114,6 +134,7 @@ export function Workspace({ api, live }: { api: ApiClient; live: LiveCanvas }) {
         onTool={chooseTool}
         previewOn={previewOn}
         onPreview={setPreviewOn}
+        pending={pending}
       />
     </div>
   );
