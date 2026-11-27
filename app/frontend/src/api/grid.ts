@@ -30,7 +30,10 @@ export interface UserQuota {
 
 export interface DrawAccepted {
   correlationId: string;
+  /** The FIRST eventIds.length pixels of the request were accepted (ADR-0017). */
   eventIds: string[];
+  /** The other pixels: refused before publication, never drawn. */
+  refused?: { count: number; reason: string; retryAfterSeconds: number | null };
 }
 
 const record = (value: unknown): Record<string, unknown> | null =>
@@ -91,11 +94,21 @@ export async function postPixels(api: ApiClient, pixels: readonly DrawPixel[]): 
   }
   const body = record(await api.json('/api/pixels', { pixels }));
   const eventIds = body?.event_ids;
-  if (!body || typeof body.correlation_id !== 'string' || !Array.isArray(eventIds) || eventIds.length !== pixels.length ||
-      !eventIds.every((id) => typeof id === 'string')) {
+  if (!body || typeof body.correlation_id !== 'string' || !Array.isArray(eventIds) || eventIds.length < 1 ||
+      eventIds.length > pixels.length || !eventIds.every((id) => typeof id === 'string')) {
     invalid('draw');
   }
-  return { correlationId: body.correlation_id, eventIds: eventIds as string[] };
+  // Fewer ids than pixels only with the explanation of the refused ones, and the other way round.
+  const refused = record(body.refused);
+  if ((eventIds.length < pixels.length) !== (refused !== null) || (refused &&
+      (refused.count !== pixels.length - eventIds.length || typeof refused.reason !== 'string' ||
+       !(refused.retry_after_seconds === null || count(refused.retry_after_seconds))))) {
+    invalid('draw');
+  }
+  return {
+    correlationId: body.correlation_id, eventIds: eventIds as string[],
+    ...(refused ? { refused: { count: refused.count as number, reason: refused.reason as string, retryAfterSeconds: refused.retry_after_seconds as number | null } } : {}),
+  };
 }
 
 export interface OverviewUrl {

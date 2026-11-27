@@ -51,6 +51,11 @@ export interface DrawOptions {
   max_write_documents?: number;
   max_estimated_bytes?: number;
   delta_ttl_ms?: number;
+  /**
+   * Sources whose quota was already reserved before publication (ADR-0017): the worker
+   * neither evaluates nor consumes it for them. Default: none, every pixel is counted here.
+   */
+  reserved_sources?: readonly DrawCommand['source'][];
 }
 
 export function drawOptions(options: DrawOptions) {
@@ -60,7 +65,11 @@ export function drawOptions(options: DrawOptions) {
     max_write_documents: options.max_write_documents ?? 450,
     max_estimated_bytes: options.max_estimated_bytes ?? 8 * 1024 * 1024,
     delta_ttl_ms: options.delta_ttl_ms ?? 3_600_000,
+    reserved_sources: new Set<DrawCommand['source']>(options.reserved_sources ?? []),
   };
+  for (const source of result.reserved_sources) {
+    if (source !== 'web' && source !== 'discord') throw new Error('reserved_sources only accepts web and discord');
+  }
   for (const value of [result.max_pixels, result.max_write_documents, result.max_estimated_bytes, result.delta_ttl_ms]) {
     if (!Number.isSafeInteger(value) || value < 1) throw new Error('Draw budgets and TTL must be positive safe integers');
   }

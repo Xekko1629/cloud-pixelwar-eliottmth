@@ -36,6 +36,34 @@ function setup(options: { config?: Partial<CanvasConfig>; remaining?: number | n
 }
 
 describe('Brush', () => {
+  it('keeps only the granted start of a request and stops the stroke there (ADR-0017)', async () => {
+    let next = 0;
+    // The first request gets 300 of its 500 pixels; the second, already in flight, nothing.
+    const { brush, bodies, context } = setup({ answer: () => (next++ === 0
+      ? jsonResponse(202, { correlation_id: 'c', event_ids: Array.from({ length: 300 }, (_, i) => `e-${i}`), refused: { count: 200, reason: 'insufficient_quota', retry_after_seconds: 40 } })
+      : jsonResponse(429, { error: 'insufficient_quota', retry_after_seconds: 40 })) });
+    context.forget = vi.fn();
+    brush.setSize(30);
+    brush.begin({ x: 0, y: 0 });
+    brush.end();
+    await flush();
+    expect(bodies.map((b) => b.pixels.length)).toEqual([500, 400]);
+    expect(brush.getState().stroke).toEqual({ status: 'rejected', sent: 300, reason: 'insufficient_quota' });
+    expect(vi.mocked(context.forget).mock.calls.map(([pixels]) => pixels.length).sort()).toEqual([200, 400]);
+    expect(strokeText(brush.getState().stroke)).toBe('Trait envoyé : 300 pixels, une partie refusée : quota de pixels dépassé.');
+  });
+
+  it('shows a 429 as a refusal, not as an uncertain failure', async () => {
+    const { brush, context } = setup({ answer: () => jsonResponse(429, { error: 'paused', retry_after_seconds: null }) });
+    context.forget = vi.fn();
+    brush.setSize(2);
+    brush.begin({ x: 0, y: 0 });
+    brush.end();
+    await flush();
+    expect(brush.getState().stroke).toEqual({ status: 'rejected', sent: 0, reason: 'paused' });
+    expect(context.forget).toHaveBeenCalledTimes(1);
+  });
+
   it('sends full batches during the stroke and the rest at the end, each pixel once', async () => {
     const { brush, bodies } = setup();
     brush.setSize(30);

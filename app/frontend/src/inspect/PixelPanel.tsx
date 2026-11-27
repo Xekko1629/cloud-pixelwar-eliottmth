@@ -12,6 +12,8 @@ import { remainingPixels, type DrawBlock, type DrawFeedback, type PixelInspector
 const REJECTIONS: Record<string, string> = {
   paused: 'la toile est en pause',
   rate_limit: 'quota de pixels dépassé',
+  insufficient_quota: 'quota de pixels dépassé',
+  drawing_disabled: 'dessin désactivé pour ce compte',
   out_of_bounds: 'hors de la grille',
   expired: 'la demande a expiré',
   batch_budget_exceeded: 'trop de pixels d’un coup',
@@ -20,6 +22,7 @@ const REJECTIONS: Record<string, string> = {
 const ERRORS: Record<string, string> = {
   publish_unavailable: 'envoi incertain, une partie a peut-être été dessinée. Vérifie avant de réessayer.',
   too_many_requests: 'trop de requêtes, réessaie dans un instant.',
+  quota_unavailable: 'quota indisponible, rien n’a été envoyé. Réessaie.',
 };
 
 const BLOCKS: Partial<Record<DrawBlock, string>> = {

@@ -25,6 +25,9 @@ it('initializes Firestore on first use only and groups through the DATA-02 proce
   expect(await process(command)).toEqual({ type: 'pixel-processed' }); await process(command);
   expect(mocks.construct).toHaveBeenCalledExactlyOnceWith({ projectId: 'demo-pixelwar-test' });
   expect(mocks.create).toHaveBeenCalledTimes(1); expect(mocks.createGroup).toHaveBeenCalledTimes(1);
+  // ADR-0017: both processors skip the quota of web pixels, reserved upstream.
+  expect(mocks.create.mock.calls[0][1]).toEqual({ reserved_sources: ['web'] });
+  expect(mocks.createGroup.mock.calls[0][1]).toEqual({ reserved_sources: ['web'] });
   expect(mocks.commit.mock.calls[0][2]).toMatchObject({ max_group: MAX_DRAW_GROUP });
   expect(mocks.process).toHaveBeenCalledTimes(2); // Idle instance: each command alone.
 });

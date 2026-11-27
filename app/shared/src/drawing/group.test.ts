@@ -100,6 +100,86 @@ describe('group commit equivalence (ADR-0014)', () => {
   });
 });
 
+describe('group commit equivalence with web quota reserved upstream (ADR-0017)', () => {
+  const seen = new Set<string>();
+  afterAll(() => {
+    expect([...seen].sort()).toEqual(['applied', 'discord_rate_limit', 'out_of_bounds', 'paused', 'superseded']);
+  });
+  it.each(Array.from({ length: 40 }, (_, seed) => seed + 1))('matches one transaction per command, seed %i', async (seed) => {
+    const pick = random(seed + 1000);
+    const commands = Array.from({ length: 3 + pick(20) }, () => input({
+      source: pick(2) ? 'web' : 'discord',
+      occurred_at: new Date(now - pick(5) * 1000).toISOString(),
+      author: { uid: users[pick(3)], name: 'User' },
+      pixels: [{ x: [0, 40, 80, 10_000][pick(4)], y: pick(2), color: 1 + pick(16) }],
+    }));
+    const config = {
+      default_limit_per_minute: 2, ...(pick(5) === 0 ? { paused: true } : {}),
+      ...(pick(3) === 0 ? { size: { width: 10_000, height: 10_000 } } : {}),
+    };
+    const options: DrawOptions = { now: () => now, reserved_sources: ['web'] };
+    const single = fakeStore(config); const grouped = fakeStore(config);
+    // A newer pixel already stored at (0, 0): older commands of the group are superseded there.
+    const previous = input({ author: { uid: users[1], name: 'User' } });
+    for (const { db, store } of [single, grouped]) {
+      store.set('config/global', { ...store.get('config/global'), paused: false });
+      await createDrawProcessor(db, options)(previous);
+      store.set('config/global', { ...store.get('config/global'), paused: config.paused ?? false });
+    }
+    const one = createDrawProcessor(single.db, options);
+    const sequential = [];
+    for (const command of [...commands].sort(compareEvents)) sequential.push(await one(command));
+    const results = await createGroupDrawProcessor(grouped.db, options)(commands);
+    for (const result of results) {
+      seen.add(result.reason === 'rate_limit' ? `${result.source}_rate_limit` : result.reason ?? (result.applied_pixels ? 'applied' : 'superseded'));
+      if (result.source === 'web') expect(result.quota).toBeUndefined();
+    }
+    const byId = new Map(sequential.map((result) => [result.event_id, result]));
+    expect(results).toEqual(commands.map((command) => byId.get(command.event_id)));
+    expect(withoutDeltas(grouped.store)).toEqual(withoutDeltas(single.store));
+  });
+});
+
+describe('web quota reserved upstream (ADR-0017)', () => {
+  const reservedOptions = { now: () => now, reserved_sources: ['web'] as const };
+  it.each(['group', 'single'] as const)('never reads nor writes users/{uid} for accepted web pixels (%s)', async (mode) => {
+    const { db, store, tx } = fakeStore({ default_limit_per_minute: 1 });
+    const commands = [input(), input({ pixels: [{ x: 1, y: 0, color: 2 }] }), input({ pixels: [{ x: 2, y: 0, color: 3 }] })];
+    const results = mode === 'group'
+      ? await createGroupDrawProcessor(db, reservedOptions)(commands)
+      : await (async () => { const out = []; for (const command of commands) out.push(await createDrawProcessor(db, reservedOptions)(command)); return out; })();
+    expect(results.every((result) => result.type === 'pixel-processed' && result.applied_pixels === 1 && !result.quota)).toBe(true);
+    const touched = [...tx.get.mock.calls, ...tx.getAll.mock.calls].flat().map((ref) => (ref as { path: string }).path);
+    expect(touched.some((path) => path.startsWith('users/') || path.startsWith('ratelimit_overrides/'))).toBe(false);
+    expect(store.has(`users/${users[0]}`)).toBe(false);
+  });
+
+  it.each(['group', 'single'] as const)('still remembers a refused web pixel in last_rejection (%s)', async (mode) => {
+    const { db, store } = fakeStore({ paused: true });
+    store.set(`users/${users[0]}`, { window_start: Timestamp.fromMillis(now - 30_000), used_pixels: 3, limit_per_minute: 20, updated_at: Timestamp.fromMillis(now - 1000), last_rejection: null });
+    const refused = input();
+    if (mode === 'group') await createGroupDrawProcessor(db, reservedOptions)([refused, input({ author: { uid: users[1], name: 'New' } })]);
+    else await createDrawProcessor(db, reservedOptions)(refused);
+    expect(store.get(`users/${users[0]}`)).toMatchObject({ used_pixels: 3, last_rejection: { event_id: refused.event_id, reason: 'paused' } });
+    // A first action refused creates the document with nothing consumed, as before (DRAW-04).
+    if (mode === 'group') expect(store.get(`users/${users[1]}`)).toMatchObject({ used_pixels: 0, last_rejection: { reason: 'paused' } });
+  });
+
+  it('keeps counting Discord pixels in the same group, on the same counter', async () => {
+    const { db, store } = fakeStore({ default_limit_per_minute: 1 });
+    const results = await createGroupDrawProcessor(db, reservedOptions)([
+      input({ pixels: [{ x: 1, y: 0, color: 1 }] }), input({ source: 'discord', pixels: [{ x: 2, y: 0, color: 1 }] }),
+      input({ source: 'discord', pixels: [{ x: 3, y: 0, color: 1 }] }),
+    ]);
+    expect(results.map((r) => [r.source, r.reason ?? r.applied_pixels])).toEqual([['web', 1], ['discord', 1], ['discord', 'rate_limit']]);
+    expect(store.get(`users/${users[0]}`)).toMatchObject({ used_pixels: 1 });
+  });
+
+  it('refuses an unknown reserved source', () => {
+    expect(() => createGroupDrawProcessor(fakeStore().db, { reserved_sources: ['mail' as 'web'] })).toThrow('reserved_sources');
+  });
+});
+
 describe('createGroupDrawProcessor', () => {
   it('writes users, each tile and one delta per region once for the whole group', async () => {
     const { db, store, tx } = fakeStore();

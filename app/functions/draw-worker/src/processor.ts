@@ -15,6 +15,12 @@ export type ProcessDraw = (command: DrawCommand) => Promise<DrawResult>;
  */
 export const MAX_DRAW_GROUP = 128;
 
+/**
+ * ADR-0017: web-proxy reserved the quota of every web pixel before publishing it (only it may
+ * publish web pixels on pixel-draw). The worker counts the quota of Discord pixels only.
+ */
+export const DRAW_OPTIONS = { reserved_sources: ['web'] } as const;
+
 /** Group commit of ADR-0014: concurrent pushes of one instance share one Firestore transaction. */
 export function createLazyDrawProcessor(projectId: string, write?: (line: string) => void): ProcessDraw {
   let process: ProcessDraw | undefined;
@@ -23,7 +29,7 @@ export function createLazyDrawProcessor(projectId: string, write?: (line: string
       const db = new Firestore({ projectId });
       // One transaction at a time per instance: the last timing is the one of the group just notified.
       let timing: GroupTiming | undefined;
-      process = createGroupCommit(createDrawProcessor(db), createGroupDrawProcessor(db, {}, (value) => { timing = value; }), {
+      process = createGroupCommit(createDrawProcessor(db, DRAW_OPTIONS), createGroupDrawProcessor(db, DRAW_OPTIONS, (value) => { timing = value; }), {
         max_group: MAX_DRAW_GROUP,
         // One line per transaction (not per pixel): group size, wait and Firestore time are what DRAW-05 shows.
         onGroup: ({ size, outcome, wait_ms }) => {

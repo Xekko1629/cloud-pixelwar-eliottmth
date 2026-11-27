@@ -125,6 +125,14 @@ describe('PixelInspector', () => {
     expect(inspector.getState().feedback).toEqual({ status: 'pending' });
   });
 
+  it('shows a quota refusal of the request as a refusal (ADR-0017)', async () => {
+    const { inspector, routes } = setup();
+    routes.pixels = () => jsonResponse(429, { error: 'insufficient_quota', retry_after_seconds: 40 });
+    inspector.select({ x: 1, y: 1 });
+    await inspector.draw();
+    expect(inspector.getState().feedback).toEqual({ status: 'rejected', reason: 'insufficient_quota' });
+  });
+
   it('shows a failed request without sending it again', async () => {
     const { inspector, routes, fetch } = setup();
     routes.pixels = () => jsonResponse(503, { error: 'publish_unavailable' });

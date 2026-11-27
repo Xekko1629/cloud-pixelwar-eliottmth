@@ -6,6 +6,7 @@
   "dependencies": {
     "@google-cloud/functions-framework": "5.0.5",
     "@google-cloud/pubsub": "6.3.2",
-    "@pixelwar/shared": "*"
+    "@pixelwar/shared": "*",
+    "google-auth-library": "11.3.2"
   }
 }

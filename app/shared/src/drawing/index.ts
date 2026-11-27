@@ -7,3 +7,7 @@ export {
   type DrawCommand, type DrawResult, type DrawOptions,
 } from './command';
 export { runDrawTransaction, isRetryableTransactionError, TRANSACTION_ATTEMPTS } from './retry';
+export {
+  createQuotaReservation, parseReservationRequest, InvalidReservationRequest,
+  type Reservation, type ReservationRequest,
+} from './reservation';

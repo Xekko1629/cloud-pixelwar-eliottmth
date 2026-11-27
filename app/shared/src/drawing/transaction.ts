@@ -42,12 +42,17 @@ export function createDrawProcessor(db: Firestore, options: DrawOptions = {}) {
       const existing = await tx.get(eventRef);
       if (existing.exists) return storedResult(existing.data()!, command);
 
-      const [global, override, user] = await tx.getAll(configRef, ref(`${COLLECTIONS.overrides}/${command.author.uid}`), userRef);
+      // ADR-0017: a reserved source (web) neither reads nor writes the quota of users/{uid}
+      // when accepted; the document is read only to remember a refusal.
+      const reserved = settings.reserved_sources.has(command.source);
+      const [global, override, user] = reserved
+        ? [await tx.get(configRef), undefined, undefined]
+        : await tx.getAll(configRef, ref(`${COLLECTIONS.overrides}/${command.author.uid}`), userRef);
       const config = global.data() as GlobalConfigDocument;
       validateConfig(config);
-      const overrideData = override.exists ? override.data() as RateLimitOverrideDocument : null;
+      const overrideData = override?.exists ? override.data() as RateLimitOverrideDocument : null;
       const limit = resolveRateLimit(config, overrideData); // Fail closed even for a paused/expired command.
-      const usage = user.exists ? user.data() as UserStateDocument : null;
+      const usage = user?.exists ? user.data() as UserStateDocument : null;
       let now = processingTime(settings.now, settings.delta_ttl_ms);
       assertNotFuture(command, now);
 
@@ -66,12 +71,14 @@ export function createDrawProcessor(db: Firestore, options: DrawOptions = {}) {
         });
         return result;
       };
-      const reject = (reason: DrawResult['reason'], quota?: DrawResult['quota']): DrawResult => {
+      // Every refusal happens before the first write: reading users/{uid} here is still allowed.
+      const reject = async (reason: DrawResult['reason'], quota?: DrawResult['quota']): Promise<DrawResult> => {
         const result = { ...makeResult(), type: 'pixel-rejected' as const, reason: reason! };
         const rejection = { event_id: command.event_id, reason: reason!, at: Timestamp.fromMillis(now) };
+        const stored = user ?? await tx.get(userRef);
         // Preserve quota/window on rejection. A first action refused (pause, out of bounds…)
         // creates the document with nothing consumed, so GET /api/state can explain it (DRAW-04).
-        if (user.exists) tx.update(userRef, { last_rejection: rejection, updated_at: Timestamp.fromMillis(now) });
+        if (stored.exists) tx.update(userRef, { last_rejection: rejection, updated_at: Timestamp.fromMillis(now) });
         else {
           tx.set(userRef, {
             window_start: Timestamp.fromMillis(Math.floor(now / RATE_LIMIT_WINDOW_MS) * RATE_LIMIT_WINDOW_MS),
@@ -80,15 +87,16 @@ export function createDrawProcessor(db: Firestore, options: DrawOptions = {}) {
         }
         return persist(quota ? { ...result, quota } : result);
       };
-      if (now - command.occurred_ms > MAX_DRAW_AGE_MS) return reject('expired');
-      if (config.paused) return reject('paused');
-      if (command.pixels.some((pixel) => !isInsideGrid(pixel, config.size))) return reject('out_of_bounds');
+      if (now - command.occurred_ms > MAX_DRAW_AGE_MS) return await reject('expired');
+      if (config.paused) return await reject('paused');
+      if (command.pixels.some((pixel) => !isInsideGrid(pixel, config.size))) return await reject('out_of_bounds');
 
       const tiles = groupPixelsByTile(command.pixels, config.canvas_version, settings.max_pixels);
       const regions = groupPixelsByRegion(command.pixels, settings.max_pixels);
-      if (countBatchDocuments(tiles.size, regions.size) + 3 > settings.max_write_documents) return reject('batch_budget_exceeded');
-      let quota = evaluateRateLimit({ config, override: overrideData, usage, now_ms: now, pixel_count: command.pixels.length });
-      if (!quota.allowed) return reject('rate_limit', quota);
+      if (countBatchDocuments(tiles.size, regions.size) + 3 > settings.max_write_documents) return await reject('batch_budget_exceeded');
+      const evaluate = () => evaluateRateLimit({ config, override: overrideData, usage, now_ms: now, pixel_count: command.pixels.length });
+      let quota = reserved ? undefined : evaluate();
+      if (quota && !quota.allowed) return await reject('rate_limit', quota);
 
       // All tile reads before ANY write. Refresh the worker clock/quota after reads.
       const entries = [...tiles.entries()];
@@ -97,9 +105,9 @@ export function createDrawProcessor(db: Firestore, options: DrawOptions = {}) {
       ]));
       now = processingTime(settings.now, settings.delta_ttl_ms);
       assertNotFuture(command, now);
-      if (now - command.occurred_ms > MAX_DRAW_AGE_MS) return reject('expired');
-      quota = evaluateRateLimit({ config, override: overrideData, usage, now_ms: now, pixel_count: command.pixels.length });
-      if (!quota.allowed) return reject('rate_limit', quota);
+      if (now - command.occurred_ms > MAX_DRAW_AGE_MS) return await reject('expired');
+      quota = reserved ? undefined : evaluate();
+      if (quota && !quota.allowed) return await reject('rate_limit', quota);
 
       const plans = entries.map(([id, tile], index) => planTileChanges({
         id, ...tile,
@@ -110,7 +118,7 @@ export function createDrawProcessor(db: Firestore, options: DrawOptions = {}) {
       const appliedRegions = applied.length ? groupPixelsByRegion(applied, settings.max_pixels) : new Map();
       const estimatedBytes = plans.filter((plan) => plan.applied.length).reduce((sum, plan) => sum + plan.estimated_bytes, 0)
         + applied.length * 5 + 16_384; // Headroom for config, user, result and document framing.
-      if (estimatedBytes > settings.max_estimated_bytes) return reject('batch_budget_exceeded');
+      if (estimatedBytes > settings.max_estimated_bytes) return await reject('batch_budget_exceeded');
 
       for (let index = 0; index < plans.length; index++) {
         if (!plans[index].applied.length) continue;
@@ -126,18 +134,20 @@ export function createDrawProcessor(db: Firestore, options: DrawOptions = {}) {
           pixels: Buffer.from(encodeDelta(group.pixels, settings.max_pixels)),
         });
       }
-      const next = quota.next_usage;
-      tx.set(userRef, {
-        window_start: Timestamp.fromMillis(next.window_start_ms), used_pixels: next.used_pixels,
-        limit_per_minute: next.limit_per_minute, updated_at: Timestamp.fromMillis(next.updated_at_ms), last_rejection: null,
-      }, { merge: true });
+      if (quota?.allowed) {
+        const next = quota.next_usage;
+        tx.set(userRef, {
+          window_start: Timestamp.fromMillis(next.window_start_ms), used_pixels: next.used_pixels,
+          limit_per_minute: next.limit_per_minute, updated_at: Timestamp.fromMillis(next.updated_at_ms), last_rejection: null,
+        }, { merge: true });
+      }
       if (applied.length) {
         const bounds = expandedBounds(config.bounds, applied);
         if (JSON.stringify(bounds) !== JSON.stringify(config.bounds)) tx.update(configRef, { bounds });
       }
       return persist({
         ...makeResult(), applied_pixels: applied.length, ignored_pixels: command.pixels.length - applied.length,
-        regions: [...appliedRegions.keys()].sort(), quota,
+        regions: [...appliedRegions.keys()].sort(), ...(quota ? { quota } : {}),
       });
     });
   };

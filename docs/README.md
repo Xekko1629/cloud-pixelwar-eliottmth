@@ -26,6 +26,7 @@
 - [Déploiement dev du parcours `/get` (image de la toile) et checklist de test — BOT-06](deploy-get-path.md)
 - [`/snapshot` : image horodatée, fiche de demande et URL signée — BOT-07a, BOT-07b](snapshot.md)
 - [Proxy d'écriture web : `POST /api/pixels` — DRAW-01](web-proxy.md)
+- [Réservation du quota web : `quota-reserver` — ADR-0017](quota-reserver.md)
 - [Lecteur de la grille pour le web : tuiles, métadonnées et état — SRV-11](tile-reader.md)
 - [Vue éloignée : pyramide d'images et URL signées — DATA-05c](overview.md)
 - [Temps réel du navigateur : listeners Firestore et Security Rules — DRAW-03a](realtime.md)

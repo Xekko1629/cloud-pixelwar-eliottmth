@@ -14,7 +14,8 @@ describe('web-proxy through the real Functions Framework', () => {
   let url: string;
   const publish = vi.fn().mockResolvedValue('confirmed');
   beforeAll(async () => {
-    http('web-proxy-http-test', createWebProxyHandler({ frontendOrigin: ORIGIN, publish, log: vi.fn() }));
+    http('web-proxy-http-test', createWebProxyHandler({ frontendOrigin: ORIGIN, publish, log: vi.fn(),
+      reserve: async ({ pixel_count }) => ({ granted: pixel_count, refused: 0, retry_after_seconds: null, limit_per_minute: 1000, remaining_pixels: 0, reset_at: '2026-11-20T10:01:00.000Z' }) }));
     server = getTestServer('web-proxy-http-test');
     server.listen(0, '127.0.0.1'); await once(server, 'listening');
     url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/pixels`;

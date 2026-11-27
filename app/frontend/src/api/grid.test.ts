@@ -59,6 +59,30 @@ describe('fetchUserQuota', () => {
   });
 });
 
+describe('postPixels with a quota reserved before publication (ADR-0017)', () => {
+  const pixels = [{ x: 0, y: 0, color: 1 }, { x: 1, y: 0, color: 1 }, { x: 2, y: 0, color: 1 }];
+  it('reads a partial grant: the first pixels, and why the others were refused', async () => {
+    const { api } = client(jsonResponse(202, { correlation_id: 'c-1', event_ids: ['e-1', 'e-2'], refused: { count: 1, reason: 'insufficient_quota', retry_after_seconds: 40 } }));
+    expect(await postPixels(api, pixels)).toEqual({
+      correlationId: 'c-1', eventIds: ['e-1', 'e-2'], refused: { count: 1, reason: 'insufficient_quota', retryAfterSeconds: 40 },
+    });
+  });
+  it.each([
+    { correlation_id: 'c-1', event_ids: ['e-1', 'e-2'] },
+    { correlation_id: 'c-1', event_ids: ['e-1', 'e-2', 'e-3'], refused: { count: 0, reason: 'x', retry_after_seconds: null } },
+    { correlation_id: 'c-1', event_ids: ['e-1'], refused: { count: 1, reason: 'insufficient_quota', retry_after_seconds: null } },
+    { correlation_id: 'c-1', event_ids: ['e-1', 'e-2'], refused: { count: 1, reason: 2, retry_after_seconds: null } },
+    { correlation_id: 'c-1', event_ids: [], refused: { count: 3, reason: 'paused', retry_after_seconds: null } },
+  ])('refuses an answer that does not add up: %j', async (body) => {
+    const { api } = client(jsonResponse(202, body));
+    await expect(postPixels(api, pixels)).rejects.toThrow('Invalid draw answer');
+  });
+  it('surfaces a 429 as an ApiError with the reason', async () => {
+    const { api } = client(jsonResponse(429, { error: 'insufficient_quota', retry_after_seconds: 40 }));
+    await expect(postPixels(api, pixels)).rejects.toMatchObject({ status: 429, code: 'insufficient_quota' });
+  });
+});
+
 describe('postPixels', () => {
   it('posts the pixels with the session and returns the event ids', async () => {
     const { fetch, api } = client(jsonResponse(202, { correlation_id: 'c-1', event_ids: ['e-1'] }));

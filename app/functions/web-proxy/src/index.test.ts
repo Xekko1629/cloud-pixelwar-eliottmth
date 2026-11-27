@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { HttpFunction } from '@google-cloud/functions-framework';
 import { parseDrawPush } from '../../draw-worker/src/message';
+import type { Reservation } from '@pixelwar/shared/drawing';
 import { createWebProxyHandler, handleWebProxy } from './index';
 
 const ORIGIN = 'https://frontend-123456789.europe-west1.run.app';
@@ -28,16 +29,21 @@ function response() {
   res.status.mockReturnValue(res); res.set.mockReturnValue(res);
   return res;
 }
+const grant = (granted: number, requested: number, reason?: Reservation['reason']) => ({
+  granted, refused: requested - granted, ...(reason ? { reason } : {}), retry_after_seconds: reason === 'insufficient_quota' ? 40 : null,
+  limit_per_minute: 1000, remaining_pixels: 0, reset_at: '2026-11-20T10:01:00.000Z',
+});
 function setup(overrides = {}) {
   const publish = vi.fn().mockResolvedValue('message-id');
+  const reserve = vi.fn(async ({ pixel_count }: { pixel_count: number }) => grant(pixel_count, pixel_count));
   const log = vi.fn();
-  const handler = createWebProxyHandler({ frontendOrigin: ORIGIN, publish, log, now: () => NOW, newId: sequence(), ...overrides });
+  const handler = createWebProxyHandler({ frontendOrigin: ORIGIN, publish, reserve, log, now: () => NOW, newId: sequence(), ...overrides });
   const invoke = async (req = request()) => {
     const res = response();
     await handler(req as unknown as Parameters<HttpFunction>[0], res as unknown as Parameters<HttpFunction>[1]);
     return res;
   };
-  return { publish, log, invoke };
+  return { publish, reserve, log, invoke };
 }
 const headers = (res: ReturnType<typeof response>) => Object.assign({}, ...res.set.mock.calls.map(([value, extra]) =>
   typeof value === 'string' ? { [value]: extra } : value));
@@ -174,5 +180,48 @@ describe('web-proxy', () => {
     const res = response();
     await handleWebProxy(request() as unknown as Parameters<HttpFunction>[0], res as unknown as Parameters<HttpFunction>[1]);
     expect(res.status).toHaveBeenCalledWith(503);
+  });
+
+  describe('quota reserved before publication (ADR-0017)', () => {
+    const stroke = { pixels: [{ x: 1, y: 1, color: 1 }, { x: 2, y: 1, color: 1 }, { x: 3, y: 1, color: 1 }] };
+    it('reserves once per request with the correlation id and the gateway uid', async () => {
+      const { invoke, reserve } = setup();
+      await invoke(request({ body: stroke }));
+      expect(reserve).toHaveBeenCalledExactlyOnceWith({ reservation_id: `${ID.slice(0, -2)}00`, uid: USER, pixel_count: 3 });
+    });
+
+    it('publishes only the first granted pixels and tells the browser about the others', async () => {
+      const { invoke, publish } = setup({ reserve: vi.fn().mockResolvedValue(grant(2, 3, 'insufficient_quota')) });
+      const res = await invoke(request({ body: stroke }));
+      expect(publish.mock.calls.map(([event]) => event.payload.pixels[0].x)).toEqual([1, 2]);
+      expect(res.status).toHaveBeenCalledWith(202);
+      expect(res.json).toHaveBeenCalledWith({
+        correlation_id: `${ID.slice(0, -2)}00`, event_ids: [`${ID.slice(0, -2)}01`, `${ID.slice(0, -2)}02`],
+        refused: { count: 1, reason: 'insufficient_quota', retry_after_seconds: 40 },
+      });
+    });
+
+    it.each([['insufficient_quota', '40'], ['paused', undefined], ['drawing_disabled', undefined]] as const)(
+      'answers 429 and publishes nothing when nothing is granted (%s)', async (reason, retryAfter) => {
+        const { invoke, publish, log } = setup({ reserve: vi.fn().mockResolvedValue(grant(0, 3, reason)) });
+        const res = await invoke(request({ body: stroke }));
+        expect(publish).not.toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(429);
+        expect(headers(res)['Retry-After']).toBe(retryAfter);
+        expect(log.mock.calls.some(([, , fields]) => fields.event_type === `web.proxy.refused.${reason}`)).toBe(true);
+      });
+
+    it('answers 503 and publishes nothing when quota-reserver fails, without logging the error', async () => {
+      const { invoke, publish, log } = setup({ reserve: vi.fn().mockRejectedValue(new Error(`secret ${USER}`)) });
+      expect((await invoke(request({ body: stroke }))).status).toHaveBeenCalledWith(503);
+      expect(publish).not.toHaveBeenCalled();
+      expect(JSON.stringify(log.mock.calls)).not.toContain(USER);
+    });
+
+    it('is unavailable without quota-reserver', async () => {
+      const { invoke, publish } = setup({ reserve: undefined });
+      expect((await invoke()).status).toHaveBeenCalledWith(503);
+      expect(publish).not.toHaveBeenCalled();
+    });
   });
 });
