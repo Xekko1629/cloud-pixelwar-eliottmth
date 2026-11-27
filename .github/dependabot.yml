@@ -1,0 +1,63 @@
+# Version updates (SEC-02). Each PR targets prod and goes through the CI like any other;
+# updates are grouped per ecosystem to keep the number of PRs low (docs/ci.md#chaîne-dapprovisionnement).
+version: 2
+
+updates:
+  # Actions pinned by SHA: Dependabot bumps the SHA and the "# vX.Y.Z" comment together.
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: prod
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore(deps)
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # One lockfile for every workspace (shared, functions, frontend, tools).
+  - package-ecosystem: npm
+    directory: /app
+    target-branch: prod
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    groups:
+      npm-patch-minor:
+        update-types: [minor, patch]
+
+  - package-ecosystem: gomod
+    directory: /app/go/discord-proxy
+    target-branch: prod
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore(deps)
+    groups:
+      go:
+        patterns: ["*"]
+
+  # Base images of the frontend, pinned by tag and digest.
+  - package-ecosystem: docker
+    directory: /app/frontend
+    target-branch: prod
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore(deps)
+
+  # Provider lock files of every stack and module.
+  - package-ecosystem: terraform
+    directories:
+      - /infra/*
+      - /infra/serverless/modules/*
+    target-branch: prod
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore(deps)
+    groups:
+      terraform:
+        patterns: ["*"]
