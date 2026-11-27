@@ -1,18 +1,55 @@
+/*
+ * Pixel War. The canvas fills the window; the controls float over it on a translucent
+ * material (tools on the left, colours at the bottom, a card on the right when needed).
+ * One set of tokens for light and dark, one accent, icons rather than sentences.
+ */
 :root {
   color-scheme: light dark;
-  --background: #f6f6f4;
-  --foreground: #1c1c1a;
-  --muted: #6b6b66;
-  --accent: #d1453b;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --background: #eeeeec;
+  --surface: #ffffff;
+  --surface-muted: #f2f2f0;
+  --foreground: #1d1d1f;
+  --muted: #6e6e73;
+  --border: rgb(0 0 0 / 0.1);
+  --accent: #e5483d;
+  --accent-strong: #c93a30;
+  --on-accent: #ffffff;
+  --discord: #5865f2;
+  --discord-strong: #4752c4;
+  --ok: #1f9d47;
+  --pending: #c25e00;
+  --error: #d70015;
+  --off: #8e8e93;
+  --glass: rgb(255 255 255 / 0.78);
+  --glass-border: rgb(255 255 255 / 0.6);
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 8px 24px rgb(0 0 0 / 0.12);
+  --press: 100ms ease-out;
+  font: 100%/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #161615;
-    --foreground: #ececea;
-    --muted: #9a9a94;
+    --background: #0b0b0c;
+    --surface: #1c1c1e;
+    --surface-muted: #2c2c2e;
+    --foreground: #f5f5f7;
+    --muted: #98989d;
+    --border: rgb(255 255 255 / 0.12);
+    --accent: #ff5a4f;
+    --accent-strong: #ff776e;
+    --on-accent: #ffffff;
+    --ok: #30d158;
+    --pending: #ff9f0a;
+    --error: #ff453a;
+    --glass: rgb(36 36 38 / 0.78);
+    --glass-border: rgb(255 255 255 / 0.1);
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 8px 24px rgb(0 0 0 / 0.5);
   }
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
@@ -21,63 +58,253 @@ body {
   color: var(--foreground);
 }
 
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* A translucent material for everything that floats over the canvas. */
+.glass,
+.toolbar,
+.dock,
+.card,
+.toast,
+.icon-button--glass,
+.pill,
+.pixel-canvas__status {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: var(--shadow), inset 0 0 0 1px var(--glass-border);
+}
+
+/* --- Top bar ------------------------------------------------------------------------ */
+
 .app {
   display: flex;
   flex-direction: column;
   height: 100dvh;
 }
 
-.app__header {
+.topbar {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 12px;
-  padding: 10px 16px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 52px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
 }
 
-.app__header h1 {
-  margin: 0;
-  font-size: 22px;
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.app__environment {
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 13px;
+.brand h1 {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.brand__env {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-.app__status {
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-section.app__status {
+.topbar__end {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  padding: 0 16px 8px;
+  align-items: center;
+  gap: 12px;
 }
 
-section.app__status p {
-  margin: 0;
+/* Realtime state: a dot and a word. */
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
 }
+
+.live::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--off);
+}
+
+.live[data-state="ok"]::before {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent);
+}
+
+.live[data-state="pending"]::before { background: var(--pending); }
+.live[data-state="error"]::before { background: var(--error); }
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+}
+
+.account__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* --- Buttons ------------------------------------------------------------------------ */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--surface-muted);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform var(--press), background-color var(--press);
+}
+
+/* Feedback on press, not on release. */
+.button:active:not(:disabled),
+.icon-button:active,
+.tool:active,
+.swatch:active,
+.segmented__item:active {
+  transform: scale(0.94);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.button--primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.button--primary:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.button--discord {
+  min-height: 48px;
+  padding: 0 22px;
+  background: var(--discord);
+  color: #fff;
+}
+
+.button--discord:hover:not(:disabled) {
+  background: var(--discord-strong);
+}
+
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: transform var(--press), background-color var(--press), color var(--press);
+}
+
+.icon-button:hover {
+  background: var(--surface-muted);
+  color: var(--foreground);
+}
+
+/* A labelled button over the canvas. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px 0 12px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform var(--press);
+}
+
+.pill:active {
+  transform: scale(0.95);
+}
+
+.icon-button--glass {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: var(--foreground);
+}
+
+/* --- Canvas and what floats over it -------------------------------------------------- */
 
 .workspace {
-  display: flex;
+  position: relative;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .pixel-canvas {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
+  position: absolute;
+  inset: 0;
+}
+
+.pixel-canvas__surface {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Pointer events drive pan and pinch: no browser scroll or page zoom on the grid. */
+  touch-action: none;
+  cursor: crosshair;
+  background: #fff;
+}
+
+.pixel-canvas__surface[data-tool="brush"] {
+  cursor: cell;
+}
+
+.pixel-canvas__surface:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 /* Preview of what is being sent: half-transparent, so it never passes for the canvas state. */
@@ -94,191 +321,518 @@ section.app__status p {
   position: absolute;
   top: 0;
   left: 0;
-  box-sizing: border-box;
   border: 2px solid var(--accent);
-  box-shadow: 0 0 0 1px #fff;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1.5px #fff, 0 2px 10px rgb(0 0 0 / 0.35);
   pointer-events: none;
-}
-
-.pixel-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 240px;
-  padding: 12px 16px;
-  overflow-y: auto;
-  font-size: 14px;
-}
-
-.pixel-panel p {
-  margin: 0;
-}
-
-.pixel-panel__quota,
-.pixel-panel__hint,
-.pixel-panel__block {
-  color: var(--muted);
-}
-
-.pixel-panel__coords {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-variant-numeric: tabular-nums;
-}
-
-.pixel-panel__swatch {
-  width: 16px;
-  height: 16px;
-  border: 1px solid var(--muted);
-  border-radius: 3px;
-}
-
-.pixel-panel__palette {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 4px;
-}
-
-.pixel-panel__color {
-  aspect-ratio: 1;
-  padding: 0;
-  border: 1px solid rgb(0 0 0 / 0.25);
-  border-radius: 3px;
-  cursor: pointer;
-}
-
-.pixel-panel__color[aria-checked="true"] {
-  outline: 2px solid var(--foreground);
-  outline-offset: 1px;
-}
-
-.pixel-panel__tools {
-  display: flex;
-  gap: 6px;
-}
-
-.pixel-panel__tool {
-  flex: 1;
-}
-
-.pixel-panel__tool[aria-checked="true"] {
-  background: var(--foreground);
-  color: var(--background);
-}
-
-.pixel-panel__size {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.pixel-panel__option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.pixel-canvas__surface[data-tool="brush"] {
-  cursor: cell;
-}
-
-.pixel-panel__draw:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-@media (max-width: 640px) {
-  .workspace {
-    flex-direction: column;
-  }
-
-  .pixel-panel {
-    width: auto;
-    max-height: 40dvh;
-  }
-}
-
-.pixel-canvas__surface {
-  display: block;
-  width: 100%;
-  height: 100%;
-  /* Pointer events drive pan and pinch: no browser scroll or page zoom on the grid. */
-  touch-action: none;
-  cursor: crosshair;
-  background: #fff;
-}
-
-.pixel-canvas__surface:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
 }
 
 .pixel-canvas__status {
   position: absolute;
-  left: 12px;
-  bottom: 12px;
-  padding: 4px 8px;
-  border-radius: 4px;
-  background: rgb(28 28 26 / 0.75);
-  color: #fff;
-  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  top: 16px;
+  left: 16px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  color: var(--foreground);
+  font: 600 0.75rem/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
 
-.app__locked {
+.pixel-canvas__fit {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+
+/* Tools: a vertical bar on the left edge. */
+.toolbar {
+  position: absolute;
+  top: 50%;
+  left: 16px;
+  z-index: 2;
   display: flex;
-  flex: 1;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 16px;
-  text-align: center;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 16px;
+  transform: translateY(-50%);
 }
 
-.app__locked p {
-  margin: 0;
-  font-size: 16px;
+.toolbar__group {
+  display: flex;
+  flex-direction: inherit;
+  gap: 4px;
 }
 
-section.app__status .app__paused {
-  color: var(--accent);
+.toolbar__divider {
+  width: 24px;
+  height: 1px;
+  background: var(--border);
+}
+
+.tool {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: transform var(--press), background-color var(--press), color var(--press);
+}
+
+.tool:hover {
+  background: var(--surface-muted);
+  color: var(--foreground);
+}
+
+.tool[aria-checked="true"] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.tool[aria-pressed="true"] {
+  color: var(--foreground);
+}
+
+/* Colours and quota: a dock at the bottom centre. */
+.dock {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: calc(100% - 32px);
+  padding: 8px 10px 8px 12px;
+  border-radius: 18px;
+  transform: translateX(-50%);
+}
+
+.dock__palette {
+  display: grid;
+  grid-template-columns: repeat(16, 28px);
+  gap: 6px;
+}
+
+.swatch {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.14);
+  cursor: pointer;
+  transition: transform var(--press);
+}
+
+/* Selected colour: a ring with a gap, readable on every colour, white included. */
+.swatch[aria-checked="true"] {
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.14), 0 0 0 2px var(--surface), 0 0 0 4px var(--foreground);
+}
+
+.quota {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 14px;
+  border-left: 1px solid var(--border);
+}
+
+.quota__ring {
+  position: relative;
+  flex: none;
+  width: 42px;
+  height: 42px;
+}
+
+.quota__ring svg {
+  transform: rotate(-90deg);
+}
+
+/* What is left, as a percentage, in the middle of the ring. */
+.quota__percent {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.quota__track,
+.quota__fill {
+  fill: none;
+  stroke-width: 3.5;
+}
+
+.quota__track {
+  stroke: var(--border);
+}
+
+.quota__fill {
+  stroke: var(--ok);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 300ms ease-out;
+}
+
+.quota[data-state="low"] .quota__fill {
+  stroke: var(--pending);
+}
+
+.quota__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 118px;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.quota__count {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.quota__count strong {
+  color: var(--foreground);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.quota__detail {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.quota[data-state="low"] .quota__percent,
+.quota[data-state="empty"] .quota__percent,
+.quota[data-state="empty"] .quota__detail {
+  color: var(--pending);
   font-weight: 600;
 }
 
-.auth {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 12px;
-  margin-left: auto;
-  font-size: 14px;
-}
-
-.auth__error {
-  color: var(--accent);
-}
-
-.auth__button {
-  padding: 4px 12px;
-  border: 1px solid currentColor;
-  border-radius: 4px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.auth__button:disabled {
-  cursor: progress;
-  opacity: 0.6;
-}
-
-/* "Voir tout le dessin" (WEB-03d): over the canvas, top right. */
-.pixel-canvas__fit {
+/* The selected pixel or the brush: a card on the right. */
+.card {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 68px;
+  right: 16px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 232px;
+  padding: 14px;
+  border-radius: 18px;
+  font-size: 0.875rem;
+}
+
+.card__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.card__swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.card__coords {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.card__meta,
+.card__note {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.card__meta strong {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.card__action {
+  width: 100%;
+}
+
+.card__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.85);
+}
+
+.card__row {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+.card__value {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.card input[type="range"] {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.segmented {
+  display: flex;
+  padding: 3px;
+  border-radius: 11px;
+  background: var(--surface-muted);
+}
+
+.segmented__item {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: transform var(--press);
+}
+
+.segmented__item[aria-checked="true"] {
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.15);
+  color: var(--foreground);
+}
+
+/* Short messages over the canvas: pause, loading, the last draw. */
+.toast {
+  position: absolute;
+  z-index: 3;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.toast--top {
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.toast--top[data-warn="true"] {
+  color: var(--pending);
+  font-weight: 600;
+}
+
+.toast--side {
+  top: 68px;
+  right: 16px;
+  max-width: 260px;
+  border-radius: 14px;
+}
+
+/* --- Sign-in page ------------------------------------------------------------------- */
+
+.welcome {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  padding: 16px;
+  /* Scattered pixels of the palette, fading out towards the card. */
+  background:
+    radial-gradient(ellipse at 50% 50%, var(--background) 0 18%, transparent 58%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='300'%3E%3Cg opacity='.5'%3E%3Crect x='24' y='40' width='18' height='18' rx='4' fill='%23E50000'/%3E%3Crect x='42' y='40' width='18' height='18' rx='4' fill='%23E59500' opacity='.7'/%3E%3Crect x='196' y='18' width='18' height='18' rx='4' fill='%23E59500'/%3E%3Crect x='300' y='96' width='18' height='18' rx='4' fill='%2302BE01'/%3E%3Crect x='300' y='114' width='18' height='18' rx='4' fill='%2394E044' opacity='.7'/%3E%3Crect x='96' y='150' width='18' height='18' rx='4' fill='%230083C7'/%3E%3Crect x='250' y='232' width='18' height='18' rx='4' fill='%23CF6EE4'/%3E%3Crect x='40' y='250' width='18' height='18' rx='4' fill='%23E5D900'/%3E%3Crect x='168' y='110' width='18' height='18' rx='4' fill='%2300D3DD' opacity='.8'/%3E%3Crect x='150' y='262' width='18' height='18' rx='4' fill='%23FFA7D1'/%3E%3C/g%3E%3C/svg%3E")
+      0 0 / 360px 300px,
+    var(--background);
+}
+
+.welcome__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 380px;
+  padding: 40px 32px;
+  border-radius: 24px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: var(--shadow), inset 0 0 0 1px var(--glass-border);
+  text-align: center;
+}
+
+.welcome__card h2 {
+  font-size: 1.875rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.welcome__card p {
+  color: var(--muted);
+}
+
+.welcome__card .button {
+  margin-top: 8px;
+}
+
+.welcome__error {
+  color: var(--error) !important;
+  font-size: 0.875rem;
+}
+
+.welcome__note {
+  font-size: 0.8125rem;
+}
+
+/* --- Small screens ------------------------------------------------------------------ */
+
+@media (max-width: 720px) {
+  .account__name,
+  .pixel-canvas__status {
+    display: none;
+  }
+
+  .toolbar {
+    top: 12px;
+    left: 12px;
+    flex-direction: row;
+    transform: none;
+  }
+
+  .toolbar__divider {
+    width: 1px;
+    height: 24px;
+  }
+
+  .pixel-canvas__fit {
+    top: 12px;
+    right: 12px;
+  }
+
+  .dock {
+    bottom: 12px;
+    gap: 10px;
+    padding: 8px;
+  }
+
+  .dock__palette {
+    grid-template-columns: repeat(8, 30px);
+  }
+
+  .swatch {
+    width: 30px;
+    height: 30px;
+  }
+
+  .dock {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .quota {
+    padding: 8px 0 0;
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
+
+  .card,
+  .toast--side {
+    top: auto;
+    right: 12px;
+    /* Above the dock: two rows of colours and the quota. */
+    bottom: 168px;
+    left: 12px;
+    width: auto;
+    max-width: none;
+  }
+
+  .toast--top {
+    top: 64px;
+  }
+}
+
+/* --- Accessibility preferences ------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .pill,
+  .quota__fill,
+  .button,
+  .icon-button,
+  .tool,
+  .swatch,
+  .segmented__item {
+    transition: none;
+  }
+
+  .button:active:not(:disabled),
+  .pill:active,
+  .icon-button:active,
+  .tool:active,
+  .swatch:active,
+  .segmented__item:active {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .toolbar,
+  .dock,
+  .card,
+  .toast,
+  .pill,
+  .icon-button--glass,
+  .pixel-canvas__status,
+  .welcome__card {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --border: rgb(0 0 0 / 0.5);
+    --muted: #3a3a3c;
+    --glass-border: rgb(0 0 0 / 0.5);
+  }
+
+  .toolbar,
+  .dock,
+  .card,
+  .toast,
+  .pill,
+  .icon-button--glass,
+  .pixel-canvas__status,
+  .welcome__card {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) and (prefers-color-scheme: dark) {
+  :root {
+    --border: rgb(255 255 255 / 0.55);
+    --muted: #d1d1d6;
+    --glass-border: rgb(255 255 255 / 0.55);
+  }
 }

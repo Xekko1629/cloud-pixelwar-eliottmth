@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react';
-import { AUTH_ERRORS, CALLBACK_PATH, type Auth } from './auth';
+import { LogOutIcon, UserIcon } from '../ui/icons';
+import { CALLBACK_PATH, type Auth } from './auth';
 
 /** Asks the gateway for the Discord authorization URL, then leaves for Discord. */
 export async function redirectToLogin(auth: Auth): Promise<void> {
@@ -7,7 +8,8 @@ export async function redirectToLogin(auth: Auth): Promise<void> {
   if (url) window.location.assign(url);
 }
 
-// Header block of the Discord login (WEB-02b): button, current user, sign-out, errors.
+// Header block of the Discord login (WEB-02b): who is signed in, and sign-out. Signed out,
+// the sign-in page of the App holds the button and the errors.
 export function AuthControls({ auth }: { auth: Auth }) {
   const state = useSyncExternalStore(auth.subscribe, auth.getState);
 
@@ -19,23 +21,16 @@ export function AuthControls({ auth }: { auth: Auth }) {
     void auth.completeLogin(search);
   }, [auth]);
 
-  if (state.status === 'signed-in') {
-    return (
-      <div className="auth">
-        <span className="auth__user">Connecté : {state.user.name}</span>
-        <button type="button" className="auth__button" onClick={() => auth.signOut()}>Se déconnecter</button>
-      </div>
-    );
-  }
-
-  const pending = state.status === 'pending';
+  if (state.status !== 'signed-in') return null;
+  const name = state.user.name;
   return (
-    <div className="auth">
-      {state.status === 'signed-out' && state.error && (
-        <span className="auth__error" role="alert">{AUTH_ERRORS[state.error]}</span>
-      )}
-      <button type="button" className="auth__button" disabled={pending} onClick={() => void redirectToLogin(auth)}>
-        {pending ? 'Connexion…' : 'Se connecter avec Discord'}
+    <div className="account">
+      <span className="account__name" title="Compte Discord connecté">
+        <UserIcon width={16} height={16} />
+        {name}
+      </span>
+      <button type="button" className="icon-button" onClick={() => auth.signOut()} aria-label="Se déconnecter" title="Se déconnecter">
+        <LogOutIcon />
       </button>
     </div>
   );

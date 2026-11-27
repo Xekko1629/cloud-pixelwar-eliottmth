@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { Bounds, GridSize } from '@pixelwar/shared/grid';
 import type { CanvasUpdates, TileChange } from '../realtime/live';
 import { fitCamera, pixelAt, screenX, screenY, visiblePixels, type Camera, type Point, type Viewport } from './camera';
+import { FrameIcon } from '../ui/icons';
 import { CanvasController } from './controller';
 import { FAR_ZOOM, RecentPixels, overviewLevel, visibleCells, type OverviewImages } from './overview';
 import { drawLayer, drawOverview, drawTiles, drawViewport, type TileRef } from './renderer';
@@ -332,8 +333,14 @@ export function PixelCanvas({
       <div ref={markerRef} className="pixel-canvas__marker" hidden aria-hidden="true" />
       <output ref={statusRef} className="pixel-canvas__status" aria-live="off" />
       {bounds && (
-        <button type="button" className="auth__button pixel-canvas__fit" onClick={() => fitRef.current()}>
-          Voir tout le dessin
+        <button
+          type="button"
+          className="pill pixel-canvas__fit"
+          onClick={() => fitRef.current()}
+          title="Cadrer toute la zone dessinée"
+        >
+          <FrameIcon width={16} height={16} />
+          Tout le dessin
         </button>
       )}
     </div>

@@ -35,6 +35,22 @@ contrat de [`auth-proxy`](../functions/auth-proxy/README.md) :
 Les tuiles (WEB-03b), l'inspection (WEB-04) et le brush (WEB-05) passent par
 `services.api` (`src/auth/setup.ts`), jamais par `fetch` directement.
 
+## Interface
+
+La toile occupe toute la fenêtre ; les commandes flottent dessus, sur un fond translucide
+(`src/styles.css`) :
+
+- **Barre d'outils** à gauche : Inspecter, Pinceau, et l'aperçu de l'envoi (œil).
+- **Palette** en bas, avec le quota : pixels restants sur la limite par minute, et le
+  compte à rebours jusqu'à la remise à zéro (calculé localement, sans requête).
+- **Carte** à droite : le pixel sélectionné (auteur, date, « Poser ») ou les réglages du
+  pinceau. Sur un écran étroit, elle passe au-dessus de la palette.
+- **En-tête** : l'état du temps réel (« En direct », « Hors ligne »…) et le pseudo Discord.
+- **« Tout le dessin »** en haut à droite cadre la zone peinte.
+- Icônes en SVG intégré (`src/ui/icons.tsx`), sans police ni ressource tierce (CSP).
+- Thèmes clair et sombre selon le système ; `prefers-reduced-motion`,
+  `prefers-reduced-transparency` et `prefers-contrast` sont respectés.
+
 ## Tuiles (WEB-03b)
 
 Contrat : [`tile-reader`](../../docs/tile-reader.md). La toile est découpée en régions
@@ -82,7 +98,7 @@ Sous le zoom ×1, la toile affiche les images de la pyramide (DATA-05c,
   minute : une image affichée depuis plus de 2 minutes est redemandée au prochain dessin de
   la toile (déplacement ou delta), jamais par minuterie. Un pixel reçu cesse d'être peint
   par-dessus quand une image demandée au moins 3 minutes après lui est arrivée.
-- **« Voir tout le dessin »** : le bouton cadre la zone peinte (`config/global.bounds`),
+- **« Tout le dessin »** : le bouton en haut à droite de la toile cadre la zone peinte (`config/global.bounds`),
   avec une marge, dans les limites du zoom.
 
 ## Pause et grille bornée en temps réel (DRAW-04)
@@ -94,7 +110,7 @@ la page :
   hauteur − 1) est grisé, avec un trait sur le bord (`drawEdge`, `src/canvas/renderer.ts`).
   Le centre de l'écran reste sur la grille (`clampCamera`) : on ne peut pas s'en éloigner.
   Quand la taille change, la caméra y est ramenée. Grille infinie : rien de tout ça.
-- **Dessin hors de la grille** : « Poser le pixel » est désactivé et le pinceau ignore les
+- **Dessin hors de la grille** : « Poser » est désactivé et le pinceau ignore les
   pixels hors de la grille (WEB-04, WEB-05). Le worker refuse de toute façon (`out_of_bounds`).
 - **Pause** : le bandeau affiche « Toile en pause », le bouton et le pinceau sont bloqués.
 - Le quota restant et le dernier refus ne sont pas en temps réel : les règles Firestore
@@ -109,7 +125,7 @@ la page :
 - **Auteur et date** : `GET /api/tiles/{tx}/{ty}/meta` à la sélection, puis de nouveau
   quand un delta temps réel touche la tuile (une seule lecture par rafale, 300 ms après
   le dernier delta). Pas de lecture en boucle.
-- **Dessin** : palette de 16 couleurs, « Poser le pixel » envoie `POST /api/pixels`. Le
+- **Dessin** : palette de 16 couleurs en bas de la toile, « Poser » (carte du pixel sélectionné) envoie `POST /api/pixels`. Le
   `202` veut dire « accepté », pas « dessiné » :
   - le pixel est « posé » quand son delta arrive avec la couleur envoyée ;
   - sinon, 3 s plus tard, une lecture de `/api/state` dit si le worker l'a refusé
@@ -129,7 +145,7 @@ la page :
 
 ## Pinceau (WEB-05)
 
-- Outil « Pinceau » du panneau : taille de **1 à 100** pixels de côté (slider), carré ou
+- Outil « Pinceau » (barre d'outils à gauche de la toile) : taille de **1 à 100** pixels de côté (slider), carré ou
   rond, couleur de la palette. Glisser sur la toile peint ; le clic droit, la molette
   enfoncée, deux doigts ou les flèches déplacent la vue.
 - **Pixels d'un trait** (`src/brush/stroke.ts`) : le pinceau est appliqué en chaque point
@@ -152,7 +168,7 @@ la page :
   arrivé) ou que son refus soit connu, même si un gros trait met plusieurs secondes à
   être traité. Au-delà de 60 s (pixel perdu), il disparaît ; un `/admin clear` vide
   l'aperçu.
-  La case « Aperçu de l'envoi » du panneau le désactive : seule la toile reste, mise à
+  Le bouton « Aperçu de l'envoi » (œil, barre d'outils) le désactive : seule la toile reste, mise à
   jour par les deltas. Le choix est gardé dans le `localStorage` du navigateur
   (`pixelwar.preview`).
 - **Quota et refus** : chaque pixel couvert est **décompté tout de suite** du quota

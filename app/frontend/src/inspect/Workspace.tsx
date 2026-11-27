@@ -69,7 +69,9 @@ export function Workspace({ api, live }: { api: ApiClient; live: LiveCanvas }) {
   }));
   const [tool, setTool] = useState<CanvasTool>('inspect');
   const { selected } = useSyncExternalStore(inspector.subscribe, inspector.getState);
-  const { config } = useSyncExternalStore(live.subscribeState, live.getState);
+  const { config, tiles } = useSyncExternalStore(live.subscribeState, live.getState);
+  const note = config?.paused ? 'Toile en pause' : tiles === 'loading' ? 'Chargement…'
+    : tiles === 'error' ? 'Chargement impossible, nouvel essai dans 10 s' : null;
 
   useEffect(() => {
     inspector.start();
@@ -110,6 +112,7 @@ export function Workspace({ api, live }: { api: ApiClient; live: LiveCanvas }) {
 
   return (
     <div className="workspace">
+      {note && <p className="toast toast--top" data-warn={config?.paused === true} role="status">{note}</p>}
       <PixelCanvas
         live={live}
         tool={tool}

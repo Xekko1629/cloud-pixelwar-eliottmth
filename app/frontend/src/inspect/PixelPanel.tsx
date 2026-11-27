@@ -3,10 +3,11 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { Brush, StrokeStatus } from '../brush/brush';
 import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from '../brush/stroke';
 import type { CanvasTool } from '../canvas/PixelCanvas';
+import { BrushIcon, CircleIcon, EyeIcon, EyeOffIcon, PointerIcon, SquareIcon } from '../ui/icons';
 import { remainingPixels, type DrawBlock, type DrawFeedback, type PixelInspector } from './inspector';
 
-// Side panel (WEB-04, WEB-05): tool, quota, palette, then the selected pixel (author,
-// date, "Poser") or the brush (size, shape, result of the last stroke).
+// Controls floating over the canvas (WEB-04, WEB-05): the tools bar on the left, the colour
+// dock with the quota at the bottom, and a card for the selected pixel or the brush.
 
 const REJECTIONS: Record<string, string> = {
   paused: 'la toile est en pause',
@@ -22,13 +23,12 @@ const ERRORS: Record<string, string> = {
 };
 
 const BLOCKS: Partial<Record<DrawBlock, string>> = {
-  paused: 'La toile est en pause.',
-  outside: 'Ce pixel est hors de la grille.',
-  quota: 'Quota atteint : un nouvel essai revérifie auprès du serveur.',
+  paused: 'Toile en pause',
+  outside: 'Hors de la grille',
+  quota: 'Quota atteint',
 };
 
-export const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'medium' });
-const timeFormat = new Intl.DateTimeFormat('fr-FR', { timeStyle: 'medium' });
+export const dateFormat = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const reason = (code: string) => REJECTIONS[code] ?? code;
 const error = (code: string) => ERRORS[code] ?? `échec de l’envoi (${code}).`;
 
@@ -56,6 +56,31 @@ export function strokeText(stroke: StrokeStatus): string | null {
   }
 }
 
+// How long the message of an ended action stays: a success briefly, a refusal a bit longer.
+const DONE_MS = 4000;
+const REFUSED_MS = 8000;
+
+/**
+ * Shows a message, and hides it after `ms` when the action it reports is over (null: keep
+ * it, the action is still running). A display timer only, nothing is asked to the server.
+ */
+export function useTransient(text: string | null, ms: number | null, source: object): string | null {
+  // `source` is the state the message comes from: a new one shows again, even with the same text.
+  const [hidden, setHidden] = useState<object | null>(null);
+  useEffect(() => {
+    if (text === null || ms === null) return undefined;
+    const timer = setTimeout(() => setHidden(source), ms);
+    return () => clearTimeout(timer);
+  }, [text, ms, source]);
+  return hidden === source ? null : text;
+}
+
+const feedbackDelay = (status: DrawFeedback['status']): number | null =>
+  status === 'drawn' ? DONE_MS : status === 'rejected' || status === 'error' || status === 'pending' ? REFUSED_MS : null;
+
+const strokeDelay = (status: StrokeStatus['status']): number | null =>
+  status === 'done' ? DONE_MS : status === 'rejected' || status === 'error' ? REFUSED_MS : null;
+
 interface PanelProps {
   inspector: PixelInspector;
   brush: Brush;
@@ -64,6 +89,11 @@ interface PanelProps {
   previewOn: boolean;
   onPreview: (on: boolean) => void;
 }
+
+const TOOLS = [
+  { value: 'inspect', label: 'Inspecter', Icon: PointerIcon },
+  { value: 'brush', label: 'Pinceau', Icon: BrushIcon },
+] as const;
 
 export function PixelPanel({ inspector, brush, tool, onTool, previewOn, onPreview }: PanelProps) {
   const state = useSyncExternalStore(inspector.subscribe, inspector.getState);
@@ -74,124 +104,197 @@ export function PixelPanel({ inspector, brush, tool, onTool, previewOn, onPrevie
 
   const { selected, quota } = state;
   const remaining = quota ? remainingPixels(quota, now) : null;
+  const feedback = useTransient(tool === 'inspect' ? feedbackText(state.feedback) : null, feedbackDelay(state.feedback.status), state.feedback);
 
   return (
-    <aside className="pixel-panel" aria-label="Outils">
-      <div className="pixel-panel__tools" role="radiogroup" aria-label="Outil">
-        {(['inspect', 'brush'] as const).map((value) => (
-          <button
-            key={value}
-            type="button"
-            role="radio"
-            aria-checked={tool === value}
-            className="auth__button pixel-panel__tool"
-            onClick={() => onTool(value)}
-          >
-            {value === 'inspect' ? 'Inspecter' : 'Pinceau'}
-          </button>
-        ))}
+    <>
+      <nav className="toolbar" aria-label="Outils">
+        <div className="toolbar__group" role="radiogroup" aria-label="Outil">
+          {TOOLS.map(({ value, label, Icon }) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={tool === value}
+              aria-label={label}
+              title={label}
+              className="tool"
+              onClick={() => onTool(value)}
+            >
+              <Icon />
+            </button>
+          ))}
+        </div>
+        <span className="toolbar__divider" aria-hidden="true" />
+        <button
+          type="button"
+          className="tool"
+          aria-pressed={previewOn}
+          aria-label="Aperçu de l’envoi"
+          title={previewOn ? 'Aperçu de l’envoi : affiché' : 'Aperçu de l’envoi : masqué'}
+          onClick={() => onPreview(!previewOn)}
+        >
+          {previewOn ? <EyeIcon /> : <EyeOffIcon />}
+        </button>
+      </nav>
+
+      <div className="dock">
+        <div className="dock__palette" role="radiogroup" aria-label="Couleur">
+          {PALETTE.map((hex, i) => (
+            <button
+              key={hex}
+              type="button"
+              role="radio"
+              aria-checked={state.brushColor === i + 1}
+              aria-label={`Couleur ${i + 1}`}
+              className="swatch"
+              style={{ background: hex }}
+              onClick={() => inspector.setBrushColor(i + 1)}
+            />
+          ))}
+        </div>
+        {quota && remaining !== null && (
+          <QuotaMeter remaining={remaining} limit={quota.limitPerMinute} resetAt={quota.resetAt} />
+        )}
       </div>
-      {quota && remaining !== null && (
-        <p className="pixel-panel__quota">
-          Pixels restants : {remaining} / {quota.limitPerMinute}
-          {remaining === 0 && ` (de nouveau à ${timeFormat.format(quota.resetAt)})`}
-        </p>
+
+      {tool === 'brush' ? <BrushControls brush={brush} /> : selected !== null ? (
+        <SelectedPixel inspector={inspector} feedback={feedback} />
+      ) : feedback && (
+        <p className="toast toast--side" role="status">{feedback}</p>
       )}
-      <div className="pixel-panel__palette" role="radiogroup" aria-label="Couleur">
-        {PALETTE.map((hex, i) => (
-          <button
-            key={hex}
-            type="button"
-            role="radio"
-            aria-checked={state.brushColor === i + 1}
-            aria-label={`Couleur ${i + 1}`}
-            className="pixel-panel__color"
-            style={{ background: hex }}
-            onClick={() => inspector.setBrushColor(i + 1)}
-          />
-        ))}
-      </div>
-      <label className="pixel-panel__option">
-        <input type="checkbox" checked={previewOn} onChange={(event) => onPreview(event.target.checked)} />
-        Aperçu de l’envoi (calque semi-transparent)
-      </label>
-      {tool === 'brush' ? <BrushControls brush={brush} /> : selected === null ? (
-        <p className="pixel-panel__hint">Clique sur un pixel pour voir son auteur et le dessiner.</p>
-      ) : (
-        <SelectedPixel inspector={inspector} />
-      )}
-      {tool === 'inspect' && feedbackText(state.feedback) && (
-        <p className="pixel-panel__feedback" role="status">{feedbackText(state.feedback)}</p>
-      )}
-    </aside>
+    </>
   );
 }
 
-function SelectedPixel({ inspector }: { inspector: PixelInspector }) {
+/** Seconds left before the quota of the minute is whole again, recomputed every second. */
+function useSecondsUntil(at: Date, active: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return undefined;
+    setNow(Date.now());
+    // A local countdown for the display only, no request to the server; it stops at zero.
+    const timer = setInterval(() => {
+      const current = Date.now();
+      setNow(current);
+      if (current >= at.getTime()) clearInterval(timer);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [active, at]);
+  return Math.max(0, Math.ceil((at.getTime() - now) / 1000));
+}
+
+// Pixels left this minute: a ring that empties, the count, the limit, and when it refills.
+function QuotaMeter({ remaining, limit, resetAt }: { remaining: number; limit: number; resetAt: Date }) {
+  const seconds = useSecondsUntil(resetAt, remaining < limit);
+  // The minute is over: the whole limit is back, even before the panel is told.
+  const left = seconds === 0 ? limit : remaining;
+  const used = left < limit;
+  const ratio = Math.min(1, left / Math.max(1, limit));
+  const circumference = 2 * Math.PI * 15;
+  const state = left === 0 ? 'empty' : ratio <= 0.25 ? 'low' : 'ok';
+  const format = (value: number) => value.toLocaleString('fr-FR');
+  return (
+    <div className="quota" data-state={state} title={`Quota : ${format(limit)} pixels par minute, remis à zéro chaque minute`}>
+      <div className="quota__ring" aria-hidden="true">
+        <svg viewBox="0 0 36 36" width="42" height="42">
+          <circle className="quota__track" cx="18" cy="18" r="15" />
+          <circle
+            className="quota__fill"
+            cx="18"
+            cy="18"
+            r="15"
+            strokeDasharray={circumference}
+            strokeDashoffset={circumference * (1 - ratio)}
+          />
+        </svg>
+        <span className="quota__percent">{Math.round(ratio * 100)}%</span>
+      </div>
+      <div className="quota__text" role="status" aria-live="off">
+        <span className="quota__count">
+          <strong>{format(left)}</strong> / {format(limit)} pixels
+        </span>
+        <span className="quota__detail">
+          {!used ? 'par minute' : left === 0 ? `épuisé · retour dans ${seconds} s` : `rechargé dans ${seconds} s`}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function SelectedPixel({ inspector, feedback }: { inspector: PixelInspector; feedback: string | null }) {
   const state = useSyncExternalStore(inspector.subscribe, inspector.getState);
   const block = inspector.drawBlock();
   const selected = state.selected!;
   return (
-    <>
-      <p className="pixel-panel__coords">
-        <span className="pixel-panel__swatch" style={{ background: state.color ? PALETTE[state.color - 1] : 'transparent' }} />
-        x {selected.x} · y {selected.y}
-      </p>
-      <p className="pixel-panel__author" aria-live="polite">
-        {state.meta === 'loading' ? 'Chargement de l’auteur…'
-          : state.meta === 'error' ? 'Auteur indisponible.'
-            : state.author ? `Par ${state.author.name}, le ${dateFormat.format(state.author.at)}.`
-              : 'Jamais peint.'}
+    <aside className="card" aria-label="Pixel sélectionné">
+      <div className="card__head">
+        <span className="card__swatch" style={{ background: state.color ? PALETTE[state.color - 1] : 'transparent' }} />
+        <span className="card__coords">{selected.x}, {selected.y}</span>
+      </div>
+      <p className="card__meta" aria-live="polite">
+        {state.meta === 'loading' ? 'Chargement…'
+          : state.meta === 'error' ? 'Auteur indisponible'
+            : state.author ? <><strong>{state.author.name}</strong> · {dateFormat.format(state.author.at)}</>
+              : 'Jamais peint'}
       </p>
       <button
         type="button"
-        className="auth__button pixel-panel__draw"
+        className="button button--primary card__action"
         // Out of quota, a click asks the server again (the limit may have changed).
         disabled={block !== null && block !== 'quota'}
         onClick={() => void inspector.draw()}
       >
-        Poser le pixel
+        <span className="card__dot" style={{ background: PALETTE[state.brushColor - 1] }} aria-hidden="true" />
+        Poser
       </button>
-      {block && BLOCKS[block] && <p className="pixel-panel__block">{BLOCKS[block]}</p>}
-    </>
+      {block && BLOCKS[block] && <p className="card__note">{BLOCKS[block]}</p>}
+      {feedback && <p className="card__note" role="status">{feedback}</p>}
+    </aside>
   );
 }
+
+const SHAPES = [
+  { value: 'square', label: 'Carré', Icon: SquareIcon },
+  { value: 'round', label: 'Rond', Icon: CircleIcon },
+] as const;
 
 function BrushControls({ brush }: { brush: Brush }) {
   const state = useSyncExternalStore(brush.subscribe, brush.getState);
   const block = brush.block();
-  const message = strokeText(state.stroke);
+  const message = useTransient(strokeText(state.stroke), strokeDelay(state.stroke.status), state.stroke);
   return (
-    <>
-      <label className="pixel-panel__size">
-        Taille : {state.size} × {state.size}
-        <input
-          type="range"
-          min={MIN_BRUSH_SIZE}
-          max={MAX_BRUSH_SIZE}
-          value={state.size}
-          onChange={(event) => brush.setSize(Number(event.target.value))}
-        />
+    <aside className="card" aria-label="Pinceau">
+      <label className="card__row" htmlFor="brush-size">
+        <span>Taille</span>
+        <output className="card__value" htmlFor="brush-size">{state.size} px</output>
       </label>
-      <div className="pixel-panel__tools" role="radiogroup" aria-label="Forme">
-        {(['square', 'round'] as const).map((shape) => (
+      <input
+        id="brush-size"
+        type="range"
+        min={MIN_BRUSH_SIZE}
+        max={MAX_BRUSH_SIZE}
+        value={state.size}
+        onChange={(event) => brush.setSize(Number(event.target.value))}
+      />
+      <div className="segmented" role="radiogroup" aria-label="Forme">
+        {SHAPES.map(({ value, label, Icon }) => (
           <button
-            key={shape}
+            key={value}
             type="button"
             role="radio"
-            aria-checked={state.shape === shape}
-            className="auth__button pixel-panel__tool"
-            onClick={() => brush.setShape(shape)}
+            aria-checked={state.shape === value}
+            aria-label={label}
+            title={label}
+            className="segmented__item"
+            onClick={() => brush.setShape(value)}
           >
-            {shape === 'square' ? 'Carré' : 'Rond'}
+            <Icon width={16} height={16} />
           </button>
         ))}
       </div>
-      <p className="pixel-panel__hint">
-        Glisse sur la toile pour peindre. Clic droit, molette enfoncée ou deux doigts pour te déplacer.
-      </p>
-      {block && <p className="pixel-panel__block">{block === 'paused' ? 'La toile est en pause.' : 'Quota atteint : un nouvel essai revérifie auprès du serveur.'}</p>}
-      {message && <p className="pixel-panel__feedback" role="status">{message}</p>}
-    </>
+      {block && <p className="card__note">{block === 'paused' ? 'Toile en pause' : 'Quota atteint'}</p>}
+      {message && <p className="card__note" role="status">{message}</p>}
+    </aside>
   );
 }
