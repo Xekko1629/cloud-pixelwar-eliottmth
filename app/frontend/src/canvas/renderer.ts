@@ -1,4 +1,4 @@
-import { TILE_SIDE } from '@pixelwar/shared/grid';
+import { TILE_SIDE, type GridSize } from '@pixelwar/shared/grid';
 import { screenX, screenY, visiblePixels, visibleTiles, type Camera, type PixelRect, type Viewport } from './camera';
 
 // The subset of CanvasRenderingContext2D the renderer uses, so tests can record the calls.
@@ -28,6 +28,9 @@ export const BACKGROUND = '#FFFFFF';
 // Pixel borders appear from this zoom on (CSS pixels per grid pixel).
 export const GRID_ZOOM = 12;
 const GRID_COLOR = 'rgba(0, 0, 0, 0.08)';
+// Outside a bounded grid (/admin size, DRAW-04): greyed, with a line on the edge.
+export const OUTSIDE = '#D1D5DB';
+const EDGE_COLOR = 'rgba(0, 0, 0, 0.5)';
 
 export interface FrameStats {
   tiles: number;
@@ -44,6 +47,7 @@ export function drawViewport(
   viewport: Viewport,
   pixelRatio: number,
   tileImage: TileImageLookup,
+  grid: GridSize | null = null,
 ): FrameStats {
   context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
   context.imageSmoothingEnabled = false;
@@ -67,7 +71,32 @@ export function drawViewport(
   }
 
   if (camera.zoom >= GRID_ZOOM) drawGrid(context, camera, viewport, pixelRatio, visiblePixels(camera, viewport));
+  drawEdge(context, camera, viewport, pixelRatio, grid);
   return stats;
+}
+
+/**
+ * Greys what lies outside a bounded grid and outlines its edge. The screen positions are
+ * clamped just outside the viewport: near 10⁹ they would be far too large for the context.
+ */
+export function drawEdge(context: DrawContext, camera: Camera, viewport: Viewport, pixelRatio: number, grid: GridSize | null): void {
+  if (!grid) return;
+  const { width, height } = viewport;
+  const fit = (value: number, max: number) => Math.min(Math.max(value, -1), max + 1);
+  const left = fit(snap(screenX(camera, viewport, 0), pixelRatio), width);
+  const right = fit(snap(screenX(camera, viewport, grid.width), pixelRatio), width);
+  const top = fit(snap(screenY(camera, viewport, 0), pixelRatio), height);
+  const bottom = fit(snap(screenY(camera, viewport, grid.height), pixelRatio), height);
+  context.fillStyle = OUTSIDE;
+  if (top > 0) context.fillRect(0, 0, width, top);
+  if (bottom < height) context.fillRect(0, bottom, width, height - bottom);
+  if (left > 0) context.fillRect(0, top, left, bottom - top);
+  if (right < width) context.fillRect(right, top, width - right, bottom - top);
+  context.strokeStyle = EDGE_COLOR;
+  context.lineWidth = 1;
+  context.beginPath();
+  context.rect(left, top, right - left, bottom - top);
+  context.stroke();
 }
 
 export interface TileRef {
@@ -88,6 +117,7 @@ export function drawTiles(
   pixelRatio: number,
   tiles: Iterable<TileRef>,
   tileImage: TileImageLookup,
+  grid: GridSize | null = null,
 ): number {
   context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
   context.imageSmoothingEnabled = false;
@@ -116,6 +146,8 @@ export function drawTiles(
         max_y: Math.min((ty + 1) * TILE_SIDE - 1, pixels.max_y),
       });
     }
+    // A tile across the edge of a bounded grid: its outer part stays grey.
+    drawEdge(context, camera, viewport, pixelRatio, grid);
     context.restore();
     drawn += 1;
   }
@@ -134,6 +166,7 @@ export function drawLayer(
   pixelRatio: number,
   tiles: Iterable<TileRef>,
   tileImage: TileImageLookup,
+  grid: GridSize | null = null,
 ): number {
   context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
   context.imageSmoothingEnabled = false;

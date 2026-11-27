@@ -56,6 +56,12 @@ describe('camera', () => {
     expect(pixelAt({ x: COORDINATE_LIMIT + 1, y: 0, zoom: 1 }, viewport, { x: 799, y: 300 })).toBeNull();
   });
 
+  it('keeps the screen centre on a bounded grid', () => {
+    const grid = { width: 100, height: 50 };
+    expect(clampCamera({ x: -20, y: 80, zoom: 4 }, grid)).toEqual({ x: 0, y: 50, zoom: 4 });
+    expect(clampCamera({ x: 30, y: 10, zoom: 4 }, grid)).toEqual({ x: 30, y: 10, zoom: 4 });
+  });
+
   it('lists the visible pixels and tiles, including partly visible ones', () => {
     const camera = { x: 0.5, y: 0.5, zoom: 10 };
     // 800 / 10 = 80 pixels wide: from -39.5 to 40.5.

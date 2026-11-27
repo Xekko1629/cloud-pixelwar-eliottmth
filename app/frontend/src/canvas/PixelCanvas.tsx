@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import type { GridSize } from '@pixelwar/shared/grid';
 import type { CanvasUpdates, TileChange } from '../realtime/live';
 import { pixelAt, screenX, screenY, visiblePixels, type Camera, type Point, type Viewport } from './camera';
 import { CanvasController } from './controller';
@@ -43,11 +44,13 @@ export interface PixelCanvasProps {
   preview?: CanvasLayer;
   // The selected pixel, outlined on the canvas (WEB-04).
   selected?: Point | null;
+  // Size of a bounded grid (config/global, DRAW-04): edge drawn, camera kept on it.
+  grid?: GridSize | null;
   // A tap, Enter (centre pixel) or Escape (null).
   onSelect?: (pixel: Point | null) => void;
 }
 
-export function PixelCanvas({ live, tool = 'inspect', stroke, preview, selected = null, onSelect }: PixelCanvasProps) {
+export function PixelCanvas({ live, tool = 'inspect', stroke, preview, selected = null, grid = null, onSelect }: PixelCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const layerRef = useRef<HTMLCanvasElement>(null);
   const statusRef = useRef<HTMLOutputElement>(null);
@@ -61,11 +64,18 @@ export function PixelCanvas({ live, tool = 'inspect', stroke, preview, selected 
   toolRef.current = tool;
   const strokeRef = useRef(stroke);
   strokeRef.current = stroke;
+  const gridRef = useRef(grid);
+  const applyGridRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     selectedRef.current = selected;
     placeMarkerRef.current();
   }, [selected]);
+
+  useEffect(() => {
+    gridRef.current = grid;
+    applyGridRef.current();
+  }, [grid?.width, grid?.height]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -115,13 +125,13 @@ export function PixelCanvas({ live, tool = 'inspect', stroke, preview, selected 
         drawLayer(layerContext, controller.current, viewport, pixelRatio, preview.keys(), (tx, ty) => layerImages.get(tx, ty));
       }
       if (redraw === 'all') {
-        drawViewport(context, controller.current, viewport, pixelRatio, lookup);
+        drawViewport(context, controller.current, viewport, pixelRatio, lookup, gridRef.current);
         placeMarker();
         showStatus();
         // The deltas listener follows the visible regions (it ignores an unchanged set).
         live.viewportChanged(visiblePixels(controller.current, viewport));
       } else {
-        drawTiles(context, controller.current, viewport, pixelRatio, redraw.values(), lookup);
+        drawTiles(context, controller.current, viewport, pixelRatio, redraw.values(), lookup, gridRef.current);
       }
     };
     const request = () => {
@@ -133,6 +143,12 @@ export function PixelCanvas({ live, tool = 'inspect', stroke, preview, selected 
       request();
     };
     const controller = new CanvasController(() => viewport, schedule);
+    // The size comes from config/global: the camera is brought back on the grid, the edge redrawn.
+    applyGridRef.current = () => {
+      controller.setGrid(gridRef.current ?? null);
+      schedule();
+    };
+    applyGridRef.current();
     // A delta repaints only the tiles it touches; a new canvas version repaints everything.
     const unsubscribe = live.subscribe((change) => {
       if (change === 'all') {

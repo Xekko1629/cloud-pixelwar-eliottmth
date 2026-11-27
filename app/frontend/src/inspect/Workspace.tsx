@@ -50,6 +50,7 @@ export function Workspace({ api, live }: { api: ApiClient; live: LiveCanvas }) {
   }));
   const [tool, setTool] = useState<CanvasTool>('inspect');
   const { selected } = useSyncExternalStore(inspector.subscribe, inspector.getState);
+  const { config } = useSyncExternalStore(live.subscribeState, live.getState);
 
   useEffect(() => {
     inspector.start();
@@ -83,6 +84,7 @@ export function Workspace({ api, live }: { api: ApiClient; live: LiveCanvas }) {
         stroke={stroke}
         preview={preview}
         selected={tool === 'inspect' ? selected : null}
+        grid={config?.size ?? null}
         onSelect={(pixel) => inspector.select(pixel)}
       />
       <PixelPanel

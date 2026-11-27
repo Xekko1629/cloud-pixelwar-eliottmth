@@ -64,6 +64,22 @@ de 1024 × 1024 pixels (16 × 16 tuiles), chargées par `GET /api/regions/{rx}/{
 - `/admin clear` (nouvelle `canvas_version`) oublie toutes les régions et recharge
   celles qui sont visibles.
 
+## Pause et grille bornée en temps réel (DRAW-04)
+
+Le listener de `config/global` donne la pause et la taille de la grille, sans recharger
+la page :
+
+- **Grille bornée** (`/admin size`, champ `size`) : ce qui est hors de (0, 0)..(largeur − 1,
+  hauteur − 1) est grisé, avec un trait sur le bord (`drawEdge`, `src/canvas/renderer.ts`).
+  Le centre de l'écran reste sur la grille (`clampCamera`) : on ne peut pas s'en éloigner.
+  Quand la taille change, la caméra y est ramenée. Grille infinie : rien de tout ça.
+- **Dessin hors de la grille** : « Poser le pixel » est désactivé et le pinceau ignore les
+  pixels hors de la grille (WEB-04, WEB-05). Le worker refuse de toute façon (`out_of_bounds`).
+- **Pause** : le bandeau affiche « Toile en pause », le bouton et le pinceau sont bloqués.
+- Le quota restant et le dernier refus ne sont pas en temps réel : les règles Firestore
+  n'ouvrent pas `users/{id}` au navigateur. Ils viennent de `GET /api/state`, au chargement
+  et après chaque envoi, et le quota est décompté localement pendant un trait.
+
 ## Inspection et dessin d'un pixel (WEB-04)
 
 - **Sélection** : un clic sans glisser (moins de 6 px de déplacement), ou `Entrée` pour

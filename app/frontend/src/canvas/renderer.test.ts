@@ -1,6 +1,6 @@
 import { COORDINATE_LIMIT, TILE_SIDE } from '@pixelwar/shared/grid';
 import { describe, expect, it } from 'vitest';
-import { BACKGROUND, GRID_ZOOM, drawLayer, drawTiles, drawViewport, type DrawContext } from './renderer';
+import { BACKGROUND, GRID_ZOOM, OUTSIDE, drawLayer, drawTiles, drawViewport, type DrawContext } from './renderer';
 
 interface DrawCall { tile: string; x: number; y: number; width: number; height: number }
 
@@ -37,6 +37,37 @@ function recordingContext() {
 const image = (tx: number, ty: number) => ({ id: `${tx},${ty}` }) as unknown as CanvasImageSource;
 const everyTile = (tx: number, ty: number) => image(tx, ty);
 const viewport = { width: 800, height: 600 };
+
+describe('edge of a bounded grid', () => {
+  it('greys what lies outside the grid and outlines it', () => {
+    const { context, fills, clips } = recordingContext();
+    // Centre (0, 0) at zoom 4: the grid (0, 0)..(50, 25) starts at the screen centre.
+    drawViewport(context, { x: 0, y: 0, zoom: 4 }, viewport, 1, () => null, { width: 50, height: 25 });
+    const grey = fills.filter((fill) => fill.style === OUTSIDE).map((fill) => fill.rect);
+    expect(grey).toEqual([[0, 0, 800, 300], [0, 400, 800, 200], [0, 300, 400, 100], [600, 300, 200, 100]]);
+    expect(clips).toContainEqual([400, 300, 200, 100]);
+  });
+
+  it('draws nothing more on an infinite grid', () => {
+    const { context, fills } = recordingContext();
+    drawViewport(context, { x: 0, y: 0, zoom: 4 }, viewport, 1, () => null, null);
+    expect(fills.some((fill) => fill.style === OUTSIDE)).toBe(false);
+  });
+
+  it('keeps the outer part of a redrawn tile grey', () => {
+    const { context, fills } = recordingContext();
+    drawTiles(context, { x: 0, y: 0, zoom: 4 }, viewport, 1, [{ tx: 0, ty: 0 }], () => null, { width: 50, height: 25 });
+    expect(fills.some((fill) => fill.style === OUTSIDE)).toBe(true);
+  });
+
+  it('keeps the edge positions near the viewport far from the origin', () => {
+    const { context, fills } = recordingContext();
+    drawViewport(context, { x: 5, y: 5, zoom: 64 }, viewport, 1, () => null, { width: 1_000_000_000, height: 1_000_000_000 });
+    for (const { rect } of fills.filter((fill) => fill.style === OUTSIDE)) {
+      expect(rect.every((value) => Math.abs(value) <= 801)).toBe(true);
+    }
+  });
+});
 
 describe('drawViewport', () => {
   it('clears to white and disables smoothing at the device pixel ratio', () => {
