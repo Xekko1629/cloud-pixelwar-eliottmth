@@ -1,6 +1,6 @@
 import { COORDINATE_LIMIT, TILE_SIDE } from '@pixelwar/shared/grid';
 import { describe, expect, it } from 'vitest';
-import { BACKGROUND, GRID_ZOOM, drawTiles, drawViewport, type DrawContext } from './renderer';
+import { BACKGROUND, GRID_ZOOM, drawLayer, drawTiles, drawViewport, type DrawContext } from './renderer';
 
 interface DrawCall { tile: string; x: number; y: number; width: number; height: number }
 
@@ -18,6 +18,7 @@ function recordingContext() {
     imageSmoothingEnabled: true,
     setTransform(...matrix) { context.transform = matrix; },
     fillRect(...rect) { fills.push({ style: context.fillStyle, rect }); },
+    clearRect(...rect) { fills.push({ style: 'clear', rect }); },
     drawImage(image, x, y, width, height) {
       draws.push({ tile: (image as unknown as { id: string }).id, x, y, width, height });
     },
@@ -145,5 +146,19 @@ describe('drawTiles', () => {
     // and 64 + 1 vertical lines are at most needed.
     expect(lines.length).toBeGreaterThan(0);
     expect(lines.length).toBeLessThanOrEqual(65 + 65);
+  });
+});
+
+describe('drawLayer', () => {
+  it('clears the layer, then draws only its visible tiles, where the canvas puts them', () => {
+    const full = recordingContext();
+    drawViewport(full.context, { x: 0, y: 0, zoom: 4 }, viewport, 1, everyTile);
+    const layer = recordingContext();
+
+    const drawn = drawLayer(layer.context, { x: 0, y: 0, zoom: 4 }, viewport, 1, [{ tx: 0, ty: 0 }, { tx: 99, ty: 0 }], everyTile);
+
+    expect(drawn).toBe(1);
+    expect(layer.fills).toEqual([{ style: 'clear', rect: [0, 0, 800, 600] }]);
+    expect(layer.draws).toEqual([full.draws.find((d) => d.tile === '0,0')]);
   });
 });

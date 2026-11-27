@@ -143,3 +143,26 @@ variable "realtime_extra_referrers" {
     error_message = "Each referrer is https://<host>/* or a local http://localhost:<port>/*."
   }
 }
+
+variable "enable_overview" {
+  description = "Far-view pyramid (DATA-05c): overview-worker, its Cloud Scheduler tick and the signed URLs of the tile-reader; needs the web API and the /draw delivery"
+  type        = bool
+  default     = false
+}
+
+variable "overview_schedule" {
+  description = "Cron schedule of the overview-tick job (UTC)"
+  type        = string
+  default     = "* * * * *"
+}
+
+variable "alert_notification_channels" {
+  description = "Monitoring notification channels of the alerts (OBS-01); empty: incidents are only shown in the console"
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for channel in var.alert_notification_channels : can(regex("^projects/[a-z][a-z0-9-]{4,28}[a-z0-9]/notificationChannels/[0-9]+$", channel))])
+    error_message = "Each channel is projects/<project>/notificationChannels/<id>."
+  }
+}

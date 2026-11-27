@@ -7,9 +7,10 @@ locals {
   # Shared hardening: IAM only (no ACL), never public.
   application_buckets = {
     # /snapshot PNGs (BOT-07a), shared through a signed URL (BOT-07b).
-    snapshots = { expire_after_days = var.snapshot_retention_days }
+    snapshots = { expire_after_days = var.snapshot_retention_days, browser_reads = false }
     # Low-resolution pyramid of the far view (DATA-05c): active images never expire.
-    overview = { expire_after_days = null }
+    # The frontend draws them on its canvas from signed URLs: CORS for its origin only.
+    overview = { expire_after_days = null, browser_reads = true }
   }
 }
 
@@ -23,6 +24,17 @@ resource "google_storage_bucket" "application" {
   uniform_bucket_level_access = true
   public_access_prevention    = "enforced"
   force_destroy               = true
+
+  dynamic "cors" {
+    for_each = each.value.browser_reads ? [local.frontend_origin] : []
+
+    content {
+      origin          = [cors.value]
+      method          = ["GET"]
+      response_header = ["Content-Type"]
+      max_age_seconds = 3600
+    }
+  }
 
   dynamic "lifecycle_rule" {
     for_each = each.value.expire_after_days == null ? [] : [each.value.expire_after_days]

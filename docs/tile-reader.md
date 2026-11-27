@@ -17,10 +17,9 @@ Le proxy lit Firestore et n'écrit jamais : son compte d'exécution n'aura que
 | `GET /api/regions/{rx}/{ry}/tiles` | Couleurs des tuiles existantes d'une région, en binaire | WEB-03b |
 | `GET /api/tiles/{tx}/{ty}/meta` | Auteur et date de chaque pixel d'une tuile | WEB-04 |
 | `GET /api/state` | Configuration globale et quota de l'appelant | WEB-03b, DRAW-04 |
+| `GET /api/overview/{niveau}/{cx}/{cy}` | URL signée d'une image de la vue éloignée | WEB-03d |
 
-Les URL signées des images de la vue éloignée, prévues par le ticket, sont
-**reportées** : le bucket `overview` (SRV-07) et les images (DATA-05c) n'existent
-pas encore. Le temps réel n'est pas ici : il passe par le service `realtime`
+Le temps réel n'est pas ici : il passe par le service `realtime`
 (DRAW-06).
 
 ## Authentification
@@ -100,8 +99,31 @@ limite personnelle de l'admin, sinon limite par défaut, et compteur remis à z�
 Cette réponse est une photo à l'instant de la lecture ; les mises à jour arrivent
 ensuite par le flux `realtime` (DRAW-04).
 
-`last_rejection` n'existe que si `users/{uid}` existe déjà : DATA-02 n'écrit pas
-de refus pour un utilisateur qui n'a jamais dessiné.
+`last_rejection` est le dernier refus depuis le dernier dessin accepté, ou `null`.
+Il est présent dès la première action d'un utilisateur, même refusée : DATA-02 crée
+alors `users/{uid}` sans rien consommer (`docs/drawing-transactions.md`).
+
+## `GET /api/overview/{niveau}/{cx}/{cy}`
+
+```json
+{
+  "canvas_version": 3, "level": 2, "cx": -1, "cy": 0,
+  "url": "https://storage.googleapis.com/…/v3/2/-1_0.png?X-Goog-Signature=…",
+  "expires_at": "2026-11-26T12:15:00.000Z"
+}
+```
+
+- `niveau` vaut 1, 2 ou 3 ; une image couvre 1024, 4096 ou 16 384 pixels de côté
+  ([overview.md](overview.md)). Hors de la grille : `400 invalid_coordinates`.
+- L'URL est signée (V4, lecture, 15 minutes) **sans vérifier que l'image existe** :
+  une zone vide répond `404` chez Cloud Storage, et le navigateur l'affiche vide.
+- Pas d'`ETag` (chaque signature est différente) : `Cache-Control: private, max-age=300`.
+- Le bucket n'autorise la lecture depuis le navigateur (CORS `GET`) que pour l'origine
+  du frontend, et reste privé : sans signature, aucun accès.
+- Signature sans clé : le compte du `tile-reader` a `roles/iam.serviceAccountTokenCreator`
+  sur **lui-même** (API `signBlob`) et `roles/storage.objectViewer` sur le bucket
+  `overview` seulement. Sans `OVERVIEW_BUCKET` (vue éloignée désactivée), la route
+  répond `503`.
 
 ## Cache
 
@@ -148,6 +170,7 @@ le refuse (`403`) pour une autre origine.
 | `GOOGLE_CLOUD_PROJECT` | Projet de la base Firestore `(default)` |
 | `FRONTEND_ORIGIN` | Seule origine autorisée par CORS |
 | `APP_ENV` | `dev` ou `prd`, pour l'export de télémétrie |
+| `OVERVIEW_BUCKET` | Bucket `overview` dont les images sont signées ; absent : `503` sur `/api/overview` |
 
 ## Observabilité
 
@@ -176,4 +199,4 @@ changement de version, métadonnées sans id Discord, quota et dernier refus.
 
 - Vérifier en dev que la gateway transmet `Content-Encoding: gzip`, `ETag` et le
   `304`, et le format réel de `X-Apigateway-Api-Userinfo`.
-- URL signées de la vue éloignée, après SRV-07 et DATA-05c.
+- Vérifier en dev une URL signée réelle (signature `signBlob`, CORS du bucket).

@@ -117,8 +117,8 @@ run "proxies_serve_concurrent_requests" {
     condition = (
       module.discord_proxy[0].concurrency == 16 && module.web_proxy[0].concurrency == 16 &&
       module.tile_reader[0].concurrency == 16 && module.auth_proxy[0].concurrency == 16 &&
-      module.draw_worker[0].concurrency == 1
+      module.draw_worker[0].concurrency == 32 && module.draw_worker[0].max_instances == 2
     )
-    error_message = "Stateless proxies serve 16 requests per instance; the draw-worker keeps 1 (Firestore contention)."
+    error_message = "Stateless proxies serve 16 requests per instance; the draw-worker holds 32 pushes to group them (ADR-0014) and keeps 2 instances as cost ceiling."
   }
 }

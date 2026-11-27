@@ -1,4 +1,4 @@
-import { crc32, deflateSync } from 'node:zlib';
+import { crc32, deflateSync, inflateSync } from 'node:zlib';
 import { PALETTE, assertInteger } from '../grid/constants';
 
 // Node only (zlib): used by the workers that render images, never by the frontend.
@@ -95,4 +95,60 @@ export function encodeIndexedPng(image: IndexedImage): Uint8Array {
     offset += part.byteLength;
   }
   return png;
+}
+
+export class InvalidPngError extends Error {
+  constructor(message: string) { super(message); this.name = 'InvalidPngError'; }
+}
+
+/**
+ * Reads back a PNG written by encodeIndexedPng, and only that format: 4-bit indexed
+ * colour, our 16-entry palette, filter type 0, no interlace. The far-view pyramid
+ * (DATA-05c) builds each level from the images of the level below.
+ */
+export function decodeIndexedPng(png: Uint8Array, maxSide = 4096): IndexedImage {
+  const fail = (reason: string): never => { throw new InvalidPngError(`Unsupported PNG: ${reason}`); };
+  if (png.byteLength < SIGNATURE.byteLength || SIGNATURE.some((byte, i) => png[i] !== byte)) fail('signature');
+  const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
+  let offset = SIGNATURE.byteLength;
+  let width = 0;
+  let height = 0;
+  const data: Uint8Array[] = [];
+  let ended = false;
+  while (offset < png.byteLength && !ended) {
+    if (offset + 12 > png.byteLength) fail('truncated chunk');
+    const length = view.getUint32(offset);
+    if (offset + 12 + length > png.byteLength) fail('truncated chunk');
+    const type = String.fromCharCode(...png.subarray(offset + 4, offset + 8));
+    const body = png.subarray(offset + 8, offset + 8 + length);
+    if (view.getUint32(offset + 8 + length) !== crc32(png.subarray(offset + 4, offset + 8 + length))) fail('CRC');
+    if (type === 'IHDR') {
+      if (length !== 13) fail('header');
+      width = view.getUint32(offset + 8);
+      height = view.getUint32(offset + 12);
+      if (body[8] !== BIT_DEPTH || body[9] !== COLOR_TYPE_INDEXED || body[10] !== 0 || body[11] !== 0 || body[12] !== 0) fail('format');
+    } else if (type === 'PLTE') {
+      if (length !== PLTE.byteLength || PLTE.some((byte, i) => body[i] !== byte)) fail('palette');
+    } else if (type === 'IDAT') {
+      data.push(body);
+    } else if (type === 'IEND') {
+      ended = true;
+    }
+    offset += 12 + length;
+  }
+  if (!ended || width < 1 || height < 1 || width > maxSide || height > maxSide || data.length === 0) fail('structure');
+  const rowBytes = Math.ceil(width / 2);
+  let raw: Uint8Array;
+  try { raw = inflateSync(Buffer.concat(data), { maxOutputLength: (rowBytes + 1) * height }); } catch { return fail('data'); }
+  if (raw.byteLength !== (rowBytes + 1) * height) fail('data length');
+  const indices = new Uint8Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    const row = y * (rowBytes + 1);
+    if (raw[row] !== 0) fail('filter');
+    for (let x = 0; x < width; x += 1) {
+      const byte = raw[row + 1 + (x >> 1)];
+      indices[y * width + x] = x % 2 === 0 ? byte >> 4 : byte & 0x0f;
+    }
+  }
+  return { width, height, indices };
 }

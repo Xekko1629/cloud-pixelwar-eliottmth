@@ -80,6 +80,16 @@ section.app__status p {
   overflow: hidden;
 }
 
+/* Preview of what is being sent: half-transparent, so it never passes for the canvas state. */
+.pixel-canvas__layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
 .pixel-canvas__marker {
   position: absolute;
   top: 0;
@@ -141,6 +151,36 @@ section.app__status p {
 .pixel-panel__color[aria-checked="true"] {
   outline: 2px solid var(--foreground);
   outline-offset: 1px;
+}
+
+.pixel-panel__tools {
+  display: flex;
+  gap: 6px;
+}
+
+.pixel-panel__tool {
+  flex: 1;
+}
+
+.pixel-panel__tool[aria-checked="true"] {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.pixel-panel__size {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pixel-panel__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pixel-canvas__surface[data-tool="brush"] {
+  cursor: cell;
 }
 
 .pixel-panel__draw:disabled {

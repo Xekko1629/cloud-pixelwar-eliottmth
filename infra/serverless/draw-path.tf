@@ -53,7 +53,10 @@ module "draw_worker_source" {
   bucket     = local.function_build.sources_bucket
 }
 
-# Initial profile from docs/draw-worker.md, to be measured in dev before raising it.
+# Group commit (ADR-0014): the pushes an instance holds at the same time share one Firestore
+# transaction, so concurrency is what lets groups form. 32 = MAX_DRAW_GROUP of
+# app/functions/draw-worker/src/processor.ts. With concurrency 1, a 500-pixel stroke ran at
+# 3.7 px/s and saturated both instances (dev, 26/11). max_instances stays the cost ceiling.
 module "draw_worker" {
   source = "./modules/function"
   count  = local.discord_pipeline_enabled ? 1 : 0
@@ -67,7 +70,7 @@ module "draw_worker" {
   build_service_account = local.function_build.service_account
   build_repository      = local.function_build.repository
   labels                = local.labels
-  concurrency           = 1
+  concurrency           = 32
   min_instances         = 0
   max_instances         = 2
   timeout_seconds       = 300
@@ -146,7 +149,12 @@ module "draw_worker_subscription" {
   invoker_service_account_email = module.draw_worker[0].invoker_service_account_email
   pubsub_agent_member           = local.pubsub_agent_member
   ack_deadline_seconds          = 330
-  labels                        = local.labels
+  # With concurrency 1, a 500-pixel stroke saturated the 2 instances: Cloud Run answered 429/500
+  # "no available instance" and 1 pixel reached the DLQ after 5 attempts (load test in
+  # dev, 26/11 19:49 UTC). 10 attempts with 10-60 s backoff stay under the 15-minute
+  # Discord token.
+  max_delivery_attempts = 10
+  labels                = local.labels
 
   depends_on = [google_service_account_iam_member.push_token_creator]
 }

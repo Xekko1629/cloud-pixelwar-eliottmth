@@ -59,14 +59,14 @@ Les autres champs (`event_id`, `occurred_at`, `source`, `actor`, `payload`) ne v
 |---|---|---|---|
 | `discord-command` | `discord-proxy` (après réponse différée `type: 5`) | `command-worker` | BOT-03, BOT-04 |
 | `pixel-draw` | `web-proxy` (`POST /api/pixels`, un message par pixel de la requête, [ADR-0014](adr/0014-un-evenement-par-pixel.md)) ; `command-worker` pour `/draw` (`source = discord`) | `draw-worker` | DRAW-01, DRAW-02, BOT-04 |
-| `pixel-processed` | `draw-worker`, un message par `pixel-draw` | `discord-notifier` (acquitte sans action les résultats `source = web`) ; consommateur de marquage de la vue éloignée | DRAW-02, BOT-05, DATA-05c |
+| `pixel-processed` | `draw-worker`, un message par `pixel-draw` | `discord-notifier` (acquitte sans action les résultats `source = web`) | DRAW-02, BOT-05 |
 | `pixel-rejected` | `draw-worker`, un message par `pixel-draw` | `discord-notifier` | DRAW-02, BOT-05 |
 | `command-rejected` | `command-worker` (`/admin` ou `/snapshot` non autorisé) | `discord-notifier` (réponse du refus) | BOT-04, BOT-08 |
 | `admin-requested` | `command-worker` (`/admin`, après autorisation) | `admin-worker` | BOT-04, BOT-08, DATA-04 |
 | `render-requested` | `command-worker` (`/get`) | `render-worker` | BOT-04, BOT-06 |
 | `snapshot-requested` | `command-worker` (`/snapshot`) | `snapshot-worker` | BOT-04, BOT-07a |
 | `snapshot-ready` | Cloud Storage : notification `OBJECT_FINALIZE` du bucket `snapshots` (message natif, sans enveloppe, section 5) | `snapshot-notifier` | SRV-07, BOT-07b |
-| `overview-tick` (nom **à valider**) | Cloud Scheduler (message natif, section 6) | `overview-worker` | SRV-05, DATA-05c |
+| `overview-tick` | Cloud Scheduler, chaque minute (message natif, section 6) | `overview-worker` | SRV-05, DATA-05c |
 
 Un pixel posé sur le web n'est pas notifié par `pixel-rejected` : le dernier rejet et sa raison sont reportés dans `users/{uid}`, que le navigateur lit par `GET /api/state` au chargement et après chaque trait (DRAW-04 ; ADR-0015). Le nom du champ (par exemple `last_rejection`) est une proposition. Le topic `pixel-rejected` ne sert donc qu'au `discord-notifier`.
 
@@ -333,21 +333,21 @@ Cloud Scheduler (job) ──publie──▶ topic overview-tick ──push OIDC�
 
 Cloud Scheduler publie dans le topic à intervalle régulier ; l'abonnement pousse vers le worker, comme pour les autres événements (ADR-0002, « Sources qui ne sont pas des proxies » ; DATA-05c, « par exemple chaque minute »). Il n'y a ni Eventarc ni `event_trigger` (ADR-0002 ; ADR-0008, section « Déclencheurs »).
 
-Le marquage des régions suit une autre chaîne :
+Les régions modifiées ne sont **pas** marquées par un consommateur de `pixel-processed`
+(décision DATA-05c du 26/11, option B) : il y aurait une invocation par pixel. Le worker
+relit les **deltas** créés depuis son passage précédent, qui sont déjà un document par
+région et par transaction, écrits dans la même transaction que les pixels :
 
 ```text
-pixel-processed ──abonnement pixel-processed.overview-mark──▶ marquage des régions modifiées
-overview-tick ──▶ overview-worker : re-rend les régions marquées, puis les niveaux 2 et 3 qui les contiennent
+overview-tick ──▶ overview-worker : deltas récents → régions → niveau 1 (tuiles), puis niveaux 2 et 3 (images)
 ```
 
-Les images sont écrites dans le bucket `overview` (SRV-07, DATA-05c). Les niveaux sont décrits dans ADR-0007, « Vue éloignée : une pyramide d'images ».
-
-Points non tranchés, détaillés en section 9 :
-
-- le stockage des régions marquées (collection, format) et sa remise à zéro ;
-- la régénération complète après `/admin clear` (DATA-05c) : quel déclencheur ;
-- le contenu du message Cloud Scheduler et le nom du topic ;
-- le droit de publication de Cloud Scheduler sur le topic (ADR-0002 ne cite que le rôle de l'agent Cloud Storage).
+Le message du job est natif : son `data` (`tick`) n'est pas lu. Un tick de plus de
+2 minutes est acquitté sans travail. L'agent de service de Cloud Scheduler reçoit
+`roles/pubsub.publisher` sur `overview-tick` seulement. Après `/admin clear`, la version
+change : le worker refait toute la pyramide et supprime les images de l'ancienne version.
+Les images sont écrites dans le bucket `overview` (SRV-07) : voir [overview.md](overview.md)
+et ADR-0007, « Vue éloignée : une pyramide d'images ».
 
 ## 7. Abonnements, DLQ et alertes
 
@@ -360,7 +360,6 @@ Convention appliquée par le module `infra/serverless/modules/push-subscription`
 | `command-worker` | `discord-command` | `command-worker` | BOT-04 |
 | `draw-worker` | `pixel-draw` | `draw-worker` | DRAW-02 |
 | `discord-notifier-processed` | `pixel-processed` | `discord-notifier` | BOT-05 |
-| `overview-mark` | `pixel-processed` | Consommateur de marquage (nom à valider) | DATA-05c |
 | `discord-notifier-rejected` | `pixel-rejected` | `discord-notifier` | BOT-05 |
 | `discord-notifier-command-rejected` | `command-rejected` | `discord-notifier` | BOT-08 |
 | `admin-worker` | `admin-requested` | `admin-worker` | BOT-08 |
@@ -379,7 +378,7 @@ Chaque abonnement pousse vers l'URL `run.app` de son worker, avec un service acc
 |---|---|---|
 | DLQ | Un topic de DLQ par abonnement | SRV-05 ; ADR-0002 |
 | Abonnement de debug sur la DLQ | Un par DLQ, pour inspecter et rejouer | SRV-05 |
-| Nombre de tentatives avant DLQ | `max_delivery_attempts = 5` : **valeur approximative**, pas une garantie de cinq exécutions exactes | SRV-05 ; ADR-0002 (« 5 par défaut ») ; #35 |
+| Nombre de tentatives avant DLQ | `max_delivery_attempts = 5` par défaut, **10 pour `draw-worker`** : **valeur approximative**, pas une garantie d'un nombre exact d'exécutions. Le test de charge du 26/11 (1 trait de 500 pixels) a saturé les 2 instances du `draw-worker` et envoyé 1 pixel en DLQ après 5 tentatives | SRV-05 ; ADR-0002 (« 5 par défaut ») ; #35 |
 | Backoff | Exponentiel, de 10 s à 60 s pour tous les abonnements | SRV-05 ; ADR-0002 ; `modules/push-subscription` |
 | Rétention | Au moins 7 jours | SRV-05 ; `docs/rate-limits.md` (« rejeu Pub/Sub/DLQ (7 jours prévus) ») |
 | Délai d'acquittement | Supérieur au timeout du worker, 600 s au maximum en push : 60 s pour `command-worker` et le notifier, 330 s pour `draw-worker` | ADR-0002 ; #35 ; `docs/deploy-draw-path.md` |
@@ -390,9 +389,11 @@ Chaque abonnement pousse vers l'URL `run.app` de son worker, avec un service acc
 
 | Alerte | Seuil | Origine |
 |---|---|---|
-| DLQ non vide | Plus de 0 message, par abonnement | SRV-05 ; ADR-0002 ; OBS-02 |
+| DLQ non vide | Plus de 0 message, par abonnement : **en place** (`infra/serverless/alerts.tf`), un incident par abonnement `*-dlq-inspect` | SRV-05 ; ADR-0002 ; OBS-02 |
 | Âge du plus vieux message non acquitté (abonnement source) | Plus de 60 s | SRV-05 ; #35 |
 | Taux d'erreur des workers du pipeline de dessin | Plus de 5 % | DRAW-05 |
+
+L'alerte « DLQ non vide » notifie les canaux de `alert_notification_channels` (variable du stack serverless, au format `projects/<projet>/notificationChannels/<id>`). Tant que le canal d'OBS-01 n'existe pas, la liste est vide : l'incident n'apparaît que dans la console Cloud Monitoring. Il reste ouvert tant que les messages sont dans l'abonnement d'inspection (7 jours) : le traiter, c'est les rejouer ou les acquitter. L'alerte sur l'âge du plus vieux message n'est pas encore en place : un trait de 500 pixels la déclencherait à chaque fois avec le débit actuel.
 
 ## 8. Consommateurs : idempotence, ordre, messages invalides
 
@@ -409,8 +410,7 @@ Pub/Sub livre au moins une fois, sans ordre garanti. Chaque consommateur doit do
 | `render-worker` | `event_id` (proposition) | BOT-06 demande de tester qu'une nouvelle livraison ne produit pas de notification en double, mais ne fixe pas de mécanisme : **À valider**. |
 | `snapshot-worker` | Clé d'objet stable par demande (BOT-07a, #54) | Proposition : `snapshots/<occurred_at de la demande>-<event_id>.png`, pour que le rejeu écrive le même objet. Le format exact est **À valider**. |
 | `snapshot-notifier` | `bucketId` + `objectId` + `objectGeneration` (section 5) | Une notification rejouée ne doit pas reposter le lien (#55). Le stockage de la trace d'envoi est **À valider**. |
-| Consommateur de marquage (vue éloignée) | Marquage idempotent par construction (proposition) | Marquer deux fois une région ne change rien. |
-| `overview-worker` | Re-rendu depuis l'état courant (proposition) | Rejouable sans effet de bord. Les exécutions concurrentes sont **À valider**. |
+| `overview-worker` | Re-rendu depuis l'état courant ; curseur `state.json` du bucket, écrit avec une précondition de génération | Rejouable sans effet de bord. Deux cycles simultanés : le premier qui écrit l'état gagne, l'autre acquitte son tick (`overview.cycle.concurrent`). |
 
 Règle d'ordre LWW pour les tuiles : un événement rejoué ou en retard n'écrase jamais un pixel plus récent (DATA-02). La comparaison suit `compareEvents` : `occurred_at` d'abord, puis `event_id` en ordre ASCII des UUID en minuscules pour départager les égalités (`app/shared/src/grid/event-order.ts`). Les deltas suivent la même logique via `created_at` (ADR-0003).
 
@@ -439,10 +439,10 @@ Décisions que les sources ne tranchent pas. Chacune est à valider avant SRV-05
 6. ~~**Motif `out_of_bounds`.**~~ Tranché par DATA-02 : motif de `pixel-rejected` à part entière (section 3.3). La liste des motifs de métrique de `docs/observability.md` reste à aligner.
 7. ~~**Coordonnée en double dans un lot.**~~ Tranché par DRAW-01 et ADR-0014 : refusée par le proxy (`400`, section 3.2). Le regroupement des écritures dans une instance n'est activé que si le mode de base reste sous 200 pixels par seconde et par instance.
 8. ~~**`canvas_version`.**~~ Tranché par DATA-02 : lu dans `config/global` pendant la transaction (section 3.2).
-9. **Régions marquées** pour la vue éloignée : collection, format, remise à zéro, et déclencheur de la régénération complète après `/admin clear` (DATA-05c).
-10. **Noms** : topic `overview-tick`, consommateur de marquage, et adoption de la convention de nommage des abonnements (section 7.1).
+9. ~~**Régions marquées**~~ Tranché par DATA-05c : pas de marquage, les régions viennent des deltas ; régénération complète au changement de `canvas_version` (section 6).
+10. **Noms** : adoption de la convention de nommage des abonnements (section 7.1). Topic `overview-tick` tranché par DATA-05c.
 11. **Backoff** des autres workers ; `max_delivery_attempts = 5` reste approximatif.
-12. **Droit de publication de Cloud Scheduler** sur `overview-tick` (non cité dans ADR-0002).
+12. ~~**Droit de publication de Cloud Scheduler**~~ Tranché par DATA-05c : `roles/pubsub.publisher` de son agent de service sur `overview-tick` seulement.
 13. **Secrets dans les messages** : le `interaction_token` circule dans `discord-command`, `pixel-draw`, `pixel-processed`, `pixel-rejected`, `render-requested`, `snapshot-requested`, `admin-requested` et `command-rejected` (toujours dans `payload.discord`, jamais dans les attributs ni dans Firestore), et serait stocké dans les métadonnées de l'objet snapshot. Il est valide 15 min : une livraison retardée au-delà ne peut plus éditer le message. Le stocker dans GCS est-il acceptable ?
 14. **`snapshot-ready`** : confirmer que le topic reste natif Cloud Storage, et ajouter `correlation_id` aux métadonnées de l'objet (BOT-07a ne le prévoit pas).
 15. ~~**Rejeu tardif du `discord-notifier`.**~~ Tranché par BOT-05 : après 15 min, un log sûr est écrit et le message est acquitté (`204`) sans appeler Discord (`docs/discord-notifier.md`).

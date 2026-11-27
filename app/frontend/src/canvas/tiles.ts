@@ -8,11 +8,13 @@ export interface TileColorsSource {
 
 const RGB = PALETTE.map((hex) => [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16)));
 
-// RGBA of a tile for ImageData; untouched pixels are white, like painted white.
-export function tileRgba(colors: Uint8Array): Uint8ClampedArray<ArrayBuffer> {
+// RGBA of a tile for ImageData; untouched pixels are white, like painted white, or
+// transparent for a layer drawn over the canvas (the preview of a stroke).
+export function tileRgba(colors: Uint8Array, untouched: 'white' | 'transparent' = 'white'): Uint8ClampedArray<ArrayBuffer> {
   if (colors.byteLength !== TILE_PIXELS) throw new Error('Tile colors must contain 4096 bytes');
   const rgba = new Uint8ClampedArray(TILE_PIXELS * 4);
   for (let i = 0; i < TILE_PIXELS; i += 1) {
+    if (colors[i] === 0 && untouched === 'transparent') continue;
     const [r, g, b] = RGB[Math.max(colors[i] - 1, 0)] ?? RGB[0];
     rgba.set([r, g, b, 255], i * 4);
   }
@@ -28,6 +30,7 @@ export class TileImageCache<Image> {
     private readonly source: TileColorsSource,
     private readonly createImage: (rgba: Uint8ClampedArray<ArrayBuffer>) => Image,
     readonly capacity = 2048,
+    private readonly untouched: 'white' | 'transparent' = 'white',
   ) {
     if (!Number.isSafeInteger(capacity) || capacity < 1) throw new RangeError('capacity must be a positive integer');
   }
@@ -45,7 +48,7 @@ export class TileImageCache<Image> {
       return image;
     }
     const colors = this.source.get(tx, ty);
-    const image = colors === null ? null : this.createImage(tileRgba(colors));
+    const image = colors === null ? null : this.createImage(tileRgba(colors, this.untouched));
     this.images.set(key, image);
     if (this.images.size > this.capacity) this.images.delete(this.images.keys().next().value!);
     return image;
