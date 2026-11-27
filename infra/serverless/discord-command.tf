@@ -81,11 +81,13 @@ locals {
     snapshot_worker   = module.snapshot_worker[0].invoker_service_account_name
     snapshot_notifier = module.snapshot_notifier[0].invoker_service_account_name
   } : {}
+  # overview-worker (DATA-05c) joins the same scoped grants when the far view is enabled.
+  overview_push_invokers = local.overview_enabled ? { overview_worker = module.overview_worker[0].invoker_service_account_name } : {}
 }
 
 # The CI deployer manages service account policies (roles/iam.serviceAccountAdmin, infra/iam).
 resource "google_service_account_iam_member" "push_token_creator" {
-  for_each = local.push_invokers
+  for_each = merge(local.push_invokers, local.overview_push_invokers)
 
   service_account_id = each.value
   role               = "roles/iam.serviceAccountTokenCreator"

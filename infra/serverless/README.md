@@ -154,7 +154,8 @@ le bucket de sources persistant d'`infra/bootstrap`.
   Une règle lifecycle supprime les objets après `snapshot_retention_days`
   (7 jours par défaut, la durée maximale d'une URL signée V4).
 - `overview` : pyramide de la vue éloignée (DATA-05c). Aucune expiration, les
-  images actives sont réécrites par l'`overview-worker`.
+  images actives sont réécrites par l'`overview-worker`. CORS `GET` pour l'origine
+  du frontend seulement, qui lit les images par URL signée (`docs/overview.md`).
 - Une notification `OBJECT_FINALIZE` du bucket `snapshots` publie dans le topic
   `snapshot-ready`, au format `JSON_API_V1`, sans enveloppe métier
   ([catalogue](../../docs/events.md), section 5). L'agent de service Cloud

@@ -61,7 +61,12 @@
   le contrat de `docs/rate-limits.md` avec `pixel_count = 1`.
 - **Regroupement d'écriture par instance** (*group commit*), activé seulement si
   le test de charge du mode de base reste sous 200 pixels par seconde et par
-  instance :
+  instance. **Activé le 26/11/2026** : le mode de base a mesuré 3,7 pixels par
+  seconde pour 2 instances sur un trait de 500 pixels (dev). Le regroupement suit
+  l'option « au fil de l'eau » : une transaction à la fois par instance, et le groupe
+  suivant réunit les pixels arrivés pendant celle-ci (sans fenêtre d'attente). Si le
+  commit échoue, chaque pixel est rejoué seul par l'instance avant de répondre
+  (`docs/draw-worker.md`). Détail du principe :
   - Les requêtes push qu'une même instance reçoit en parallèle (concurrence
     Cloud Run) attendent au plus quelques dizaines de millisecondes, ou un nombre
     maximal de pixels fixé par le budget de tuiles et de documents.
@@ -69,8 +74,8 @@
     évalué pixel par pixel dans l'ordre `compareEvents`, règle last-write-wins par
     pixel, tuiles groupées, un delta par région.
   - Chaque requête ne reçoit son `2xx` qu'après le commit. Si le commit échoue,
-    toutes les requêtes du groupe répondent `500` et chaque message est
-    redélivré seul.
+    l'instance rejoue chaque pixel seul avec la transaction du mode de base ; seul
+    un pixel qui échoue encore répond `500` et est redélivré seul.
   - Le broker transporte toujours un événement par pixel, et aucun message n'est
     acquitté avant que son pixel soit durable. Le regroupement ne change que la
     façon dont le worker écrit dans Firestore. Ce n'est pas l'« écriture par

@@ -4,7 +4,7 @@ Un abonnement push Pub/Sub vers un worker privé, avec sa propre DLQ (ADR-0002, 
 
 | Ressource | Rôle |
 | --- | --- |
-| `google_pubsub_topic.dlq` | `<name>-dlq`, reçoit les messages après environ 5 échecs |
+| `google_pubsub_topic.dlq` | `<name>-dlq`, reçoit les messages après environ `max_delivery_attempts` échecs (5 par défaut, de 5 à 100) |
 | `google_pubsub_subscription.dlq_inspect` | `<name>-dlq-inspect`, pull, pour inspecter et rejouer |
 | `google_pubsub_subscription.main` | `<name>`, push OIDC vers `push_endpoint` (aussi audience), retry 10 à 60 s, 7 jours |
 | `dlq_publisher`, `dlq_forwarder` | Droits de transfert de l'agent Pub/Sub, limités à cette DLQ et cet abonnement |

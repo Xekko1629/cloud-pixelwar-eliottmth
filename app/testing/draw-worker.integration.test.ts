@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Firestore } from '@google-cloud/firestore';
 import { PubSub, type Message } from '@google-cloud/pubsub';
 import type { HttpFunction } from '@google-cloud/functions-framework';
-import { createDrawProcessor } from '@pixelwar/shared/drawing';
+import { createDrawProcessor, createGroupCommit, createGroupDrawProcessor } from '@pixelwar/shared/drawing';
 import type { DrawResultEvent, PixelDrawEvent } from '@pixelwar/shared/events';
 import { tileId } from '@pixelwar/shared/grid';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -58,10 +58,13 @@ afterAll(async () => {
   } finally { await client.close(); await db.terminate(); }
 });
 
-function handler(output = publish, now = drawNow) {
+function handler(output = publish, now = drawNow, grouped = false) {
   const write = vi.fn();
+  const single = createDrawProcessor(db, { root, now: () => now });
+  const process = grouped
+    ? createGroupCommit(single, createGroupDrawProcessor(db, { root, now: () => now }), { max_group: 32 }) : single;
   const handle = createDrawWorkerHandler({ subscription: drawSubscription, applicationId: testApplication,
-    process: createDrawProcessor(db, { root, now: () => now }), publish: output, write });
+    process, publish: output, write });
   const invoke = async (event: PixelDrawEvent, messageId = '123') => {
     const body = drawPush(event); body.message.messageId = messageId;
     const res = { status: vi.fn(), json: vi.fn(), send: vi.fn(), set: vi.fn() };
@@ -99,7 +102,7 @@ describe('draw-worker with real local Firestore and Pub/Sub', () => {
     await ref('config/global').update({ paused: true });
     expect((await invoke(paused)).status).toHaveBeenCalledWith(204);
     expect((await resultsFor(paused))[0].event).toMatchObject({ type: 'pixel-rejected', payload: { result: { reason: 'paused' } } });
-    expect((await ref(`users/${paused.actor.uid}`).get()).exists).toBe(false);
+    expect((await ref(`users/${paused.actor.uid}`).get()).data()).toMatchObject({ used_pixels: 0, last_rejection: { reason: 'paused' } });
     await ref('config/global').update({ paused: false });
     const fresh = command(); expect((await invoke(fresh)).status).toHaveBeenCalledWith(204);
     expect((await resultsFor(fresh))[0].event.type).toBe('pixel-processed');
@@ -125,6 +128,19 @@ describe('draw-worker with real local Firestore and Pub/Sub', () => {
     expect((await resultsFor(second))[0].event.payload.result.reason).toBe('rate_limit');
     expect((await db.collection(`${root}/tile_colors`).get()).size).toBe(1);
     expect((await ref(`users/${first.actor.uid}`).get()).get('used_pixels')).toBe(1);
+  });
+  it('groups a burst of concurrent pushes (ADR-0014): one result per pixel, exact quota, fewer transactions', async () => {
+    await ref('config/global').update({ default_limit_per_minute: 30 });
+    const stroke = Array.from({ length: 40 }, (_, x) => { const event = command(); event.payload.pixels = [{ x, y: 0, color: 2 }]; return event; });
+    const { invoke } = handler(publish, drawNow, true);
+    const responses = await Promise.all(stroke.map((event, index) => invoke(event, String(1000 + index))));
+    for (const res of responses) expect(res.status).toHaveBeenCalledWith(204);
+    const results = (await Promise.all(stroke.map((event) => resultsFor(event)))).flat();
+    expect(results.filter((r) => r.event.type === 'pixel-processed')).toHaveLength(30);
+    expect(results.filter((r) => r.event.payload.result.reason === 'rate_limit')).toHaveLength(10);
+    expect((await ref(`users/${stroke[0].actor.uid}`).get()).get('used_pixels')).toBe(30);
+    // The first push runs alone, the others share a few transactions: far fewer deltas than pixels.
+    expect((await db.collection(`${root}/deltas`).get()).size).toBeLessThan(10);
   });
   it('refuses a message that carries several pixels, before any Firestore write', async () => {
     const event = command(); event.payload.pixels = [{ x: 0, y: 0, color: 2 }, { x: 1, y: 0, color: 3 }];

@@ -94,7 +94,9 @@ describe('atomic drawing on the Firestore emulator', () => {
     await ref('config/global').update({ default_limit_per_minute: 1 });
     const result = await processor()(command({ pixels: [{ x: 0, y: 0, color: 1 }, { x: 1, y: 0, color: 2 }] }));
     expect(result).toMatchObject({ type: 'pixel-rejected', reason: 'rate_limit' });
-    expect((await ref('users/123456789012345678').get()).exists).toBe(false);
+    // A first refused action creates the user document with nothing consumed (DRAW-04).
+    expect((await ref('users/123456789012345678').get()).data()).toMatchObject({
+      used_pixels: 0, limit_per_minute: 1, last_rejection: { event_id: result.event_id, reason: 'rate_limit' } });
     expect((await db.collection(`${root}/tile_colors`).get()).empty).toBe(true);
   });
 

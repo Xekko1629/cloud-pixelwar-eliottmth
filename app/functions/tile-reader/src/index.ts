@@ -5,21 +5,27 @@ import type { HttpFunction } from '@google-cloud/functions-framework';
 import { GATEWAY_USERINFO_HEADER, gatewayIdentity } from '@pixelwar/shared/gateway';
 import { createLogger } from '@pixelwar/shared/observability/logger';
 import { createFunctionTelemetry, type FunctionTelemetry } from '@pixelwar/shared/observability/function';
-import { InvalidRoute, etagOf, matchesEtag, metaBody, parseRoute, regionBody, stateBody, type Route } from './responses';
+import { InvalidRoute, etagOf, matchesEtag, metaBody, overviewBody, parseRoute, regionBody, stateBody, type Route } from './responses';
+import { createOverviewSigner, type SignOverview } from './overview';
 import { createFirestoreTileStore, type TileStore } from './store';
 
 interface Options {
   /** https://frontend-<project number>.<region>.run.app, the only origin allowed by CORS. */
   frontendOrigin?: string;
   store?: TileStore;
+  /** Signed URLs of the far-view images (DATA-05c); without it, /api/overview answers 503. */
+  signOverview?: SignOverview;
   now?: () => number;
   log?: ReturnType<typeof createLogger>;
   telemetry?: FunctionTelemetry;
 }
 
-const SPANS: Record<Route['kind'], string> = { tiles: 'tiles.region.read', meta: 'tiles.meta.read', state: 'state.read' };
+const SPANS: Record<Route['kind'], string> = {
+  tiles: 'tiles.region.read', meta: 'tiles.meta.read', state: 'state.read', overview: 'overview.sign',
+};
 const CONTENT_TYPES: Record<Route['kind'], string> = {
   tiles: 'application/octet-stream', meta: 'application/json; charset=utf-8', state: 'application/json; charset=utf-8',
+  overview: 'application/json; charset=utf-8',
 };
 
 /** SRV-11: the browser's only read path to Firestore, behind the gateway and the session JWT (ADR-0013). */
@@ -57,7 +63,9 @@ export function createTileReaderHandler(options: Options): HttpFunction {
       return;
     }
     if (req.method !== 'GET') { res.set('Allow', 'GET').status(405).json({ error: 'method_not_allowed' }); return; }
-    if (!options.store || !options.frontendOrigin) { res.status(503).json({ error: 'unavailable' }); return; }
+    if (!options.store || !options.frontendOrigin || (route.kind === 'overview' && !options.signOverview)) {
+      res.status(503).json({ error: 'unavailable' }); return;
+    }
     const identity = gatewayIdentity(req.get(GATEWAY_USERINFO_HEADER));
     if (!identity) { refuse('invalid_identity'); res.status(401).json({ error: 'unauthenticated' }); return; }
 
@@ -73,6 +81,8 @@ export function createTileReaderHandler(options: Options): HttpFunction {
         let result: Buffer;
         if (current.kind === 'tiles') result = regionBody(version, current, await store.regionTiles(version, current.region));
         else if (current.kind === 'meta') result = metaBody(version, current, await store.tileAuthors(version, current.tx, current.ty));
+        // Signed without checking that the image exists: a missing image (404) is an empty area.
+        else if (current.kind === 'overview') result = overviewBody(version, current, await options.signOverview!(version, current));
         // Only the caller's own document: the uid comes from the session, never from the URL.
         else result = stateBody(config, await store.user(identity.uid), now());
         operation.outcome('served');
@@ -84,6 +94,10 @@ export function createTileReaderHandler(options: Options): HttpFunction {
       res.status(503).json({ error: 'read_unavailable' }); return;
     }
 
+    if (current.kind === 'overview') {
+      // A new signature on every call: no ETag, but the browser may reuse the URL while it is valid.
+      res.set({ 'Cache-Control': 'private, max-age=300', 'Content-Type': CONTENT_TYPES.overview }).status(200).send(body); return;
+    }
     const etag = etagOf(body);
     res.set({ 'Cache-Control': 'private, no-cache', ETag: etag });
     if (matchesEtag(req.get('If-None-Match'), etag)) { res.status(304).send(); return; }
@@ -99,4 +113,6 @@ export function createTileReaderHandler(options: Options): HttpFunction {
 export const handleTileReader = createTileReaderHandler({
   frontendOrigin: process.env.FRONTEND_ORIGIN,
   store: process.env.GOOGLE_CLOUD_PROJECT ? createFirestoreTileStore(new Firestore({ projectId: process.env.GOOGLE_CLOUD_PROJECT })) : undefined,
+  signOverview: process.env.GOOGLE_CLOUD_PROJECT && process.env.OVERVIEW_BUCKET
+    ? createOverviewSigner(process.env.GOOGLE_CLOUD_PROJECT, process.env.OVERVIEW_BUCKET) : undefined,
 });

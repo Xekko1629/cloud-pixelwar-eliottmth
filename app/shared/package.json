@@ -16,7 +16,8 @@
     "./auth": "./src/auth/index.ts",
     "./render/canvas": "./src/render/canvas.ts",
     "./discord/request-push": "./src/discord/request-push.ts",
-    "./snapshot": "./src/snapshot/index.ts"
+    "./snapshot": "./src/snapshot/index.ts",
+    "./overview": "./src/overview/index.ts"
   },
   "dependencies": {
     "@google-cloud/firestore": "9.4.0",

@@ -64,6 +64,73 @@ de 1024 × 1024 pixels (16 × 16 tuiles), chargées par `GET /api/regions/{rx}/{
 - `/admin clear` (nouvelle `canvas_version`) oublie toutes les régions et recharge
   celles qui sont visibles.
 
+## Inspection et dessin d'un pixel (WEB-04)
+
+- **Sélection** : un clic sans glisser (moins de 6 px de déplacement), ou `Entrée` pour
+  le pixel au centre ; `Échap` désélectionne. Le pixel est entouré par un seul élément
+  posé sur le canvas, déplacé avec la caméra.
+- **Auteur et date** : `GET /api/tiles/{tx}/{ty}/meta` à la sélection, puis de nouveau
+  quand un delta temps réel touche la tuile (une seule lecture par rafale, 300 ms après
+  le dernier delta). Pas de lecture en boucle.
+- **Dessin** : palette de 16 couleurs, « Poser le pixel » envoie `POST /api/pixels`. Le
+  `202` veut dire « accepté », pas « dessiné » :
+  - le pixel est « posé » quand son delta arrive avec la couleur envoyée ;
+  - sinon, 3 s plus tard, une lecture de `/api/state` dit si le worker l'a refusé
+    (`last_rejection` avec le même `event_id` : pause, quota, hors de la grille…) ;
+  - un échec d'envoi n'est jamais renvoyé automatiquement : un `202` perdu ferait un
+    second trait (voir [`web-proxy`](../../docs/web-proxy.md)).
+- **Avant l'envoi**, le bouton est désactivé si la toile est en pause (listener de
+  `config/global`), si le pixel est hors de la grille (`size`), ou si le quota est épuisé.
+  Le quota vient de `/api/state`, lu au démarrage et après chaque dessin ; il redevient
+  plein à `reset_at`. C'est toujours le serveur qui décide.
+
+| Fichier | Rôle |
+| --- | --- |
+| `src/api/grid.ts` | Appels `meta`, `state` et `pixels`, réponses validées |
+| `src/inspect/inspector.ts` | Sélection, auteur, quota, envoi et confirmation, sans React |
+| `src/inspect/PixelPanel.tsx`, `Workspace.tsx` | Panneau du pixel et assemblage avec le canvas |
+
+## Pinceau (WEB-05)
+
+- Outil « Pinceau » du panneau : taille de **1 à 100** pixels de côté (slider), carré ou
+  rond, couleur de la palette. Glisser sur la toile peint ; le clic droit, la molette
+  enfoncée, deux doigts ou les flèches déplacent la vue.
+- **Pixels d'un trait** (`src/brush/stroke.ts`) : le pinceau est appliqué en chaque point
+  du chemin (Bresenham entre deux événements pointeur, plus les événements regroupés
+  par le navigateur), donc un trait rapide n'a pas de trou. Entre deux points voisins,
+  seul le bord avant du tampon est ajouté (≈ 100 pixels par pas à la taille 100, au lieu
+  de 10 000). Chaque pixel n'apparaît qu'une fois par trait, donc jamais deux fois dans
+  une requête (`400 duplicate_pixel`). Hors de la grille bornée (`size`) ou de ±10⁹, il
+  est ignoré.
+- **Envoi** (`src/brush/brush.ts`) : le **même pipeline qu'un pixel seul**, sans endpoint
+  ni événement propre au pinceau (ADR-0014). Les pixels partent au fil du trait par
+  requêtes `POST /api/pixels` de 500 au plus, quatre en parallèle au maximum, et le
+  reste au relâchement. La toile n'affiche que ce que les deltas apportent.
+- **Aperçu** (`src/brush/preview.ts`) : ce qui vient d'être envoyé (trait ou « Poser le
+  pixel ») s'affiche tout de suite sur un **calque distinct et semi-transparent**, un
+  second canvas posé sur la toile. Ce n'est pas l'état : la toile, elle, ne change
+  qu'avec les deltas et montre toujours l'état réel (sujet §3.3), et l'aperçu ne fait
+  que marquer ce qui est en cours d'envoi, sans jamais passer pour un pixel posé. Un
+  pixel de l'aperçu disparaît quand la toile montre sa couleur (son delta est arrivé),
+  dès que son refus est connu, sinon au bout de 5 s ; un `/admin clear` vide l'aperçu.
+  La case « Aperçu de l'envoi » du panneau le désactive : seule la toile reste, mise à
+  jour par les deltas. Le choix est gardé dans le `localStorage` du navigateur
+  (`pixelwar.preview`).
+- **Quota et refus** : chaque pixel couvert est **décompté tout de suite** du quota
+  affiché (`PixelInspector.consume`), car `/api/state` ne le voit qu'une fois traité par
+  le worker : deux traits rapides ne croient donc pas avoir tout le quota. Le trait
+  s'arrête au quota restant, et rien n'est dessiné ni envoyé au-delà. Chaque lecture de
+  `/api/state` recale sur le chiffre du serveur (dessins faits depuis Discord compris),
+  et c'est lui qui décide.
+- Un seul message par trait : 3 s après la fin, `/api/state` dit si le dernier refus
+  appartient à l'un de ses événements ; l'aperçu du trait est alors retiré tout de
+  suite. Après un échec d'envoi, le reste du trait est abandonné, jamais renvoyé
+  automatiquement. En pause, le pinceau ne démarre pas.
+- **Démo de charge** : un admin relève la limite d'un compte avec `/admin ratelimit`
+  (par exemple 1 000 000 pixels par minute), puis un trait à la taille 100 envoie
+  plusieurs milliers de pixels par seconde. Le débit par instance du `draw-worker` se lit
+  sur le dashboard (DRAW-05).
+
 ## Développement local
 
 ```sh

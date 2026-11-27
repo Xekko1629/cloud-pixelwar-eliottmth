@@ -71,11 +71,12 @@ module "tile_reader" {
   # CORS preflights). One instance per request multiplied cold starts.
   concurrency     = 16
   timeout_seconds = 15
-  environment_variables = {
+  # OVERVIEW_BUCKET enables the signed far-view URLs (overview-path.tf); without it, 503.
+  environment_variables = merge({
     APP_ENV              = var.environment
     GOOGLE_CLOUD_PROJECT = var.project_id
     FRONTEND_ORIGIN      = local.frontend_origin
-  }
+  }, local.overview_enabled ? { OVERVIEW_BUCKET = local.overview_bucket } : {})
 }
 
 # Reads only: tiles, metadata, config/global and the caller's users document.

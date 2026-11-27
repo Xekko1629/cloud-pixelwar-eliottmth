@@ -92,7 +92,7 @@ On ne peut pas afficher une grille infinie d'un coup. Comme une carte en ligne, 
 | 3 | 16×16 régions (16384×16384) | 1 pour 64×64 |
 
 - Les images ne sont générées que là où quelque chose est peint. Une image absente est une zone vide.
-- Quand une région change, l'`overview-worker` régénère son image de niveau 1, puis celles des niveaux 2 et 3 qui la contiennent.
+- Quand une région change, l'`overview-worker` régénère son image de niveau 1, puis celles des niveaux 2 et 3 qui la contiennent. Il trouve les régions modifiées dans les **deltas** (un par région et par transaction), et non par un consommateur de `pixel-processed` qui coûterait une invocation par pixel (DATA-05c, 26/11/2026 ; [overview.md](../overview.md)).
 - Le dézoom s'arrête au niveau 3. Un écran 1920×1080 couvre alors environ 120 000×70 000 pixels de grille, soit une quarantaine d'images. On peut se déplacer à l'infini, mais pas tout voir d'un coup : le bouton « voir tout le dessin » cadre sur `bounds`, dans la limite de ce zoom.
 
 ### `/get` et `/snapshot`

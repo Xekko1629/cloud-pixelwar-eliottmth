@@ -9,9 +9,10 @@ locals {
     # /snapshot PNGs (BOT-07a), shared through a signed URL (BOT-07b).
     # requests/<event_id>.json holds the interaction token for the notifier (BOT-07b): the
     # token lives 15 minutes, its request is deleted after one day.
-    snapshots = { expire_after_days = var.snapshot_retention_days, requests_expire_after_days = 1 }
+    snapshots = { expire_after_days = var.snapshot_retention_days, requests_expire_after_days = 1, browser_reads = false }
     # Low-resolution pyramid of the far view (DATA-05c): active images never expire.
-    overview = { expire_after_days = null, requests_expire_after_days = null }
+    # The frontend draws them on its canvas from signed URLs: CORS for its origin only.
+    overview = { expire_after_days = null, requests_expire_after_days = null, browser_reads = true }
   }
 }
 
@@ -25,6 +26,17 @@ resource "google_storage_bucket" "application" {
   uniform_bucket_level_access = true
   public_access_prevention    = "enforced"
   force_destroy               = true
+
+  dynamic "cors" {
+    for_each = each.value.browser_reads ? [local.frontend_origin] : []
+
+    content {
+      origin          = [cors.value]
+      method          = ["GET"]
+      response_header = ["Content-Type"]
+      max_age_seconds = 3600
+    }
+  }
 
   dynamic "lifecycle_rule" {
     for_each = each.value.expire_after_days == null ? [] : [each.value.expire_after_days]

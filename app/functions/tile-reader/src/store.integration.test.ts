@@ -71,4 +71,13 @@ describe('tile-reader on the Firestore emulator', () => {
     const other = JSON.parse(stateBody(await store.config(), await store.user('523456789012345678'), now).toString());
     expect(other.user).toMatchObject({ used_pixels: 0, last_rejection: null });
   });
+
+  it('explains the very first action of a new user when it is refused (DRAW-04)', async () => {
+    await db.doc(`${root}/config/global`).update({ paused: true });
+    const rejected = await draw([{ x: 3, y: 1, color: 3 }]);
+    const store = createFirestoreTileStore(db, { root });
+    const state = JSON.parse(stateBody(await store.config(), await store.user(AUTHOR.uid), now + 5000).toString());
+    expect(state.user).toMatchObject({ used_pixels: 0, remaining_pixels: 20,
+      last_rejection: { event_id: rejected.event_id, reason: 'paused' } });
+  });
 });

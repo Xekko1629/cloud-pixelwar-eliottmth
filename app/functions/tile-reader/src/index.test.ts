@@ -152,4 +152,36 @@ describe('tile-reader', () => {
     await handleTileReader(request('/api/state') as unknown as Parameters<HttpFunction>[0], res as unknown as Parameters<HttpFunction>[1]);
     expect(res.status).toHaveBeenCalledWith(503);
   });
+
+  it('signs the far-view image of the current canvas version (DATA-05c)', async () => {
+    const signOverview = vi.fn().mockResolvedValue({ url: 'https://storage.example.test/v4/2/-1_3.png?X-Goog-Signature=abc', expires_at: '2026-11-20T10:16:05.000Z' });
+    const { invoke } = setup({ signOverview });
+    const res = await invoke(request('/api/overview/2/-1/3'));
+    expect(signOverview).toHaveBeenCalledWith(4, { kind: 'overview', level: 2, cx: -1, cy: 3 });
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(JSON.parse(res.send.mock.calls[0][0].toString())).toEqual({
+      canvas_version: 4, level: 2, cx: -1, cy: 3,
+      url: 'https://storage.example.test/v4/2/-1_3.png?X-Goog-Signature=abc', expires_at: '2026-11-20T10:16:05.000Z',
+    });
+    expect(headers(res)).toMatchObject({ 'Cache-Control': 'private, max-age=300', 'Content-Type': 'application/json; charset=utf-8' });
+    expect(headers(res).ETag).toBeUndefined();
+  });
+  it.each([['/api/overview/4/0/0', 404], ['/api/overview/1/01/0', 404], ['/api/overview/1/1000000/0', 400], ['/api/overview/3/0/61036', 400]])(
+    'refuses the overview path %s with %i', async (path, status) => {
+      const { invoke } = setup({ signOverview: vi.fn() });
+      expect((await invoke(request(path))).status).toHaveBeenCalledWith(status);
+    });
+  it('answers 503 for overview images without a signer, and when signing fails', async () => {
+    expect((await setup().invoke(request('/api/overview/1/0/0'))).status).toHaveBeenCalledWith(503);
+    const { invoke, log } = setup({ signOverview: vi.fn().mockRejectedValue(new Error('signBlob denied')) });
+    const res = await invoke(request('/api/overview/1/0/0'));
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(JSON.stringify(log.mock.calls)).not.toContain('signBlob');
+  });
+  it('requires the session for overview images too', async () => {
+    const signOverview = vi.fn();
+    const { invoke } = setup({ signOverview });
+    expect((await invoke(request('/api/overview/1/0/0', { headers: { 'x-apigateway-api-userinfo': undefined } }))).status).toHaveBeenCalledWith(401);
+    expect(signOverview).not.toHaveBeenCalled();
+  });
 });
