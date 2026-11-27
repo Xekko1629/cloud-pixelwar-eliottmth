@@ -13,7 +13,7 @@ import {
 } from './command';
 import { planTileChanges } from './tiles';
 
-function validateConfig(config: GlobalConfigDocument): void {
+export function validateConfig(config: GlobalConfigDocument): void {
   try {
     if (!config || typeof config.paused !== 'boolean') throw new Error();
     assertCanvasVersion(config.canvas_version);
@@ -142,7 +142,7 @@ export function createDrawProcessor(db: Firestore, options: DrawOptions = {}) {
   };
 }
 
-function expandedBounds(bounds: Bounds | null, pixels: PreparedDraw['pixels']): Bounds {
+export function expandedBounds(bounds: Bounds | null, pixels: PreparedDraw['pixels']): Bounds {
   const result = bounds ? { ...bounds } : { min_x: pixels[0].x, min_y: pixels[0].y, max_x: pixels[0].x, max_y: pixels[0].y };
   for (const pixel of pixels) {
     result.min_x = Math.min(result.min_x, pixel.x);

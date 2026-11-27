@@ -53,6 +53,11 @@ output "concurrency" {
   value       = var.concurrency
 }
 
+output "max_instances" {
+  description = "Maximum number of instances: the cost ceiling of the function"
+  value       = var.max_instances
+}
+
 output "memory" {
   description = "Memory limit per instance"
   value       = var.memory
