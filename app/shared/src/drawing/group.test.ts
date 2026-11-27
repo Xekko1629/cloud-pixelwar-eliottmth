@@ -199,6 +199,33 @@ describe('createGroupDrawProcessor', () => {
     expect(tx.update.mock.calls.length).toBe(updates);
   });
 
+  it('reports the attempts and read times of the transaction, retries included', async () => {
+    const { db } = fakeStore();
+    const run = db.runTransaction.bind(db);
+    // First attempt aborted by Firestore after its reads, as on contention; the SDK replays it.
+    (db as unknown as { runTransaction: typeof run }).runTransaction = (async (work: Parameters<typeof run>[0]) => {
+      await run(async (tx) => { await work(tx); throw new Error('ABORTED'); }).catch(() => undefined);
+      return run(work);
+    }) as typeof run;
+    const timings: unknown[] = [];
+    await createGroupDrawProcessor(db, { now: () => now }, (timing) => { timings.push({ ...timing }); })(
+      [input(), input({ pixels: [{ x: 1, y: 0, color: 1 }] })]);
+    expect(timings).toEqual([{
+      attempts: 2, read_processed_ms: expect.any(Number), read_people_ms: expect.any(Number),
+      read_tiles_ms: expect.any(Number), transaction_ms: expect.any(Number),
+    }]);
+  });
+
+  it('reports the timing of a failed group, and a throwing observer never fails the draw', async () => {
+    const { db } = fakeStore({ canvas_version: 'broken' });
+    const onTiming = vi.fn();
+    await expect(createGroupDrawProcessor(db, { now: () => now }, onTiming)([input(), input()])).rejects.toThrow();
+    expect(onTiming).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ attempts: 1, read_tiles_ms: 0 }));
+    const ok = fakeStore();
+    const results = await createGroupDrawProcessor(ok.db, { now: () => now }, () => { throw new Error('observer'); })([input()]);
+    expect(results[0].type).toBe('pixel-processed');
+  });
+
   it('supports an isolated document root', async () => {
     const { db, store } = fakeStore();
     store.set('tests/unit/config/global', store.get('config/global')!);

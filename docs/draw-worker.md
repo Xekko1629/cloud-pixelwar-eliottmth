@@ -161,6 +161,21 @@ Logs d'un groupe, une ligne par transaction (pas par pixel) :
 | `draw.group.committed` | INFO | Un groupe de `group_size` pixels a été écrit en une transaction |
 | `draw.group.fallback` | WARNING | Le groupe a échoué ; ses `group_size` pixels sont rejoués un par un |
 
+Champs de ces deux lignes, pour savoir où passe le temps d'un groupe :
+
+| Champ | Sens |
+| --- | --- |
+| `group_size` | Pixels du groupe |
+| `wait_ms` | Attente du plus vieux pixel du groupe dans l'instance, le temps que la transaction précédente finisse |
+| `attempts` | Tentatives de la transaction ; plus de 1 : Firestore l'a annulée (contention) et le SDK l'a rejouée |
+| `read_processed_ms` | Lecture des `processed/{event_id}` (déduplication), dernière tentative |
+| `read_people_ms` | Lecture de `config/global`, des `users/{uid}` et des surcharges de quota, dernière tentative |
+| `read_tiles_ms` | Lecture des tuiles, dernière tentative (0 si aucun pixel n'arrive jusqu'aux tuiles) |
+| `transaction_ms` | Durée totale de la transaction, reprises comprises |
+
+Exemple de requête Cloud Logging :
+`resource.labels.service_name="draw-worker" AND jsonPayload.event_type="draw.group.committed" AND jsonPayload.attempts>1`.
+
 Un pixel traité seul n'écrit pas de ligne de groupe. Chaque pixel garde son log
 `draw.result.published`. Le débit par instance de DRAW-05 se lit sur ces logs et sur
 la métrique de tentatives du worker.

@@ -36,6 +36,19 @@ interface Person {
   rejection?: { event_id: string; reason: string } | null;
 }
 
+/**
+ * Where the time of one group transaction goes (DRAW-05): reads of the LAST attempt, and the
+ * whole runTransaction call, retries included. attempts > 1 means Firestore aborted the
+ * transaction on contention (another one wrote a document it read) and the SDK replayed it.
+ */
+export interface GroupTiming {
+  attempts: number;
+  read_processed_ms: number;
+  read_people_ms: number;
+  read_tiles_ms: number;
+  transaction_ms: number;
+}
+
 interface TileState {
   id: string; tx: number; ty: number; region: string;
   colors?: TileColorsDocument; metadata?: TileMetadataDocument;
@@ -52,7 +65,7 @@ interface TileState {
  * Any error fails the whole group and nothing is written: the caller then processes each
  * command alone, so that one faulty command never blocks the others.
  */
-export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {}) {
+export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {}, onTiming?: (timing: GroupTiming) => void) {
   const settings = drawOptions(options);
   const ref = (path: string) => db.doc(settings.root ? `${settings.root}/${path}` : path);
 
@@ -69,9 +82,17 @@ export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {
       if (!first) unique.set(command.event_id, command);
     }
 
+    const timing: GroupTiming = { attempts: 0, read_processed_ms: 0, read_people_ms: 0, read_tiles_ms: 0, transaction_ms: 0 };
+    const timed = async <T>(field: 'read_processed_ms' | 'read_people_ms' | 'read_tiles_ms', read: Promise<T>): Promise<T> => {
+      const started = performance.now();
+      try { return await read; } finally { timing[field] = Math.round(performance.now() - started); }
+    };
+    const started = performance.now();
     const results = await db.runTransaction(async (tx) => {
+      timing.attempts += 1;
+      timing.read_processed_ms = 0; timing.read_people_ms = 0; timing.read_tiles_ms = 0;
       const distinct = [...unique.values()];
-      const stored = await tx.getAll(...distinct.map((c) => ref(`${COLLECTIONS.processed}/${c.event_id}`)));
+      const stored = await timed('read_processed_ms', tx.getAll(...distinct.map((c) => ref(`${COLLECTIONS.processed}/${c.event_id}`))));
       const done = new Map<string, DrawResult>();
       const pending: PreparedDraw[] = [];
       distinct.forEach((command, index) => {
@@ -82,9 +103,9 @@ export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {
 
       const configRef = ref(`${COLLECTIONS.config}/global`);
       const uids = [...new Set(pending.map((c) => c.author.uid))];
-      const snapshots = await tx.getAll(configRef, ...uids.flatMap((uid) => [
+      const snapshots = await timed('read_people_ms', tx.getAll(configRef, ...uids.flatMap((uid) => [
         ref(`${COLLECTIONS.overrides}/${uid}`), ref(`${COLLECTIONS.users}/${uid}`),
-      ]));
+      ])));
       const config = snapshots[0].data() as GlobalConfigDocument;
       validateConfig(config);
       const people = new Map<string, Person>(uids.map((uid, i) => {
@@ -132,9 +153,9 @@ export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {
 
         // All tile reads before ANY write. Refresh the worker clock after reads.
         const entries = [...tiles.values()];
-        const read = await tx.getAll(...entries.flatMap((tile) => [
+        const read = await timed('read_tiles_ms', tx.getAll(...entries.flatMap((tile) => [
           ref(`${COLLECTIONS.colors}/${tile.id}`), ref(`${COLLECTIONS.metadata}/${tile.id}`),
-        ]));
+        ])));
         entries.forEach((tile, index) => {
           tile.colors = read[index * 2].data() as TileColorsDocument | undefined;
           tile.metadata = read[index * 2 + 1].data() as TileMetadataDocument | undefined;
@@ -252,6 +273,9 @@ export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {
         done.set(command.event_id, result);
       }
       return done;
+    }).finally(() => {
+      timing.transaction_ms = Math.round(performance.now() - started);
+      try { onTiming?.(timing); } catch { /* Observability never fails a draw. */ }
     });
     return commands.map((command) => results.get(command.event_id)!);
   };

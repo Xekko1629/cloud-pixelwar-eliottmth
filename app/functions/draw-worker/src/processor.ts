@@ -1,6 +1,6 @@
 import { Firestore } from '@google-cloud/firestore';
 import {
-  createDrawProcessor, createGroupCommit, createGroupDrawProcessor, type DrawCommand, type DrawResult,
+  createDrawProcessor, createGroupCommit, createGroupDrawProcessor, type DrawCommand, type DrawResult, type GroupTiming,
 } from '@pixelwar/shared/drawing';
 
 export type ProcessDraw = (command: DrawCommand) => Promise<DrawResult>;
@@ -18,15 +18,19 @@ export function createLazyDrawProcessor(projectId: string, write?: (line: string
   return async (command) => {
     if (!process) {
       const db = new Firestore({ projectId });
-      process = createGroupCommit(createDrawProcessor(db), createGroupDrawProcessor(db), {
+      // One transaction at a time per instance: the last timing is the one of the group just notified.
+      let timing: GroupTiming | undefined;
+      process = createGroupCommit(createDrawProcessor(db), createGroupDrawProcessor(db, {}, (value) => { timing = value; }), {
         max_group: MAX_DRAW_GROUP,
-        // One line per transaction (not per pixel): group size is what DRAW-05 shows.
-        onGroup: ({ size, outcome }) => {
+        // One line per transaction (not per pixel): group size, wait and Firestore time are what DRAW-05 shows.
+        onGroup: ({ size, outcome, wait_ms }) => {
           if (outcome === 'single') return;
           write?.(`${JSON.stringify({
             severity: outcome === 'fallback' ? 'WARNING' : 'INFO', function: 'draw-worker',
             event_type: outcome === 'fallback' ? 'draw.group.fallback' : 'draw.group.committed', group_size: size,
+            wait_ms, ...timing,
           })}\n`);
+          timing = undefined;
         },
       });
     }

@@ -6,12 +6,18 @@ export type ProcessGroup = (commands: readonly DrawCommand[]) => Promise<DrawRes
 export interface GroupCommitOptions {
   /** Largest group sent in one transaction. */
   max_group: number;
-  /** Called once per transaction attempt, for logs and metrics. */
-  onGroup?: (event: { size: number; outcome: 'single' | 'committed' | 'fallback' }) => void;
+  /**
+   * Called once per transaction attempt, for logs and metrics. wait_ms: how long the oldest
+   * command of the group waited in this instance for the previous transaction to finish.
+   */
+  onGroup?: (event: { size: number; outcome: 'single' | 'committed' | 'fallback'; wait_ms: number }) => void;
+  /** Clock in milliseconds, for tests. */
+  now?: () => number;
 }
 
 interface Waiting {
   command: DrawCommand;
+  queued_at: number;
   resolve: (result: DrawResult) => void;
   reject: (error: unknown) => void;
 }
@@ -29,9 +35,10 @@ interface Waiting {
 export function createGroupCommit(processOne: ProcessOne, processGroup: ProcessGroup, options: GroupCommitOptions): ProcessOne {
   if (!Number.isSafeInteger(options.max_group) || options.max_group < 1) throw new Error('max_group must be a positive safe integer');
   const queue: Waiting[] = [];
+  const now = options.now ?? (() => performance.now());
   let running = false;
-  const notify = (size: number, outcome: 'single' | 'committed' | 'fallback') => {
-    try { options.onGroup?.({ size, outcome }); } catch { /* Observability never fails a draw. */ }
+  const notify = (size: number, outcome: 'single' | 'committed' | 'fallback', wait_ms: number) => {
+    try { options.onGroup?.({ size, outcome, wait_ms }); } catch { /* Observability never fails a draw. */ }
   };
   const alone = async (item: Waiting) => {
     try { item.resolve(await processOne(item.command)); } catch (error) { item.reject(error); }
@@ -42,7 +49,8 @@ export function createGroupCommit(processOne: ProcessOne, processGroup: ProcessG
     try {
       while (queue.length) {
         const group = queue.splice(0, options.max_group);
-        if (group.length === 1) { notify(1, 'single'); await alone(group[0]); continue; }
+        const wait = Math.max(0, Math.round(now() - group[0].queued_at));
+        if (group.length === 1) { notify(1, 'single', wait); await alone(group[0]); continue; }
         let results: DrawResult[] | undefined;
         try {
           results = await processGroup(group.map((item) => item.command));
@@ -51,10 +59,10 @@ export function createGroupCommit(processOne: ProcessOne, processGroup: ProcessG
           results = undefined;
         }
         if (results) {
-          notify(group.length, 'committed');
+          notify(group.length, 'committed', wait);
           group.forEach((item, index) => item.resolve(results![index]));
         } else {
-          notify(group.length, 'fallback');
+          notify(group.length, 'fallback', wait);
           // One after the other: in parallel they would contend on the same documents again.
           for (const item of group) await alone(item);
         }
@@ -65,7 +73,7 @@ export function createGroupCommit(processOne: ProcessOne, processGroup: ProcessG
   };
 
   return (command) => new Promise<DrawResult>((resolve, reject) => {
-    queue.push({ command, resolve, reject });
+    queue.push({ command, queued_at: now(), resolve, reject });
     if (!running) void drain();
   });
 }
