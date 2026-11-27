@@ -17,7 +17,15 @@ export function createFirestoreBackend(config: FirestoreConfig): FirestoreBacken
 
   return {
     watchConfig(next, error) {
-      return onSnapshot(doc(db, 'config', 'global'), (snapshot) => next(snapshot.data() ?? null), error);
+      // Metadata changes too: a snapshot "from cache" means the connection is lost, and the
+      // next one from the server means it is back (DRAW-03b). The SDK never raises an error
+      // for a network cut, it keeps the listener and resyncs on its own.
+      return onSnapshot(
+        doc(db, 'config', 'global'),
+        { includeMetadataChanges: true },
+        (snapshot) => next(snapshot.data() ?? null, snapshot.metadata.fromCache),
+        error,
+      );
     },
 
     watchDeltas(request, added, error) {
@@ -30,7 +38,7 @@ export function createFirestoreBackend(config: FirestoreConfig): FirestoreBacken
         const documents = snapshot.docChanges()
           .filter((change) => change.type === 'added')
           .map((change) => change.doc.data());
-        added(documents);
+        added(documents, snapshot.metadata.fromCache);
       }, error);
     },
   };

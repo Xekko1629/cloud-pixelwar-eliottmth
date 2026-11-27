@@ -58,7 +58,8 @@ de 1024 × 1024 pixels (16 × 16 tuiles), chargées par `GET /api/regions/{rx}/{
   reçu en temps réel pendant la requête. Ces pixels sont gardés, puis repeints sur
   les tuiles chargées, dans l'ordre (`src/realtime/live.ts`).
 - Une région en échec est redemandée 10 s plus tard si elle est toujours visible ;
-  après une coupure du temps réel, les régions visibles sont redemandées.
+  après une coupure du temps réel ou du réseau, les régions visibles sont redemandées
+  ([coupure et reprise](../../docs/realtime.md#coupure-et-reprise-draw-03b)).
 - Au-delà de 30 régions visibles (vue éloignée, WEB-03d), rien n'est chargé. Avec le
   zoom minimal actuel (×1), un écran 2560 × 1440 en montre au plus 12.
 - `/admin clear` (nouvelle `canvas_version`) oublie toutes les régions et recharge

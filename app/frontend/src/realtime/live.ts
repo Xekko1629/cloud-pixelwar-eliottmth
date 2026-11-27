@@ -92,8 +92,10 @@ export class LiveCanvas implements CanvasUpdates {
     this.feed = new RealtimeFeed(backend, {
       config: (config) => this.update({ config }),
       status: (status) => {
-        // Back after a cut: deltas older than their TTL are gone, ask tile-reader again.
-        const reconnected = this.state.status === 'error' && status === 'live';
+        // Back after a cut (DRAW-03b): the listener resyncs the deltas it missed, but those
+        // past their TTL are gone, so tile-reader is asked again (304 when nothing changed).
+        // The pixels received meanwhile are repainted in order on the answer.
+        const reconnected = (this.state.status === 'error' || this.state.status === 'offline') && status === 'live';
         this.update({ status });
         if (reconnected) this.regions.revalidate();
       },
