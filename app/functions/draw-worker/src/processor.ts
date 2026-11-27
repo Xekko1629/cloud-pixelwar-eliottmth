@@ -35,8 +35,8 @@ export function createLazyDrawProcessor(projectId: string, write?: (line: string
         onGroup: ({ size, outcome, wait_ms }) => {
           if (outcome === 'single') return;
           write?.(`${JSON.stringify({
-            severity: outcome === 'fallback' ? 'WARNING' : 'INFO', function: 'draw-worker',
-            event_type: outcome === 'fallback' ? 'draw.group.fallback' : 'draw.group.committed', group_size: size,
+            severity: outcome === 'committed' ? 'INFO' : 'WARNING', function: 'draw-worker',
+            event_type: `draw.group.${outcome}`, group_size: size,
             wait_ms, ...timing,
           })}\n`);
           timing = undefined;
