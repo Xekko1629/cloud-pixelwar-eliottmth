@@ -50,11 +50,14 @@ run "only_snapshots_expire" {
   assert {
     condition = (
       length(google_storage_bucket.application["overview"].lifecycle_rule) == 0 &&
-      length(google_storage_bucket.application["snapshots"].lifecycle_rule) == 1 &&
+      length(google_storage_bucket.application["snapshots"].lifecycle_rule) == 2 &&
+      one(google_storage_bucket.application["snapshots"].lifecycle_rule[1].condition).age == 1 &&
+      one(google_storage_bucket.application["snapshots"].lifecycle_rule[1].condition).matches_prefix == tolist(["requests/"]) &&
+      google_storage_notification.snapshot_ready.object_name_prefix == "snapshots/" &&
       one(google_storage_bucket.application["snapshots"].lifecycle_rule[0].condition).age == 7 &&
       one(google_storage_bucket.application["snapshots"].lifecycle_rule[0].action).type == "Delete"
     )
-    error_message = "Snapshots expire after 7 days by default; active overview images never expire."
+    error_message = "Snapshots expire after 7 days by default and their requests (interaction token) after one day; only images notify; active overview images never expire."
   }
 }
 

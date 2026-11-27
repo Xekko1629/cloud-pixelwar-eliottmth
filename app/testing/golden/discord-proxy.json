@@ -596,7 +596,7 @@
       "published": null
     },
     {
-      "name": "snapshot_unavailable",
+      "name": "snapshot",
       "request": {
         "method": "POST",
         "path": "/discord/interactions",
@@ -609,14 +609,48 @@
       "response": {
         "status": 200,
         "body": {
-          "type": 4,
-          "data": {
-            "content": "Cette commande n'est pas encore disponible.",
-            "flags": 64,
-            "allowed_mentions": {
-              "parse": []
-            }
-          }
+          "type": 5
+        }
+      },
+      "published": {
+        "schema_version": 1,
+        "event_id": "1fee09aa-76c4-88a5-a42b-feb4e38c3123",
+        "correlation_id": "1fee09aa-76c4-88a5-a42b-feb4e38c3123",
+        "source": "discord",
+        "occurred_at": "2027-01-15T08:00:00.000Z",
+        "actor": {
+          "uid": "423456789012345678",
+          "name": "Synthetic user",
+          "roles": [
+            "523456789012345678"
+          ]
+        },
+        "payload": {
+          "command": "snapshot",
+          "options": {},
+          "interaction_id": "1593540240998400000",
+          "application_id": "123456789012345678",
+          "guild_id": "223456789012345678",
+          "channel_id": "323456789012345678",
+          "interaction_token": "synthetic-interaction-token"
+        }
+      }
+    },
+    {
+      "name": "snapshot_with_options",
+      "request": {
+        "method": "POST",
+        "path": "/discord/interactions",
+        "headers": {
+          "X-Signature-Ed25519": "c1dfdac2e0b98635a92abf945edc89b2ef8e76cf2cea888a9662a23189aecf4342e37458c74f54a655f3dde8229c0c8075c7c86e5c86d1dec599b02c830e1306",
+          "X-Signature-Timestamp": "1800000000"
+        },
+        "body": "{\"type\":2,\"id\":\"1593540240998400000\",\"application_id\":\"123456789012345678\",\"guild_id\":\"223456789012345678\",\"channel_id\":\"323456789012345678\",\"token\":\"synthetic-interaction-token\",\"member\":{\"user\":{\"id\":\"423456789012345678\",\"username\":\"Synthetic user\"},\"roles\":[\"523456789012345678\"]},\"data\":{\"type\":1,\"name\":\"snapshot\",\"options\":[{\"type\":4,\"name\":\"x\",\"value\":-1},{\"type\":4,\"name\":\"y\",\"value\":64},{\"type\":4,\"name\":\"color\",\"value\":3}]}}"
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "error": "Invalid command interaction."
         }
       },
       "published": null

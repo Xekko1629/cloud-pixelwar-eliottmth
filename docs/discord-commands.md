@@ -63,7 +63,7 @@ npm run discord:commands -- --admin --apply --confirm-application-id "$DISCORD_A
 
 `default_member_permissions = "0"` masque `/admin` aux non-administrateurs du serveur
 dans l'interface Discord ; l'allow-list `admin-allowlist` reste le seul contrôle réel.
-`--hello`, `--draw`, `--admin` et `--get` sont exclusifs.
+`--hello`, `--draw`, `--admin`, `--get` et `--snapshot` sont exclusifs.
 
 ## Mode ciblé `/get` en dev
 
@@ -72,6 +72,17 @@ Même stratégie pour la seule commande `/get` (BOT-06), sans option :
 ```sh
 npm run discord:commands -- --get
 npm run discord:commands -- --get --apply --confirm-application-id "$DISCORD_APPLICATION_ID"
+```
+
+## Mode ciblé `/snapshot` en dev
+
+Même stratégie pour la seule commande `/snapshot` (BOT-07a), sans option. Elle garde
+`default_member_permissions: "0"` : Discord ne la montre qu'aux administrateurs du
+serveur, et le `command-worker` revérifie l'allow-list.
+
+```sh
+npm run discord:commands -- --snapshot
+npm run discord:commands -- --snapshot --apply --confirm-application-id "$DISCORD_APPLICATION_ID"
 ```
 
 ## Mode ciblé `/draw` en dev

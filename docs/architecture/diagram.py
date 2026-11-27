@@ -215,6 +215,7 @@ FLOWS = [
     F('render_worker', 'discord_api', 'HTTPS PATCH + PNG', layout=False),
     F('t_snapshot', 'snapshot_worker', 'push OIDC', 'event'),
     F('snapshot_worker', 'b_snapshots', 'PNG horodaté'),
+    F('snapshot_worker', 'firestore', 'tuiles (lecture)', 'read', layout=False),
     F('b_snapshots', 't_snapshot_ready', 'OBJECT_FINALIZE', 'event', layout=False),
     F('t_snapshot_ready', 'snapshot_notifier', 'push OIDC', 'event'),
     F('scheduler', 't_overview', 'publish', 'event'),

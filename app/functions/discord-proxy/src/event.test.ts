@@ -17,7 +17,7 @@ describe('provisional discord-command v1 envelope', () => {
     { member: { user: { id: 'invalid', username: 'test' }, roles: [] } },
     { member: { user: { id: '123', username: '' }, roles: [] } },
     { member: { user: { id: '123', username: 'test' }, roles: ['invalid'] } },
-    { data: null }, { data: { type: 1, name: 'snapshot' } },
+    { data: null }, { data: { type: 1, name: 'hello' } },
   ])('rejects invalid metadata without echoing it: %j', (changes) => {
     expect(() => commandEvent({ ...drawInteraction(), ...changes }, testApplication)).toThrow();
   });

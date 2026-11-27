@@ -2,7 +2,7 @@ import { pathToFileURL } from 'node:url';
 import {
   readTarget, registrationPlan, registerCommands, helloRegistrationPlan, registerHelloCommand,
   drawRegistrationPlan, registerDrawCommand, adminRegistrationPlan, registerAdminCommand,
-  getRegistrationPlan, registerGetCommand,
+  getRegistrationPlan, registerGetCommand, snapshotRegistrationPlan, registerSnapshotCommand,
 } from './register';
 
 export async function run(
@@ -12,27 +12,28 @@ export async function run(
   registerDraw: typeof registerDrawCommand = registerDrawCommand,
   registerAdmin: typeof registerAdminCommand = registerAdminCommand,
   registerGet: typeof registerGetCommand = registerGetCommand,
+  registerSnapshot: typeof registerSnapshotCommand = registerSnapshotCommand,
 ): Promise<void> {
   let apply = false;
-  let mode = 'all' as 'all' | 'hello' | 'draw' | 'admin' | 'get';
+  let mode = 'all' as 'all' | 'hello' | 'draw' | 'admin' | 'get' | 'snapshot';
   let confirmation = '';
   for (let index = 0; index < args.length; index++) {
     const argument = args[index];
     if (argument === '--apply' && !apply) apply = true;
-    else if (['--hello', '--draw', '--admin', '--get'].includes(argument) && mode === 'all') mode = argument.slice(2) as typeof mode;
+    else if (['--hello', '--draw', '--admin', '--get', '--snapshot'].includes(argument) && mode === 'all') mode = argument.slice(2) as typeof mode;
     else if (argument === '--confirm-application-id' && !confirmation && args[index + 1]) confirmation = args[++index];
-    else throw new Error('Usage: discord:commands [--hello | --draw | --admin | --get] [--apply --confirm-application-id ID]');
+    else throw new Error('Usage: discord:commands [--hello | --draw | --admin | --get | --snapshot] [--apply --confirm-application-id ID]');
   }
   const target = readTarget(env);
   const plan = mode === 'draw' ? drawRegistrationPlan(target) : mode === 'admin' ? adminRegistrationPlan(target)
-    : mode === 'get' ? getRegistrationPlan(target)
+    : mode === 'get' ? getRegistrationPlan(target) : mode === 'snapshot' ? snapshotRegistrationPlan(target)
     : mode === 'hello' ? helloRegistrationPlan(target) : registrationPlan(target);
   if (!apply) {
     if (confirmation) throw new Error('Confirmation requires --apply.');
     print(JSON.stringify({ mode: 'dry-run', ...plan }, null, 2));
     return;
   }
-  const registration = { all: register, hello: registerHello, draw: registerDraw, admin: registerAdmin, get: registerGet }[mode];
+  const registration = { all: register, hello: registerHello, draw: registerDraw, admin: registerAdmin, get: registerGet, snapshot: registerSnapshot }[mode];
   await registration(target, env.DISCORD_BOT_TOKEN ?? '', confirmation);
   print(`Registered ${plan.commands.length} commands for ${target.environment} application ${target.applicationId}.`);
 }

@@ -144,7 +144,7 @@ run "delivery_wires_the_draw_path" {
     condition = (
       module.command_worker[0].invoker_service_account_email != module.command_worker[0].service_account_email &&
       module.discord_proxy[0].invoker_service_account_email == null &&
-      toset(keys(google_service_account_iam_member.push_token_creator)) == toset(["command_worker", "draw_worker", "discord_notifier", "admin_worker", "render_worker"]) &&
+      toset(keys(google_service_account_iam_member.push_token_creator)) == toset(["command_worker", "draw_worker", "discord_notifier", "admin_worker", "render_worker", "snapshot_worker", "snapshot_notifier"]) &&
       google_service_account_iam_member.push_token_creator["command_worker"].service_account_id == module.command_worker[0].invoker_service_account_name &&
       google_service_account_iam_member.push_token_creator["command_worker"].role == "roles/iam.serviceAccountTokenCreator" &&
       google_service_account_iam_member.push_token_creator["command_worker"].member == "serviceAccount:service-123456789@gcp-sa-pubsub.iam.gserviceaccount.com"
