@@ -107,6 +107,18 @@ describe('CanvasController', () => {
     expect(onChange).toHaveBeenCalledWith({ x: 9, y: 9, zoom: 2 });
   });
 
+  it('brings the camera back on a bounded grid, and keeps it there', () => {
+    const { controller: c, onChange } = controller({ x: -500, y: 20, zoom: 4 });
+    c.setGrid({ width: 100, height: 100 });
+    expect(c.current).toEqual({ x: 0, y: 20, zoom: 4 });
+    expect(onChange).toHaveBeenCalledTimes(1);
+    c.key('ArrowLeft');
+    expect(c.current.x).toBe(0);
+    c.setGrid(null);
+    c.key('ArrowLeft');
+    expect(c.current.x).toBeLessThan(0);
+  });
+
   describe('taps', () => {
     it('reports a press that barely moved as a tap, where it started', () => {
       const c = new CanvasController(() => viewport, () => {});

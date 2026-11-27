@@ -1,4 +1,4 @@
-import { COORDINATE_LIMIT, TILE_SIDE } from '@pixelwar/shared/grid';
+import { COORDINATE_LIMIT, TILE_SIDE, type GridSize } from '@pixelwar/shared/grid';
 
 // The camera looks at the infinite grid (ADR-0007). (x, y) is the world point at the centre
 // of the screen, in grid pixels; pixel (px, py) covers [px, px + 1) × [py, py + 1).
@@ -43,11 +43,12 @@ export function initialCamera(): Camera {
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
-// The camera stays inside the validated coordinates, ±10⁹ (pixel 10⁹ ends at 10⁹ + 1).
-export function clampCamera(camera: Camera): Camera {
+// The camera stays inside the validated coordinates, ±10⁹ (pixel 10⁹ ends at 10⁹ + 1). On a
+// bounded grid (/admin size, DRAW-04), the screen centre stays on (0, 0)..(width, height).
+export function clampCamera(camera: Camera, grid: GridSize | null = null): Camera {
   return {
-    x: clamp(camera.x, -COORDINATE_LIMIT, COORDINATE_LIMIT + 1),
-    y: clamp(camera.y, -COORDINATE_LIMIT, COORDINATE_LIMIT + 1),
+    x: clamp(camera.x, grid ? 0 : -COORDINATE_LIMIT, grid ? grid.width : COORDINATE_LIMIT + 1),
+    y: clamp(camera.y, grid ? 0 : -COORDINATE_LIMIT, grid ? grid.height : COORDINATE_LIMIT + 1),
     zoom: clamp(camera.zoom, MIN_ZOOM, MAX_ZOOM),
   };
 }

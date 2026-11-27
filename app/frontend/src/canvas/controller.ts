@@ -1,4 +1,5 @@
-import { initialCamera, pan, zoomAt, type Camera, type Point, type Viewport } from './camera';
+import type { GridSize } from '@pixelwar/shared/grid';
+import { clampCamera, initialCamera, pan, zoomAt, type Camera, type Point, type Viewport } from './camera';
 
 // Turns pointer, wheel and keyboard input into camera moves. Independent of React and
 // of the DOM: the component forwards the events in CSS pixels relative to the canvas.
@@ -16,6 +17,8 @@ export class CanvasController {
   private readonly pointers = new Map<number, Point>();
   // The single press that may still become a tap; a second finger or a drag cancels it.
   private tap: { id: number; start: Point; moved: boolean } | null = null;
+  // Size of a bounded grid (DRAW-04): every move keeps the screen centre on it.
+  private grid: GridSize | null = null;
 
   constructor(
     private readonly viewport: () => Viewport,
@@ -33,7 +36,14 @@ export class CanvasController {
     return this.pointers.size > 0;
   }
 
-  private set(camera: Camera): void {
+  /** The grid became bounded, changed size or became infinite again. */
+  setGrid(grid: GridSize | null): void {
+    this.grid = grid;
+    this.set(this.camera);
+  }
+
+  private set(next: Camera): void {
+    const camera = clampCamera(next, this.grid);
     if (camera.x === this.camera.x && camera.y === this.camera.y && camera.zoom === this.camera.zoom) return;
     this.camera = camera;
     this.onChange(camera);
