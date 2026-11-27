@@ -49,11 +49,11 @@ describe('PreviewLayer', () => {
     expect(preview.size).toBe(0);
   });
 
-  it('keeps a pixel 5 s at most by default', () => {
+  it('keeps a pixel until its delta or its refusal, 60 s at most', () => {
     const delays: number[] = [];
     const preview = new PreviewLayer({ setTimer: (_callback, ms) => delays.push(ms) });
     preview.add([{ x: 1, y: 0, color: 4 }]);
-    expect(delays).toEqual([5_000]);
+    expect(delays).toEqual([60_000]);
   });
 
   it('shows nothing while turned off, and clears what was shown', () => {

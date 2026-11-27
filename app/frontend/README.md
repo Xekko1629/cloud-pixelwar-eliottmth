@@ -148,8 +148,10 @@ la page :
   second canvas posé sur la toile. Ce n'est pas l'état : la toile, elle, ne change
   qu'avec les deltas et montre toujours l'état réel (sujet §3.3), et l'aperçu ne fait
   que marquer ce qui est en cours d'envoi, sans jamais passer pour un pixel posé. Un
-  pixel de l'aperçu disparaît quand la toile montre sa couleur (son delta est arrivé),
-  dès que son refus est connu, sinon au bout de 5 s ; un `/admin clear` vide l'aperçu.
+  pixel de l'aperçu reste jusqu'à ce que la toile montre sa couleur (son delta est
+  arrivé) ou que son refus soit connu, même si un gros trait met plusieurs secondes à
+  être traité. Au-delà de 60 s (pixel perdu), il disparaît ; un `/admin clear` vide
+  l'aperçu.
   La case « Aperçu de l'envoi » du panneau le désactive : seule la toile reste, mise à
   jour par les deltas. Le choix est gardé dans le `localStorage` du navigateur
   (`pixelwar.preview`).

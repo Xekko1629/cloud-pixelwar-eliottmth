@@ -7,9 +7,9 @@ import type { TileChange } from '../realtime/live';
 // drawn over the canvas, never mixed with its tiles. The canvas itself only changes with
 // the deltas: it always shows the real state, the preview only marks what is pending.
 //
-// A preview pixel disappears when the canvas shows its colour (its delta arrived), or
-// after `ttlMs` (refused, lost, or drawn over by someone else meanwhile). A refusal is known
-// about 3 s after the send (Brush, PixelInspector), so 5 s is enough and keeps it short.
+// A preview pixel stays until the canvas shows its colour (its delta arrived) or its refusal
+// is known (Brush, PixelInspector): a large stroke may take the workers several seconds.
+// `ttlMs` is only a safety net for a pixel lost, or drawn over by someone else meanwhile.
 
 export interface PreviewOptions {
   ttlMs?: number;
@@ -26,7 +26,7 @@ export class PreviewLayer implements TileColorsSource {
   private on = true;
 
   constructor(options: PreviewOptions = {}) {
-    this.ttlMs = options.ttlMs ?? 5_000;
+    this.ttlMs = options.ttlMs ?? 60_000;
     this.setTimer = options.setTimer ?? ((callback, ms) => setTimeout(callback, ms));
   }
 
