@@ -150,6 +150,35 @@ describe('PixelInspector', () => {
   });
 });
 
+describe('PixelInspector.consume', () => {
+  it('lowers the known quota at once, and the next /api/state read sets it back', async () => {
+    const { inspector, routes } = setup({ remaining: 3 });
+    inspector.start();
+    await flush();
+    inspector.consume(2);
+    expect(inspector.getState().quota?.remainingPixels).toBe(1);
+    inspector.select({ x: 1, y: 1 });
+    await inspector.draw();
+    expect(inspector.getState().quota?.remainingPixels).toBe(0);
+    expect(inspector.drawBlock()).toBe('quota');
+    routes.state = () => jsonResponse(200, quota(2));
+    await inspector.reloadQuota();
+    expect(inspector.getState().quota?.remainingPixels).toBe(2);
+  });
+
+  it('starts from the whole limit when reset_at has passed', async () => {
+    const { inspector, routes } = setup();
+    const past = quota(0);
+    past.user.reset_at = '2026-11-26T10:01:00.000Z';
+    routes.state = () => jsonResponse(200, past);
+    inspector.start();
+    await flush();
+    // NOW is 10:01:30: the minute of that read is over, 20 pixels are back.
+    inspector.consume(5);
+    expect(inspector.getState().quota).toMatchObject({ remainingPixels: 15, resetAt: new Date('2026-11-26T10:02:00.000Z') });
+  });
+});
+
 describe('remainingPixels', () => {
   it('gives the whole limit back after reset_at', () => {
     const value = { limitPerMinute: 20, usedPixels: 20, remainingPixels: 0, resetAt: new Date(NOW + 1000), lastRejection: null };

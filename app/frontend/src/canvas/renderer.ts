@@ -9,6 +9,7 @@ export interface DrawContext {
   imageSmoothingEnabled: boolean;
   setTransform(a: number, b: number, c: number, d: number, e: number, f: number): void;
   fillRect(x: number, y: number, width: number, height: number): void;
+  clearRect(x: number, y: number, width: number, height: number): void;
   drawImage(image: CanvasImageSource, dx: number, dy: number, dw: number, dh: number): void;
   beginPath(): void;
   moveTo(x: number, y: number): void;
@@ -116,6 +117,38 @@ export function drawTiles(
       });
     }
     context.restore();
+    drawn += 1;
+  }
+  return drawn;
+}
+
+/**
+ * Draws a transparent layer over the canvas, such as the preview of a stroke (WEB-05):
+ * the layer is cleared, then only the given tiles are drawn, those of the layer, not the
+ * whole viewport. Returns the number of visible tiles drawn.
+ */
+export function drawLayer(
+  context: DrawContext,
+  camera: Camera,
+  viewport: Viewport,
+  pixelRatio: number,
+  tiles: Iterable<TileRef>,
+  tileImage: TileImageLookup,
+): number {
+  context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  context.imageSmoothingEnabled = false;
+  context.clearRect(0, 0, viewport.width, viewport.height);
+  const visible = visibleTiles(camera, viewport);
+  let drawn = 0;
+  for (const { tx, ty } of tiles) {
+    if (tx < visible.min_x || tx > visible.max_x || ty < visible.min_y || ty > visible.max_y) continue;
+    const image = tileImage(tx, ty);
+    if (image === null) continue;
+    const left = snap(screenX(camera, viewport, tx * TILE_SIDE), pixelRatio);
+    const right = snap(screenX(camera, viewport, (tx + 1) * TILE_SIDE), pixelRatio);
+    const top = snap(screenY(camera, viewport, ty * TILE_SIDE), pixelRatio);
+    const bottom = snap(screenY(camera, viewport, (ty + 1) * TILE_SIDE), pixelRatio);
+    context.drawImage(image, left, top, right - left, bottom - top);
     drawn += 1;
   }
   return drawn;
