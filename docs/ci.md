@@ -265,6 +265,16 @@ scripts/check-no-public.sh cloud-pixelwar-dev
 Les versions npm et Go directes sont fixées dans les `package.json` et `go.mod`,
 les transitives par `app/package-lock.json` et `go.sum`.
 
+Toutes sont utilisées et maintenues (vérifié le 27/11/2026 : aucun projet abandonné,
+une release ou un commit dans les derniers mois, éditeur officiel pour la plupart). Deux
+cas à connaître :
+
+- `@google-cloud/firestore`, `@google-cloud/pubsub` et `google-auth-library` : leurs
+  anciens dépôts GitHub sont archivés car Google les a déplacés dans le monorepo
+  `googleapis/google-cloud-node`, où ils sont publiés chaque mois.
+- `functions-framework-go` : pas de release depuis mars 2025, mais c'est le framework
+  officiel de Google, requis par le runtime Go de Cloud Run functions, avec une API stable.
+
 ## Vérification, concurrence et diagnostic
 
 - Chaque apply/destroy est sérialisé par environnement **et stack**, sans
