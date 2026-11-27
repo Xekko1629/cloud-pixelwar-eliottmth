@@ -56,7 +56,7 @@ export function createDrawWorkerHandler(options: Options): HttpFunction {
 const projectId = process.env.GOOGLE_CLOUD_PROJECT;
 export const handleDrawWorker = createDrawWorkerHandler({
   subscription: process.env.PIXEL_DRAW_SUBSCRIPTION, applicationId: process.env.DISCORD_APPLICATION_ID,
-  process: projectId ? createLazyDrawProcessor(projectId) : undefined,
+  process: projectId ? createLazyDrawProcessor(projectId, (line) => { process.stdout.write(line); }) : undefined,
   publish: projectId ? createResultPublisher(projectId, {
     'pixel-processed': process.env.PIXEL_PROCESSED_TOPIC, 'pixel-rejected': process.env.PIXEL_REJECTED_TOPIC,
   }) : undefined,
