@@ -337,6 +337,31 @@ permissions, échantillonnage et erreurs d'export. Conserver les résultats dans
 les rapports de test ou les tickets. Un handler utilisant uniquement le logger
 n'émet pas automatiquement des traces et métriques.
 
+## Alertes
+
+Le stack `foundation` crée le canal d'alertes de chaque environnement (OBS-01,
+`infra/foundation/alerting.tf`) : un canal Cloud Monitoring de type e-mail par
+adresse de `alert_emails` (`dev.tfvars`, `prd.tfvars`). Il est appliqué par la
+pipeline, avant les autres stacks.
+
+Les politiques d'alerte des autres stacks (OBS-04) envoient vers les canaux de la
+sortie `alert_notification_channels`, lue par `terraform_remote_state` comme
+`infra/runners` lit déjà `foundation`. Chaque politique explique dans son champ
+`documentation` quoi faire quand elle se déclenche.
+
+### Vérifier que les alertes arrivent
+
+La politique « Test du canal d'alertes » se déclenche dès qu'une entrée est écrite
+dans le log `pixelwar-alert-test` :
+
+```sh
+gcloud logging write pixelwar-alert-test "test du canal" --severity=WARNING --project=cloud-pixelwar-dev
+```
+
+L'e-mail arrive en général en moins de 5 minutes, à chaque adresse. Une politique
+sur log envoie au plus une notification toutes les 5 minutes et l'incident se ferme
+seul au bout de 30 minutes. Remplacer le projet par `cloud-pixelwar-prod` pour prd.
+
 ## Sources (consultées le 29 octobre 2026)
 
 - [OpenTelemetry JS : instrumentation manuelle](https://opentelemetry.io/docs/languages/js/instrumentation/).

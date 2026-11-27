@@ -35,6 +35,7 @@ TRACKED_RESOURCES = {
     'google_cloud_scheduler_job', 'google_compute_network', 'google_container_cluster',
     'google_container_node_pool', 'google_firebaserules_release', 'google_firestore_database',
     'google_iam_workload_identity_pool', 'google_monitoring_alert_policy', 'google_monitoring_dashboard',
+    'google_monitoring_notification_channel',
     'google_secret_manager_secret', 'google_storage_bucket', 'helm_release',
 }
 TRACKED_MODULE_SOURCES = ('modules/function', 'modules/pubsub-topic', 'modules/api-gateway')
@@ -139,7 +140,8 @@ COMPONENTS = [
     C('telemetry', 'Logging / Monitoring / Trace', 'gcp.operations.Monitoring', 'application', 'Observabilité',
       note='logs JSON + OTLP, correlation_id'),
     C('alerts', 'Alertes et dashboards', 'gcp.operations.Logging', 'application', 'Observabilité',
-      ('*:google_monitoring_alert_policy.*', '*:google_monitoring_dashboard.*')),
+      ('*:google_monitoring_alert_policy.*', '*:google_monitoring_dashboard.*',
+       '*:google_monitoring_notification_channel.*'), 'canal e-mail par environnement'),
 
     # --- Platform: delivery ----------------------------------------------------------------------
     C('github', 'GitHub', 'onprem.vcs.Github', 'plateforme', 'GitHub', note='PR, review, tags vX.Y.Z'),

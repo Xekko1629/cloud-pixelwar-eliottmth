@@ -41,3 +41,13 @@ variable "node_disk_size_gb" {
   type        = number
   default     = 30
 }
+
+variable "alert_emails" {
+  description = "Email addresses that receive the Cloud Monitoring alerts of this environment (one channel each)"
+  type        = list(string)
+
+  validation {
+    condition     = length(var.alert_emails) > 0 && alltrue([for email in var.alert_emails : can(regex("^[^@ ]+@[^@ ]+[.][^@ ]+$", email))])
+    error_message = "Give at least one valid email address."
+  }
+}
