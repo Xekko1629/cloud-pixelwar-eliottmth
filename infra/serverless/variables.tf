@@ -126,3 +126,31 @@ variable "discord_oauth_client_secret_version" {
     error_message = "Select an explicit numeric secret version, not latest."
   }
 }
+
+variable "enable_realtime" {
+  description = "Security Rules and browser API key of the Firestore listeners of the frontend (ADR-0015); needs the firebaserules and apikeys APIs of infra/iam"
+  type        = bool
+  default     = false
+}
+
+variable "realtime_extra_referrers" {
+  description = "Extra pages allowed to use the browser API key besides the frontend, e.g. a local Vite server in dev"
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for referrer in var.realtime_extra_referrers : can(regex("^(https://[a-z0-9.-]+|http://(localhost|127[.]0[.]0[.]1)(:[0-9]+)?)/[*]$", referrer))])
+    error_message = "Each referrer is https://<host>/* or a local http://localhost:<port>/*."
+  }
+}
+
+variable "alert_notification_channels" {
+  description = "Monitoring notification channels of the alerts (OBS-01); empty: incidents are only shown in the console"
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for channel in var.alert_notification_channels : can(regex("^projects/[a-z][a-z0-9-]{4,28}[a-z0-9]/notificationChannels/[0-9]+$", channel))])
+    error_message = "Each channel is projects/<project>/notificationChannels/<id>."
+  }
+}

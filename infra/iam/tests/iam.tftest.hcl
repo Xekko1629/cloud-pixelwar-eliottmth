@@ -37,6 +37,30 @@ run "apis_in_one_place" {
   }
 }
 
+run "realtime_of_the_browser" {
+  command = plan
+
+  assert {
+    condition = (
+      contains(keys(google_project_service.apis), "firebaserules.googleapis.com") &&
+      contains(keys(google_project_service.apis), "apikeys.googleapis.com") &&
+      !contains(keys(google_project_service.apis), "firebase.googleapis.com") &&
+      !contains(keys(google_project_service.apis), "identitytoolkit.googleapis.com")
+    )
+    error_message = "Security Rules and API keys are enabled for the Firestore listeners (ADR-0015), without any Firebase product."
+  }
+
+  assert {
+    condition = (
+      contains([for binding in google_project_iam_member.deployer : binding.role], "roles/firebaserules.admin") &&
+      contains([for binding in google_project_iam_member.deployer : binding.role], "roles/serviceusage.apiKeysAdmin") &&
+      contains([for binding in google_project_iam_member.planner : binding.role], "roles/firebaserules.viewer") &&
+      contains([for binding in google_project_iam_member.planner : binding.role], "roles/serviceusage.apiKeysViewer")
+    )
+    error_message = "The deployer manages the rules and the browser key of infra/serverless; the planner can read them."
+  }
+}
+
 run "persistent_application_secrets" {
   command = plan
 

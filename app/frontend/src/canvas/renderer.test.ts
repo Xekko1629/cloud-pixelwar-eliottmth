@@ -1,6 +1,6 @@
 import { COORDINATE_LIMIT, TILE_SIDE } from '@pixelwar/shared/grid';
 import { describe, expect, it } from 'vitest';
-import { BACKGROUND, GRID_ZOOM, drawViewport, type DrawContext } from './renderer';
+import { BACKGROUND, GRID_ZOOM, drawTiles, drawViewport, type DrawContext } from './renderer';
 
 interface DrawCall { tile: string; x: number; y: number; width: number; height: number }
 
@@ -9,6 +9,8 @@ function recordingContext() {
   const draws: DrawCall[] = [];
   const fills: { style: unknown; rect: number[] }[] = [];
   const lines: number[][] = [];
+  const clips: number[][] = [];
+  let depth = 0;
   const context: DrawContext & { transform?: number[] } = {
     fillStyle: '',
     strokeStyle: '',
@@ -23,8 +25,12 @@ function recordingContext() {
     moveTo(x, y) { lines.push([x, y]); },
     lineTo() {},
     stroke() {},
+    save() { depth += 1; },
+    restore() { depth -= 1; },
+    rect(...rect) { clips.push(rect); },
+    clip() {},
   };
-  return { context, draws, fills, lines };
+  return { context, draws, fills, lines, clips, depth: () => depth };
 }
 
 const image = (tx: number, ty: number) => ({ id: `${tx},${ty}` }) as unknown as CanvasImageSource;
@@ -103,5 +109,41 @@ describe('drawViewport', () => {
     // 800 / 16 = 50 columns and 600 / 16 = 38 rows (37.5 rounded up), plus their closing border.
     expect(above.lines).toHaveLength(51 + 39);
     expect(above.context.lineWidth).toBe(0.5);
+  });
+});
+
+describe('drawTiles', () => {
+  const camera = { x: 0, y: 0, zoom: 4 };
+
+  it('redraws only the given visible tiles, exactly where drawViewport puts them', () => {
+    const full = recordingContext();
+    drawViewport(full.context, camera, viewport, 1, everyTile);
+    const partial = recordingContext();
+
+    const drawn = drawTiles(partial.context, camera, viewport, 1, [{ tx: 0, ty: 0 }, { tx: 50, ty: 0 }], everyTile);
+
+    expect(drawn).toBe(1);
+    const expected = full.draws.find((d) => d.tile === '0,0')!;
+    expect(partial.draws).toEqual([expected]);
+    expect(partial.clips).toEqual([[expected.x, expected.y, expected.width, expected.height]]);
+    expect(partial.fills).toEqual([{ style: BACKGROUND, rect: [expected.x, expected.y, expected.width, expected.height] }]);
+    expect(partial.depth()).toBe(0);
+  });
+
+  it('clears a tile that became empty', () => {
+    const { context, draws, fills } = recordingContext();
+    drawTiles(context, camera, viewport, 2, [{ tx: -1, ty: -1 }], () => null);
+    expect(draws).toEqual([]);
+    expect(fills).toHaveLength(1);
+    expect(context.transform).toEqual([2, 0, 0, 2, 0, 0]);
+  });
+
+  it('draws the grid of the tile only, at the zoom of the grid', () => {
+    const { context, lines } = recordingContext();
+    drawTiles(context, { x: 32, y: 32, zoom: GRID_ZOOM }, viewport, 1, [{ tx: 0, ty: 0 }], everyTile);
+    // 800 / 12 ≈ 67 visible columns, 600 / 12 = 50 rows: the tile holds all the rows
+    // and 64 + 1 vertical lines are at most needed.
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines.length).toBeLessThanOrEqual(65 + 65);
   });
 });

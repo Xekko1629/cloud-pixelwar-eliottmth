@@ -1,5 +1,5 @@
 # Firestore database of the grid (ADR-0007), its composite indexes, index exemptions
-# and TTL policies. No security rules: no client ever talks to Firestore (ADR-0013).
+# and TTL policies. The Security Rules of the browser listeners are in realtime.tf (ADR-0015).
 # Access is IAM only, granted to the runtime identity of each function that needs it:
 # roles/datastore.user for the workers that write, roles/datastore.viewer for readers.
 locals {

@@ -134,6 +134,8 @@ memory          = "512Mi"
 et Cloud Run refusait les autres livraisons (« no available instance »), d'où des
 relivraisons et un pixel en DLQ. Le traitement réel d'un pixel ne prenait que 0,2 s.
 
+Mesures avant et après : [protocole de mesure du débit](draw-throughput.md).
+
 **Regroupement d'écriture** ([ADR-0014](adr/0014-un-evenement-par-pixel.md)) :
 
 - Une instance n'exécute qu'**une** transaction à la fois

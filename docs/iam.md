@@ -23,13 +23,13 @@ Federation, sans clé. L'environnement GitHub sélectionne l'identité :
 
 | Identité | Rôles | Ressource | Justification |
 |---|---|---|---|
-| `github-terraform` (deployer), environnement `<env>` | `storage.admin`, `artifactregistry.admin`, `iam.serviceAccountAdmin`, `iam.serviceAccountUser`, `cloudfunctions.admin`, `run.admin`, `pubsub.admin`, `datastore.owner`, `cloudscheduler.admin`, `apigateway.admin`, `serviceusage.serviceUsageAdmin`, `monitoring.editor`, `logging.configWriter`, `compute.networkAdmin` | Projet | Un rôle par type de ressource que la CI crée (`deployer_roles`). Les rôles admin couvrent aussi les policies IAM de ces ressources. |
+| `github-terraform` (deployer), environnement `<env>` | `storage.admin`, `artifactregistry.admin`, `iam.serviceAccountAdmin`, `iam.serviceAccountUser`, `cloudfunctions.admin`, `run.admin`, `pubsub.admin`, `datastore.owner`, `firebaserules.admin`, `serviceusage.apiKeysAdmin`, `cloudscheduler.admin`, `apigateway.admin`, `serviceusage.serviceUsageAdmin`, `monitoring.editor`, `logging.configWriter`, `compute.networkAdmin` | Projet | Un rôle par type de ressource que la CI crée (`deployer_roles`). Les rôles admin couvrent aussi les policies IAM de ces ressources. |
 | | `container.admin` | Projet, prd seulement | Cluster des runners, CRD et RBAC des charts Helm (`deployer_cluster_roles`). |
 | | `resourcemanager.projectIamAdmin` **sous condition** `modifiedGrantsByRole` | Projet | Ne peut accorder ou retirer que les rôles de `deployer_grantable_roles` : `logging.logWriter`, `monitoring.metricWriter`, `cloudtrace.agent`, `telemetry.tracesWriter`, `datastore.user`, `datastore.viewer`, `artifactregistry.reader`, `storage.objectViewer`. Jamais owner, editor ou un rôle d'admin IAM. |
 | | `deployerSecretIamPolicy` (personnalisé) | Chaque secret applicatif | Donner `secretAccessor` au runtime d'une fonction sur son secret. |
 | | `deployerServiceAccountIamPolicy` (personnalisé), `iam.serviceAccountUser` | `external-secrets` (prd) | Bindings ajoutés par les stacks jetables sur des comptes persistants. Les comptes créés par serverless (invokers, `session-signer`) sont couverts par `iam.serviceAccountAdmin`. |
 | | `secretmanager.secretAccessor` | Secret `arc-github-app` (prd) | Jeton GitHub App de courte durée pour gérer les variables des runners. |
-| `github-planner` (planner), environnement `<env>-plan` | `viewer` | Projet | Plans de PR en lecture seule. |
+| `github-planner` (planner), environnement `<env>-plan` | `viewer`, `firebaserules.viewer`, `serviceusage.apiKeysViewer` | Projet | Plans de PR en lecture seule. Les deux derniers rafraîchissent les Security Rules et la clé d'API du temps réel (ADR-0015), que `viewer` ne lit pas entièrement. |
 | | `plannerResourceIamRead` (personnalisé) : `storage.buckets`, `pubsub.topics`, `pubsub.subscriptions`, `iam.serviceAccounts` `.getIamPolicy` | Projet | Lire les policies que `viewer` ne couvre pas, pour rafraîchir les bindings pendant un plan. |
 | | `storage.objectViewer` | Bucket des sources de fonctions | Comparer les archives pendant un plan serverless. |
 

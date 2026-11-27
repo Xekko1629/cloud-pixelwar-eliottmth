@@ -1,7 +1,5 @@
 {
-  "firestore": {
-    "rules": "testing/firestore.rules"
-  },
+  "firestore": {},
   "emulators": {
     "firestore": { "host": "127.0.0.1", "port": 8085 },
     "pubsub": { "host": "127.0.0.1", "port": 8086 },

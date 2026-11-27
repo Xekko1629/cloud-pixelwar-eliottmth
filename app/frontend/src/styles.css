@@ -66,10 +66,97 @@ section.app__status p {
   margin: 0;
 }
 
+.workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
 .pixel-canvas {
   position: relative;
   flex: 1;
+  min-width: 0;
   min-height: 0;
+  overflow: hidden;
+}
+
+.pixel-canvas__marker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 1px #fff;
+  pointer-events: none;
+}
+
+.pixel-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 240px;
+  padding: 12px 16px;
+  overflow-y: auto;
+  font-size: 14px;
+}
+
+.pixel-panel p {
+  margin: 0;
+}
+
+.pixel-panel__quota,
+.pixel-panel__hint,
+.pixel-panel__block {
+  color: var(--muted);
+}
+
+.pixel-panel__coords {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pixel-panel__swatch {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--muted);
+  border-radius: 3px;
+}
+
+.pixel-panel__palette {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+}
+
+.pixel-panel__color {
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px solid rgb(0 0 0 / 0.25);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.pixel-panel__color[aria-checked="true"] {
+  outline: 2px solid var(--foreground);
+  outline-offset: 1px;
+}
+
+.pixel-panel__draw:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (max-width: 640px) {
+  .workspace {
+    flex-direction: column;
+  }
+
+  .pixel-panel {
+    width: auto;
+    max-height: 40dvh;
+  }
 }
 
 .pixel-canvas__surface {
@@ -98,4 +185,53 @@ section.app__status p {
   font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
   font-variant-numeric: tabular-nums;
   pointer-events: none;
+}
+
+.app__locked {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  text-align: center;
+}
+
+.app__locked p {
+  margin: 0;
+  font-size: 16px;
+}
+
+section.app__status .app__paused {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.auth {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin-left: auto;
+  font-size: 14px;
+}
+
+.auth__error {
+  color: var(--accent);
+}
+
+.auth__button {
+  padding: 4px 12px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.auth__button:disabled {
+  cursor: progress;
+  opacity: 0.6;
 }

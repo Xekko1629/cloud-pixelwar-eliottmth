@@ -10,7 +10,7 @@ derrière API Gateway, déclarée dans `infra/serverless/auth-proxy.tf` et activ
 | Route | Gateway | Rôle |
 | --- | --- | --- |
 | `GET /auth/login` | publique | URL d'autorisation Discord (scope `identify`) et `state` signé, valable 10 min |
-| `POST /auth/exchange` `{ code, state }` | publique | Vérifie le `state`, échange le code, lit l'utilisateur, **jette le token Discord**, renvoie un JWT de session d'une heure |
+| `POST /auth/exchange` `{ code, state }` | publique | Vérifie le `state`, échange le code, lit l'utilisateur, **jette le token Discord**, renvoie un JWT de session de 15 min |
 | `POST /api/session/refresh` | JWT de session | Nouveau JWT avec la même identité, tant que la connexion Discord a moins de 12 h |
 
 Réponses : `{ token, expires_at, user: { id, name } }` pour la session,

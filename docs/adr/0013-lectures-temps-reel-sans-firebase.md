@@ -1,6 +1,6 @@
 # ADR-0013 · Lectures et temps réel sans SDK Firebase
 
-- **Statut** : Proposé ; partie « Lectures ponctuelles » maintenue, partie « Temps réel » (service `realtime`) à remplacer par [ADR-0015](0015-temps-reel-listeners-firestore-navigateur.md), proposé
+- **Statut** : Proposé ; partie « Lectures ponctuelles » maintenue, partie « Temps réel » (service `realtime`) remplacée par [ADR-0015](0015-temps-reel-listeners-firestore-navigateur.md), accepté
 - **Date** : 2026-11-19
 - **Tickets** : SRV-06 (#36), DRAW-03a (#61), DRAW-03b (#62), DRAW-04 (#63), WEB-03b (#67), WEB-03c (#68), WEB-04 (#70), DATA-05c (#47). Remplace [ADR-0004](0004-lectures-directes-firestore.md) et le côté lecture de [ADR-0003](0003-temps-reel-listeners-firestore.md).
 - **Références** : Sujet §3.1, §3.4 · C06 §7 · C07 §3.3 · [Cloud Run : requêtes longues et streaming](https://cloud.google.com/run/docs/triggering/websockets)

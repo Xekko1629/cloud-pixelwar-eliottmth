@@ -36,7 +36,7 @@ génère `/config.js` :
 | `APP_ENV` | `environment` | `dev` ou `prd` |
 | `GATEWAY_URL` | output `gateway_url` du stack `gateway` | origine https, ou vide |
 | `FIRESTORE_PROJECT_ID` | `project_id` | id de projet GCP |
-| `FIRESTORE_API_KEY` | variable `firestore_api_key` (DRAW-03a, ADR-0015) | clé d'API Google, ou vide |
+| `FIRESTORE_API_KEY` | output `firestore_web_api_key` du stack `serverless` (DRAW-03a, ADR-0015) | clé d'API Google, ou vide |
 | `DISCORD_CLIENT_ID` | variable `discord_client_id` (WEB-02b) | snowflake Discord, ou vide |
 
 Une valeur invalide arrête le conteneur : la révision Cloud Run ne démarre pas, au

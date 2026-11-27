@@ -49,12 +49,14 @@ npx vitest run --config vitest.integration.config.ts
 Aucune connexion Firebase ni clé cloud n'est nécessaire pour ces tests. Le projet
 fictif `demo-pixelwar-test` et les endpoints loopback sont contrôlés avant la
 construction des clients SDK pour éviter de cibler GCP. Chaque test utilise des
-IDs uniques et nettoie ses ressources. Les règles Firestore locales refusent les
-accès clients : les SDK serveur d'intégration passent par l'accès administrateur
-de l'émulateur. La production n'a pas de règles : aucun client ne parle à Firestore
-(ADR-0013) et l'accès passe uniquement par IAM. Ce fichier ne doit pas être
-déployé avec `firebase deploy`. Les index et TTL de production sont dans
-`infra/serverless/firestore.tf` ; l'émulateur ne les applique pas.
+IDs uniques et nettoie ses ressources. Les SDK serveur d'intégration passent par
+l'accès administrateur de l'émulateur, sans règles. Les Security Rules du navigateur
+(`infra/serverless/firestore.rules`, ADR-0015) sont chargées par
+`testing/firestore-rules.integration.test.ts` lui-même : `firebase.json` n'en
+déclare pas, le CLI refusant un fichier hors de `app/`. Elles sont publiées par
+Terraform, jamais par `firebase deploy` ([temps réel](realtime.md)). Les index et
+TTL de production sont dans `infra/serverless/firestore.tf` ; l'émulateur ne les
+applique pas.
 
 ## Ajouter des tests
 
