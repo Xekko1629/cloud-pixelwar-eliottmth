@@ -143,3 +143,15 @@ variable "realtime_extra_referrers" {
     error_message = "Each referrer is https://<host>/* or a local http://localhost:<port>/*."
   }
 }
+
+variable "enable_overview" {
+  description = "Far-view pyramid (DATA-05c): overview-worker, its Cloud Scheduler tick and the signed URLs of the tile-reader; needs the web API and the /draw delivery"
+  type        = bool
+  default     = false
+}
+
+variable "overview_schedule" {
+  description = "Cron schedule of the overview-tick job (UTC)"
+  type        = string
+  default     = "* * * * *"
+}

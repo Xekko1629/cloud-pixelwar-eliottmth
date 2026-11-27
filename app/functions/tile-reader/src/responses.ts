@@ -3,12 +3,14 @@ import {
   REGION_SIDE, TILE_SIDE, assertTileCoordinates, encodeRegionTiles, evaluateRateLimit, regionId,
   type GlobalConfigDocument, type TimestampValue,
 } from '@pixelwar/shared/grid';
+import { assertOverviewCell, type OverviewLevel } from '@pixelwar/shared/overview';
 import type { PixelAuthor, StoredTile, UserReadState } from './store';
 
 export type Route =
   | { kind: 'tiles'; rx: number; ry: number; region: string }
   | { kind: 'meta'; tx: number; ty: number }
-  | { kind: 'state' };
+  | { kind: 'state' }
+  | { kind: 'overview'; level: OverviewLevel; cx: number; cy: number };
 
 export class InvalidRoute extends Error {
   constructor() { super('invalid_coordinates'); this.name = 'InvalidRoute'; }
@@ -18,6 +20,7 @@ export class InvalidRoute extends Error {
 const INTEGER = '(0|-?[1-9][0-9]{0,9})';
 const TILES = new RegExp(`^/api/regions/${INTEGER}/${INTEGER}/tiles$`);
 const META = new RegExp(`^/api/tiles/${INTEGER}/${INTEGER}/meta$`);
+const OVERVIEW = new RegExp(`^/api/overview/([1-3])/${INTEGER}/${INTEGER}$`);
 
 /** undefined: unknown path (404). InvalidRoute: known path, coordinates out of the grid (400). */
 export function parseRoute(path: string): Route | undefined {
@@ -32,6 +35,12 @@ export function parseRoute(path: string): Route | undefined {
     const tx = Number(meta[1]); const ty = Number(meta[2]);
     try { assertTileCoordinates(tx, ty); } catch { throw new InvalidRoute(); }
     return { kind: 'meta', tx, ty };
+  }
+  const overview = OVERVIEW.exec(path);
+  if (overview) {
+    const level = Number(overview[1]) as OverviewLevel; const cx = Number(overview[2]); const cy = Number(overview[3]);
+    try { assertOverviewCell(level, cx, cy); } catch { throw new InvalidRoute(); }
+    return { kind: 'overview', level, cx, cy };
   }
   return undefined;
 }
@@ -83,4 +92,8 @@ export function matchesEtag(header: string | undefined, etag: string): boolean {
   const opaque = etag.slice(2);
   return header.split(',').map((value) => value.trim()).some((value) =>
     value === '*' || value === etag || value === opaque || value.replace(/^W\//, '') === opaque);
+}
+
+export function overviewBody(version: number, route: Extract<Route, { kind: 'overview' }>, signed: { url: string; expires_at: string }): Buffer {
+  return Buffer.from(JSON.stringify({ canvas_version: version, level: route.level, cx: route.cx, cy: route.cy, ...signed }));
 }

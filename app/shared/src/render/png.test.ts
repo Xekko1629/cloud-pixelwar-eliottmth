@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { decodePng } from '../../../testing/png-reader';
 import { PALETTE, TILE_PIXELS, TILE_SIDE, emptyTileColors } from '../grid';
-import { encodeIndexedPng, renderTilePng, storedColorToPngIndex, tileToIndexedImage } from '.';
+import { InvalidPngError, decodeIndexedPng, encodeIndexedPng, renderTilePng, storedColorToPngIndex, tileToIndexedImage } from '.';
 
 describe('renderTilePng', () => {
   it('renders an empty tile as a white 64×64 image', () => {
@@ -85,5 +85,24 @@ describe('encodeIndexedPng', () => {
     expect(() => encodeIndexedPng({ width: 2, height: 2, indices: new Uint8Array(3) })).toThrow('width × height');
     expect(() => encodeIndexedPng({ width: 0, height: 1, indices: new Uint8Array(0) })).toThrow(RangeError);
     expect(() => encodeIndexedPng({ width: 1, height: 1, indices: Uint8Array.of(16) })).toThrow('between 0 and 15');
+  });
+});
+
+describe('decodeIndexedPng', () => {
+  it('reads back what encodeIndexedPng wrote, odd widths included', () => {
+    for (const [width, height] of [[1, 1], [3, 2], [256, 256]]) {
+      const indices = Uint8Array.from({ length: width * height }, (_, i) => (i * 7) % 16);
+      expect(decodeIndexedPng(encodeIndexedPng({ width, height, indices }))).toEqual({ width, height, indices });
+    }
+  });
+  it('refuses any other PNG, a corrupt one or one larger than allowed', () => {
+    const png = encodeIndexedPng({ width: 4, height: 4, indices: new Uint8Array(16) });
+    const corrupt = Uint8Array.from(png); corrupt[corrupt.length - 20] ^= 0xff;
+    const signature = Uint8Array.from(png); signature[0] = 0;
+    const header = Uint8Array.from(png); header[24] = 8; // Bit depth 8 instead of 4.
+    for (const bad of [corrupt, signature, header, png.subarray(0, 40), new Uint8Array(3)]) {
+      expect(() => decodeIndexedPng(bad)).toThrow(InvalidPngError);
+    }
+    expect(() => decodeIndexedPng(png, 2)).toThrow('structure');
   });
 });

@@ -106,7 +106,7 @@ COMPONENTS = [
     C('t_overview', 'overview-tick', 'gcp.analytics.PubSub', 'application', 'Pub/Sub · suites',
       ('serverless:module.overview_tick',)),
     C('scheduler', 'Cloud Scheduler', 'gcp.devtools.Scheduler', 'application', 'Pub/Sub · suites',
-      ('serverless:google_cloud_scheduler_job.overview',), 'chaque minute'),
+      ('serverless:google_cloud_scheduler_job.overview_tick',), 'chaque minute'),
     # --- Workers ---------------------------------------------------------------------------------
     C('command_worker', 'command-worker', 'gcp.compute.Run', 'application', 'Workers · étape 1 (ingress interne)',
       ('serverless:module.command_worker',), 'commandes + droits admin'),
@@ -218,6 +218,8 @@ FLOWS = [
     F('scheduler', 't_overview', 'publish', 'event'),
     F('t_overview', 'overview_worker', 'push OIDC', 'event'),
     F('overview_worker', 'b_overview', 'images basse résolution'),
+    F('overview_worker', 'firestore', 'deltas et tuiles (lecture)', 'read', layout=False),
+    F('tile_reader', 'b_overview', 'URL signées (15 min)', 'read', layout=False),
     F('t_discord_command', 't_dlq', 'échecs répétés', 'event', layout=False),
     # Replies to Discord
     F('discord_notifier', 'discord_api', 'HTTPS PATCH (réponse)'),

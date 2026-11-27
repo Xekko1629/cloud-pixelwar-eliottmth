@@ -2,10 +2,13 @@
   "name": "@pixelwar/function-tile-reader",
   "private": true,
   "type": "module",
-  "pixelwar": { "entryPoint": "handleTileReader" },
+  "pixelwar": {
+    "entryPoint": "handleTileReader"
+  },
   "dependencies": {
-    "@google-cloud/functions-framework": "5.0.5",
     "@google-cloud/firestore": "9.4.0",
+    "@google-cloud/functions-framework": "5.0.5",
+    "@google-cloud/storage": "8.4.0",
     "@pixelwar/shared": "*"
   }
 }
