@@ -168,9 +168,12 @@ la page :
   arrivé) ou que son refus soit connu, même si un gros trait met plusieurs secondes à
   être traité. Au-delà de 60 s (pixel perdu), il disparaît ; un `/admin clear` vide
   l'aperçu.
-  Le bouton « Aperçu de l'envoi » (œil, barre d'outils) le désactive : seule la toile reste, mise à
-  jour par les deltas. Le choix est gardé dans le `localStorage` du navigateur
-  (`pixelwar.preview`).
+  Le bouton « Aperçu de l'envoi » (œil, barre d'outils) masque le calque : seule la toile
+  reste, mise à jour par les deltas. Le choix est gardé dans le `localStorage` du
+  navigateur (`pixelwar.preview`).
+- **En attente** : la palette affiche le nombre de pixels envoyés dont le delta n'est pas
+  encore arrivé (« 1 240 en attente »), aperçu affiché ou masqué. Il descend au fil des
+  deltas et disparaît à zéro.
 - **Quota et refus** : chaque pixel couvert est **décompté tout de suite** du quota
   affiché (`PixelInspector.consume`), car `/api/state` ne le voit qu'une fois traité par
   le worker : deux traits rapides ne croient donc pas avoir tout le quota. Le trait

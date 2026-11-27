@@ -520,6 +520,37 @@ p {
   font-weight: 600;
 }
 
+/* Pixels sent, waiting for their delta: shown only while there are some. */
+.pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 14px;
+  border-left: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pending strong {
+  color: var(--foreground);
+  font-weight: 700;
+}
+
+.pending__spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 800ms linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* The selected pixel or the brush: a card on the right. */
 .card {
   position: absolute;
@@ -748,7 +779,8 @@ p {
     align-items: stretch;
   }
 
-  .quota {
+  .quota,
+  .pending {
     padding: 8px 0 0;
     border-top: 1px solid var(--border);
     border-left: 0;
@@ -773,6 +805,12 @@ p {
 /* --- Accessibility preferences ------------------------------------------------------ */
 
 @media (prefers-reduced-motion: reduce) {
+  /* Still visible, just not turning. */
+  .pending__spinner {
+    animation: none;
+    border-color: var(--accent);
+  }
+
   .pill,
   .quota__fill,
   .button,

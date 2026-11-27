@@ -70,6 +70,9 @@ export function Workspace({ api, live }: { api: ApiClient; live: LiveCanvas }) {
   const [tool, setTool] = useState<CanvasTool>('inspect');
   const { selected } = useSyncExternalStore(inspector.subscribe, inspector.getState);
   const { config, tiles } = useSyncExternalStore(live.subscribeState, live.getState);
+  // Pixels sent whose delta has not arrived yet, shown or not on the preview layer.
+  const subscribePending = useMemo(() => (listener: () => void) => preview.subscribe(() => listener()), [preview]);
+  const pending = useSyncExternalStore(subscribePending, () => preview.size);
   const note = config?.paused ? 'Toile en pause' : tiles === 'loading' ? 'Chargement…'
     : tiles === 'error' ? 'Chargement impossible, nouvel essai dans 10 s' : null;
 
@@ -131,6 +134,7 @@ export function Workspace({ api, live }: { api: ApiClient; live: LiveCanvas }) {
         onTool={chooseTool}
         previewOn={previewOn}
         onPreview={setPreviewOn}
+        pending={pending}
       />
     </div>
   );

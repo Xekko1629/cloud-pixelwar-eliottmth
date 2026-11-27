@@ -87,6 +87,8 @@ interface PanelProps {
   tool: CanvasTool;
   onTool: (tool: CanvasTool) => void;
   previewOn: boolean;
+  // Pixels sent and not yet confirmed by their delta.
+  pending: number;
   onPreview: (on: boolean) => void;
 }
 
@@ -95,7 +97,7 @@ const TOOLS = [
   { value: 'brush', label: 'Pinceau', Icon: BrushIcon },
 ] as const;
 
-export function PixelPanel({ inspector, brush, tool, onTool, previewOn, onPreview }: PanelProps) {
+export function PixelPanel({ inspector, brush, tool, onTool, previewOn, onPreview, pending }: PanelProps) {
   const state = useSyncExternalStore(inspector.subscribe, inspector.getState);
   const brushState = useSyncExternalStore(brush.subscribe, brush.getState);
   // Re-evaluated on each render; the inspector re-renders at the end of the quota minute.
@@ -153,6 +155,12 @@ export function PixelPanel({ inspector, brush, tool, onTool, previewOn, onPrevie
             />
           ))}
         </div>
+        {pending > 0 && (
+          <span className="pending" role="status" title="Pixels envoyés, en attente de traitement par le serveur">
+            <span className="pending__spinner" aria-hidden="true" />
+            <strong>{pending.toLocaleString('fr-FR')}</strong> en attente
+          </span>
+        )}
         {quota && remaining !== null && (
           <QuotaMeter remaining={remaining} limit={quota.limitPerMinute} resetAt={quota.resetAt} />
         )}
