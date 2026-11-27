@@ -166,6 +166,32 @@ describe('PixelInspector.consume', () => {
     expect(inspector.getState().quota?.remainingPixels).toBe(2);
   });
 
+  it('asks the server again when a click finds no quota left, and draws if it allows', async () => {
+    const { inspector, routes, fetch } = setup({ remaining: 0 });
+    inspector.start();
+    await flush();
+    inspector.select({ x: 1, y: 1 });
+    expect(inspector.drawBlock()).toBe('quota');
+    // An admin raised the limit meanwhile (/admin ratelimit).
+    const raised = quota(0);
+    raised.user = { ...raised.user, limit_per_minute: 1000, used_pixels: 20, remaining_pixels: 980 };
+    routes.state = () => jsonResponse(200, raised);
+    await inspector.draw();
+    expect(fetch.mock.calls.filter(([url]) => String(url).endsWith('/api/pixels'))).toHaveLength(1);
+    expect(inspector.getState().quota?.remainingPixels).toBe(979);
+  });
+
+  it('reads the quota again at most once every 2 s on user actions', async () => {
+    const { inspector, fetch } = setup();
+    inspector.start();
+    await flush();
+    const reads = () => fetch.mock.calls.filter(([url]) => String(url).endsWith('/api/state')).length;
+    await inspector.recheckQuota();
+    await inspector.recheckQuota();
+    // The read at start, then one recheck: the second comes too soon.
+    expect(reads()).toBe(2);
+  });
+
   it('starts from the whole limit when reset_at has passed', async () => {
     const { inspector, routes } = setup();
     const past = quota(0);

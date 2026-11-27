@@ -12,6 +12,9 @@ import type { TileChange } from '../realtime/live';
 // when its delta repaints the pixel; without it after a few seconds, /api/state tells
 // whether the worker refused it (last_rejection).
 
+
+// A quota recheck on a user action reads /api/state at most this often.
+const RECHECK_MS = 2_000;
 export interface Point {
   x: number;
   y: number;
@@ -76,6 +79,7 @@ export class PixelInspector {
   private metaTimer: unknown = null;
   private confirmTimer: unknown = null;
   private resetTimer: unknown = null;
+  private recheckedAt = -Infinity;
   private sentColor = 0;
   private unsubscribe: (() => void) | null = null;
 
@@ -137,6 +141,9 @@ export class PixelInspector {
   }
 
   async draw(): Promise<void> {
+    // Out of quota as far as we know: the server may say otherwise (new minute, limit
+    // raised by /admin ratelimit). Asked again on this click, never on a timer.
+    if (this.drawBlock() === 'quota') await this.recheckQuota();
     const selected = this.state.selected;
     if (!selected || this.drawBlock() !== null) return;
     const color = this.state.brushColor;
@@ -214,6 +221,16 @@ export class PixelInspector {
   /** Reads /api/state again (after a brush stroke). */
   reloadQuota(): Promise<UserQuota | null> {
     return this.refreshQuota();
+  }
+
+  /**
+   * Reads /api/state again on a user action (a try while out of quota, back on the tab),
+   * at most once every RECHECK_MS: the limit may have changed (/admin ratelimit).
+   */
+  async recheckQuota(): Promise<void> {
+    if (this.now() - this.recheckedAt < RECHECK_MS) return;
+    this.recheckedAt = this.now();
+    await this.refreshQuota();
   }
 
   /**

@@ -160,7 +160,10 @@ la page :
   le worker : deux traits rapides ne croient donc pas avoir tout le quota. Le trait
   s'arrête au quota restant, et rien n'est dessiné ni envoyé au-delà. Chaque lecture de
   `/api/state` recale sur le chiffre du serveur (dessins faits depuis Discord compris),
-  et c'est lui qui décide.
+  et c'est lui qui décide. Quand le quota connu est à 0, chaque nouvel essai (clic sur
+  « Poser le pixel » ou début de trait) et chaque retour sur l'onglet relisent
+  `/api/state`, au plus une fois toutes les 2 s : une limite relevée par
+  `/admin ratelimit` est prise en compte sans recharger la page. Jamais sur minuterie.
 - Un seul message par trait : 3 s après la fin, `/api/state` dit si le dernier refus
   appartient à l'un de ses événements ; l'aperçu du trait est alors retiré tout de
   suite. Après un échec d'envoi, le reste du trait est abandonné, jamais renvoyé

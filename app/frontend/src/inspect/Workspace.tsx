@@ -62,6 +62,7 @@ export function Workspace({ api, live }: { api: ApiClient; live: LiveCanvas }) {
       return quota ? remainingPixels(quota, Date.now()) : null;
     },
     reloadQuota: () => inspector.reloadQuota(),
+    recheckQuota: () => inspector.recheckQuota(),
     preview: (pixels) => preview.add(pixels),
     forget: (pixels) => preview.forget(pixels),
     consume: (count) => inspector.consume(count),
@@ -73,6 +74,19 @@ export function Workspace({ api, live }: { api: ApiClient; live: LiveCanvas }) {
   useEffect(() => {
     inspector.start();
     return () => inspector.stop();
+  }, [inspector]);
+
+  // Back on the tab: the quota may have changed meanwhile (a new minute, /admin ratelimit).
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void inspector.recheckQuota();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
   }, [inspector]);
 
   useEffect(() => {

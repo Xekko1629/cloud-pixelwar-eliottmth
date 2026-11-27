@@ -24,7 +24,7 @@ const ERRORS: Record<string, string> = {
 const BLOCKS: Partial<Record<DrawBlock, string>> = {
   paused: 'La toile est en pause.',
   outside: 'Ce pixel est hors de la grille.',
-  quota: 'Quota atteint.',
+  quota: 'Quota atteint : un nouvel essai revérifie auprès du serveur.',
 };
 
 export const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'medium' });
@@ -146,7 +146,8 @@ function SelectedPixel({ inspector }: { inspector: PixelInspector }) {
       <button
         type="button"
         className="auth__button pixel-panel__draw"
-        disabled={block !== null}
+        // Out of quota, a click asks the server again (the limit may have changed).
+        disabled={block !== null && block !== 'quota'}
         onClick={() => void inspector.draw()}
       >
         Poser le pixel
@@ -189,7 +190,7 @@ function BrushControls({ brush }: { brush: Brush }) {
       <p className="pixel-panel__hint">
         Glisse sur la toile pour peindre. Clic droit, molette enfoncée ou deux doigts pour te déplacer.
       </p>
-      {block && <p className="pixel-panel__block">{block === 'paused' ? 'La toile est en pause.' : 'Quota atteint.'}</p>}
+      {block && <p className="pixel-panel__block">{block === 'paused' ? 'La toile est en pause.' : 'Quota atteint : un nouvel essai revérifie auprès du serveur.'}</p>}
       {message && <p className="pixel-panel__feedback" role="status">{message}</p>}
     </>
   );
