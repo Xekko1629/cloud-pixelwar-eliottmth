@@ -146,7 +146,12 @@ module "draw_worker_subscription" {
   invoker_service_account_email = module.draw_worker[0].invoker_service_account_email
   pubsub_agent_member           = local.pubsub_agent_member
   ack_deadline_seconds          = 330
-  labels                        = local.labels
+  # A 500-pixel stroke saturates the 2 single-request instances: Cloud Run answers 429/500
+  # "no available instance" and 1 pixel reached the DLQ after 5 attempts (load test in
+  # dev, 26/11 19:49 UTC). 10 attempts with 10-60 s backoff stay under the 15-minute
+  # Discord token.
+  max_delivery_attempts = 10
+  labels                = local.labels
 
   depends_on = [google_service_account_iam_member.push_token_creator]
 }

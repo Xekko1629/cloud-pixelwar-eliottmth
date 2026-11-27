@@ -55,7 +55,7 @@ resource "google_pubsub_subscription" "main" {
   }
   dead_letter_policy {
     dead_letter_topic     = google_pubsub_topic.dlq.id
-    max_delivery_attempts = 5
+    max_delivery_attempts = var.max_delivery_attempts
   }
 
   depends_on = [
