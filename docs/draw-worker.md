@@ -181,16 +181,22 @@ réservée) compte toutes les sources.
   décision de quota dans l'ordre `compareEvents`, son résultat et son acquittement.
   Le résultat d'un groupe est identique à celui de transactions successives dans cet
   ordre (test d'équivalence de `group.test.ts`).
-- Si la transaction du groupe échoue (tuile corrompue, budget dépassé, contention
-  persistante), l'instance rejoue chaque pixel **seul**, l'un après l'autre : un pixel
+- Si la transaction du groupe échoue sur une erreur de données (tuile corrompue, budget
+  dépassé), l'instance rejoue chaque pixel **seul**, l'un après l'autre : un pixel
   défectueux n'échoue que sa propre requête, que Pub/Sub relivre seule.
+- Si elle échoue sur une **contention** (annulée à chacune des 10 tentatives), ses pixels
+  ne sont **pas** rejoués un par un : ils retomberaient sur les mêmes tuiles, et l'instance
+  restait bloquée plusieurs minutes (dev, 27/11 18:38 UTC : jusqu'à 267 s d'attente,
+  23 800 refus `429`). Tous ses pixels répondent `503` d'un coup ; Pub/Sub les relivre plus
+  tard, étalés par son délai de 10 à 60 s, et l'instance passe au groupe suivant.
 
 Logs d'un groupe, une ligne par transaction (pas par pixel) :
 
 | `event_type` | Sévérité | Quand |
 | --- | --- | --- |
 | `draw.group.committed` | INFO | Un groupe de `group_size` pixels a été écrit en une transaction |
-| `draw.group.fallback` | WARNING | Le groupe a échoué ; ses `group_size` pixels sont rejoués un par un |
+| `draw.group.fallback` | WARNING | Le groupe a échoué sur une erreur de données ; ses `group_size` pixels sont rejoués un par un |
+| `draw.group.contention` | WARNING | Le groupe a été annulé par Firestore à chaque tentative (contention) ; ses `group_size` pixels sont refusés (`503`) et relivrés plus tard par Pub/Sub, sans rejeu un par un |
 
 Champs de ces deux lignes, pour savoir où passe le temps d'un groupe :
 

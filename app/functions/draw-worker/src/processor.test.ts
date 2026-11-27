@@ -52,6 +52,27 @@ it('logs one line per group, with its wait and Firestore timing, and none for a 
   ]);
 });
 
+it('logs a contended group as a warning, with its timing', async () => {
+  const lines: string[] = [];
+  let release!: () => void;
+  const timing = { attempts: 10, read_processed_ms: 20, read_people_ms: 10, read_tiles_ms: 700, transaction_ms: 9000 };
+  mocks.process.mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve({ type: 'pixel-processed' }); }));
+  mocks.processGroup.mockImplementationOnce(async () => {
+    mocks.createGroup.mock.calls.at(-1)![2](timing);
+    throw Object.assign(new Error('ABORTED'), { code: 10 });
+  });
+  const process = createLazyDrawProcessor('demo-pixelwar-test', (line) => lines.push(line));
+  const first = process(command);
+  await vi.waitFor(() => expect(release).toBeDefined());
+  const grouped = [process(command), process(command)].map((p) => p.catch(() => 'refused'));
+  release();
+  expect(await Promise.all(grouped)).toEqual(['refused', 'refused']);
+  await first;
+  expect(lines.map((line) => JSON.parse(line))).toEqual([
+    { severity: 'WARNING', function: 'draw-worker', event_type: 'draw.group.contention', group_size: 2, wait_ms: expect.any(Number), ...timing },
+  ]);
+});
+
 it('logs a fallback as a warning, without the timing of an earlier group', async () => {
   const lines: string[] = [];
   let release!: () => void;

@@ -93,6 +93,31 @@ describe('createGroupCommit', () => {
     expect(one.mock.calls.map(([input]) => input.event_id)).toEqual([1, 2, 3, 4].map((id) => command(id).event_id));
   });
 
+  it('fails every command of a contended group at once, without replaying them one by one', async () => {
+    const first = gate();
+    const one = vi.fn(async (input: DrawCommand) => { if (input.event_id === command(1).event_id) await first.promise; return result(input, 'one'); });
+    const aborted = Object.assign(new Error('10 ABORTED'), { code: 10 });
+    const group = vi.fn(async () => { throw aborted; });
+    const onGroup = vi.fn();
+    const process = createGroupCommit(one, group, { max_group: 32, onGroup });
+    const answers = [1, 2, 3, 4].map((id) => process(command(id)).then((r) => r.event_id, (error: unknown) => error));
+    first.open();
+    expect(await Promise.all(answers)).toEqual([command(1).event_id, aborted, aborted, aborted]);
+    expect(one).toHaveBeenCalledTimes(1); // Only the first command, alone; never the 3 of the group.
+    expect(onGroup).toHaveBeenCalledWith(expect.objectContaining({ size: 3, outcome: 'contention' }));
+    // The instance is free again at once: the next command is processed.
+    expect(await process(command(5))).toMatchObject({ tag: 'one' });
+  });
+
+  it('lets the caller decide what contention is', async () => {
+    const first = gate();
+    const one = vi.fn(async (input: DrawCommand) => { if (input.event_id === command(1).event_id) await first.promise; return result(input, 'one'); });
+    const process = createGroupCommit(one, vi.fn(async () => { throw new Error('custom'); }), { max_group: 32, isContention: () => true });
+    const answers = [1, 2, 3].map((id) => process(command(id)).then(() => 'ok', () => 'refused'));
+    first.open();
+    expect(await Promise.all(answers)).toEqual(['ok', 'refused', 'refused']);
+  });
+
   it('falls back when a group returns a wrong number of results', async () => {
     const first = gate();
     const one = vi.fn(async (input: DrawCommand) => { if (input.event_id === command(1).event_id) await first.promise; return result(input, 'one'); });
