@@ -139,6 +139,17 @@ describe('LiveCanvas', () => {
       expect(live.source.get(0, 0)![1]).toBe(5);
     });
 
+    it('passes every realtime pixel on, and loads no region in the far view', async () => {
+      const { live, state, fetcher } = await signedIn();
+      const pixels = vi.fn();
+      live.subscribePixels(pixels);
+      state.deltas[0]!([delta(1, 0, 9)]);
+      expect(pixels).toHaveBeenCalledWith([{ x: 1, y: 0, color: 9 }]);
+      live.viewportChanged({ min_x: 5000, min_y: 0, max_x: 5100, max_y: 100 }, true);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      expect(live.getState().tiles).toBe('far');
+    });
+
     it('forgets the tiles on sign-out and on a new canvas version', async () => {
       const { live, state, answers, fetcher, changes } = await signedIn();
       answers[0]!({ canvas_version: 1, tiles: [{ tx: 0, ty: 0, colors: tile(2) }] });

@@ -1,11 +1,28 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import type { ApiClient } from '../api/client';
+import { fetchOverviewUrl } from '../api/grid';
 import { Brush } from '../brush/brush';
 import { PreviewLayer } from '../brush/preview';
+import { OverviewImages, type OverviewLoader } from '../canvas/overview';
 import { PixelCanvas, type CanvasTool, type StrokeHandlers } from '../canvas/PixelCanvas';
 import type { LiveCanvas } from '../realtime/live';
 import { PixelInspector, remainingPixels } from './inspector';
 import { PixelPanel } from './PixelPanel';
+
+// Far view (WEB-03d): a signed URL from tile-reader, then the image straight from Cloud
+// Storage. An empty area has no image: the URL answers 404 and the area stays white.
+export function overviewLoader(api: ApiClient, image: () => HTMLImageElement = () => new Image()): OverviewLoader {
+  return async (level, cx, cy) => {
+    const { url } = await fetchOverviewUrl(api, level, cx, cy);
+    return new Promise((resolve) => {
+      const element = image();
+      element.decoding = 'async';
+      element.onload = () => resolve(element);
+      element.onerror = () => resolve(null);
+      element.src = url;
+    });
+  };
+}
 
 // Whether the preview layer is shown, remembered per browser; on unless turned off.
 const PREVIEW_KEY = 'pixelwar.preview';
@@ -31,6 +48,7 @@ export function writePreviewSetting(on: boolean, storage: () => Pick<Storage, 's
 // on a preview layer over the canvas, until its delta arrives; the panel can turn it off.
 export function Workspace({ api, live }: { api: ApiClient; live: LiveCanvas }) {
   const [preview] = useState(() => new PreviewLayer());
+  const [overview] = useState(() => new OverviewImages(overviewLoader(api)));
   const [previewOn, setPreviewOn] = useState(() => readPreviewSetting());
   const [inspector] = useState(() => new PixelInspector(api, live, {
     preview: (pixels) => preview.add(pixels),
@@ -85,6 +103,8 @@ export function Workspace({ api, live }: { api: ApiClient; live: LiveCanvas }) {
         preview={preview}
         selected={tool === 'inspect' ? selected : null}
         grid={config?.size ?? null}
+        overview={overview}
+        bounds={config?.bounds ?? null}
         onSelect={(pixel) => inspector.select(pixel)}
       />
       <PixelPanel

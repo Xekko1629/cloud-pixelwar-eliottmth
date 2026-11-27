@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { SESSION_KEY, SessionStore } from '../auth/session';
 import { TOKEN, USER, jsonResponse, memoryStorage } from '../auth/testing';
 import { ApiClient } from './client';
-import { fetchTileMeta, fetchUserQuota, postPixels } from './grid';
+import { fetchOverviewUrl, fetchTileMeta, fetchUserQuota, postPixels } from './grid';
 
 function client(...answers: Response[]) {
   const fetch = vi.fn<typeof globalThis.fetch>(async () => answers.shift() ?? jsonResponse(500, {}));
@@ -80,5 +80,26 @@ describe('postPixels', () => {
   it('passes the refusal code of the gateway', async () => {
     const { api } = client(jsonResponse(503, { error: 'publish_unavailable' }));
     await expect(postPixels(api, [{ x: 0, y: 0, color: 1 }])).rejects.toMatchObject({ status: 503, code: 'publish_unavailable' });
+  });
+});
+
+describe('fetchOverviewUrl', () => {
+  const answer = { canvas_version: 3, level: 2, cx: -1, cy: 0, url: 'https://storage.googleapis.com/b/v3/2/-1_0.png?X-Goog-Signature=s', expires_at: '2026-11-26T12:15:00.000Z' };
+
+  it('reads the signed URL of a far-view image', async () => {
+    const { api, fetch } = client(jsonResponse(200, answer));
+    expect(await fetchOverviewUrl(api, 2, -1, 0)).toEqual({
+      canvasVersion: 3, url: answer.url, expiresAt: new Date('2026-11-26T12:15:00.000Z'),
+    });
+    expect(String(fetch.mock.calls[0]![0])).toBe('https://gw.example.dev/api/overview/2/-1/0');
+  });
+
+  it.each([
+    { ...answer, cx: 5 },
+    { ...answer, url: 'http://storage.googleapis.com/x.png' },
+    { ...answer, expires_at: 'soon' },
+  ])('refuses an answer that does not match: %o', async (body) => {
+    const { api } = client(jsonResponse(200, body));
+    await expect(fetchOverviewUrl(api, 2, -1, 0)).rejects.toThrow('Invalid overview answer');
   });
 });

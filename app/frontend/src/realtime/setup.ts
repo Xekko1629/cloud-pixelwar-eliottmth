@@ -54,6 +54,6 @@ export const TILE_LABELS: Record<TileStatus, string> = {
   'signed-out': 'connexion requise',
   loading: 'chargement…',
   ready: 'à jour',
-  far: 'zoome pour charger les pixels',
+  far: 'vue éloignée, images mises à jour chaque minute',
   error: 'chargement impossible, nouvel essai dans 10 s',
 };

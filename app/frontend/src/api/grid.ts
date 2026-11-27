@@ -97,3 +97,20 @@ export async function postPixels(api: ApiClient, pixels: readonly DrawPixel[]): 
   }
   return { correlationId: body.correlation_id, eventIds: eventIds as string[] };
 }
+
+export interface OverviewUrl {
+  canvasVersion: number;
+  url: string;
+  expiresAt: Date;
+}
+
+/** Signed URL of one far-view image (WEB-03d, docs/overview.md), valid 15 minutes. */
+export async function fetchOverviewUrl(api: ApiClient, level: number, cx: number, cy: number): Promise<OverviewUrl> {
+  const body = record(await api.json(`/api/overview/${level}/${cx}/${cy}`));
+  const expiresAt = date(body?.expires_at);
+  if (!body || body.level !== level || body.cx !== cx || body.cy !== cy || !count(body.canvas_version) ||
+      typeof body.url !== 'string' || !body.url.startsWith('https://') || !expiresAt) {
+    invalid('overview');
+  }
+  return { canvasVersion: body.canvas_version, url: body.url, expiresAt };
+}

@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
-import type { GridSize } from '@pixelwar/shared/grid';
+import type { Bounds, GridSize } from '@pixelwar/shared/grid';
 import type { CanvasUpdates, TileChange } from '../realtime/live';
-import { pixelAt, screenX, screenY, visiblePixels, type Camera, type Point, type Viewport } from './camera';
+import { fitCamera, pixelAt, screenX, screenY, visiblePixels, type Camera, type Point, type Viewport } from './camera';
 import { CanvasController } from './controller';
-import { drawLayer, drawTiles, drawViewport, type TileRef } from './renderer';
+import { FAR_ZOOM, RecentPixels, overviewLevel, visibleCells, type OverviewImages } from './overview';
+import { drawLayer, drawOverview, drawTiles, drawViewport, type TileRef } from './renderer';
 import { TileImageCache, type TileColorsSource } from './tiles';
 
 // One 64×64 canvas per painted tile, drawn scaled with drawImage: never a DOM element per pixel.
@@ -15,7 +16,8 @@ function createTileImage(rgba: Uint8ClampedArray<ArrayBuffer>): HTMLCanvasElemen
   return canvas;
 }
 
-const formatZoom = (zoom: number) => (zoom >= 10 ? zoom.toFixed(0) : zoom.toFixed(1));
+const formatZoom = (zoom: number) =>
+  (zoom >= 10 ? zoom.toFixed(0) : zoom >= 1 ? zoom.toFixed(1) : `1/${Math.round(1 / zoom)}`);
 
 // Full-size canvas of the grid. Redraws only when the camera, the size or a realtime delta
 // changes something, in the next animation frame: no render loop and no polling. Deltas
@@ -46,11 +48,17 @@ export interface PixelCanvasProps {
   selected?: Point | null;
   // Size of a bounded grid (config/global, DRAW-04): edge drawn, camera kept on it.
   grid?: GridSize | null;
+  // Images of the far view (WEB-03d), shown below zoom 1.
+  overview?: OverviewImages;
+  // Painted area (config/global.bounds): the "voir tout le dessin" button frames it.
+  bounds?: Bounds | null;
   // A tap, Enter (centre pixel) or Escape (null).
   onSelect?: (pixel: Point | null) => void;
 }
 
-export function PixelCanvas({ live, tool = 'inspect', stroke, preview, selected = null, grid = null, onSelect }: PixelCanvasProps) {
+export function PixelCanvas({
+  live, tool = 'inspect', stroke, preview, selected = null, grid = null, overview, bounds = null, onSelect,
+}: PixelCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const layerRef = useRef<HTMLCanvasElement>(null);
   const statusRef = useRef<HTMLOutputElement>(null);
@@ -66,6 +74,9 @@ export function PixelCanvas({ live, tool = 'inspect', stroke, preview, selected 
   strokeRef.current = stroke;
   const gridRef = useRef(grid);
   const applyGridRef = useRef<() => void>(() => {});
+  const boundsRef = useRef(bounds);
+  boundsRef.current = bounds;
+  const fitRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     selectedRef.current = selected;
@@ -97,6 +108,9 @@ export function PixelCanvas({ live, tool = 'inspect', stroke, preview, selected 
     let painting: number | null = null;
     // What the next frame must redraw: everything, or only these tiles.
     let dirty: Map<string, TileRef> | 'all' = 'all';
+    // Realtime pixels the far view paints over its images, which lag behind (WEB-03d).
+    const recent = new RecentPixels();
+    const isFar = () => overview !== undefined && controller.current.zoom < FAR_ZOOM;
 
     const showStatus = () => {
       const camera = controller.current;
@@ -124,7 +138,18 @@ export function PixelCanvas({ live, tool = 'inspect', stroke, preview, selected 
         layerDirty = false;
         drawLayer(layerContext, controller.current, viewport, pixelRatio, preview.keys(), (tx, ty) => layerImages.get(tx, ty));
       }
-      if (redraw === 'all') {
+      if (isFar()) {
+        // Far view: images of the pyramid level that suits the zoom, redrawn as a whole.
+        const camera = controller.current;
+        const level = overviewLevel(camera.zoom);
+        overview!.show(level, visibleCells(camera, viewport, level));
+        const pixels = recent.inside(visiblePixels(camera, viewport));
+        drawOverview(context, camera, viewport, pixelRatio, level, (l, cx, cy) => overview!.get(l, cx, cy), pixels, gridRef.current);
+        placeMarker();
+        showStatus();
+        // No region is loaded; the deltas listener follows every region past 30.
+        live.viewportChanged(visiblePixels(camera, viewport), true);
+      } else if (redraw === 'all') {
         drawViewport(context, controller.current, viewport, pixelRatio, lookup, gridRef.current);
         placeMarker();
         showStatus();
@@ -149,10 +174,20 @@ export function PixelCanvas({ live, tool = 'inspect', stroke, preview, selected 
       schedule();
     };
     applyGridRef.current();
+    fitRef.current = () => {
+      if (boundsRef.current) controller.moveTo(fitCamera(boundsRef.current, viewport));
+    };
     // A delta repaints only the tiles it touches; a new canvas version repaints everything.
     const unsubscribe = live.subscribe((change) => {
       if (change === 'all') {
         images.clear();
+        overview?.clear();
+        recent.clear();
+        schedule();
+        return;
+      }
+      if (isFar()) {
+        for (const tile of change) images.invalidate(tile.tx, tile.ty);
         schedule();
         return;
       }
@@ -161,6 +196,12 @@ export function PixelCanvas({ live, tool = 'inspect', stroke, preview, selected 
         if (dirty !== 'all') dirty.set(`${tile.tx},${tile.ty}`, tile);
       }
       request();
+    });
+    const unsubscribePixels = live.subscribePixels?.((pixels) => recent.add(pixels, Date.now()));
+    // A new image shows the realtime pixels older than it: they are no longer painted over it.
+    const unsubscribeOverview = overview?.subscribe((area, askedAt) => {
+      recent.covered(area, askedAt);
+      if (isFar()) schedule();
     });
     // The preview only redraws its own layer.
     const unsubscribeLayer = preview?.subscribe((change) => {
@@ -261,6 +302,9 @@ export function PixelCanvas({ live, tool = 'inspect', stroke, preview, selected 
       if (frame !== 0) cancelAnimationFrame(frame);
       unsubscribe();
       unsubscribeLayer?.();
+      unsubscribePixels?.();
+      unsubscribeOverview?.();
+      fitRef.current = () => {};
       observer.disconnect();
       canvas.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('pointermove', onPointerMove);
@@ -273,7 +317,7 @@ export function PixelCanvas({ live, tool = 'inspect', stroke, preview, selected 
       endStroke();
       canvas.removeEventListener('keydown', onKeyDown);
     };
-  }, [live, preview]);
+  }, [live, preview, overview]);
 
   return (
     <div className="pixel-canvas">
@@ -287,6 +331,11 @@ export function PixelCanvas({ live, tool = 'inspect', stroke, preview, selected 
       <canvas ref={layerRef} className="pixel-canvas__layer" aria-hidden="true" />
       <div ref={markerRef} className="pixel-canvas__marker" hidden aria-hidden="true" />
       <output ref={statusRef} className="pixel-canvas__status" aria-live="off" />
+      {bounds && (
+        <button type="button" className="auth__button pixel-canvas__fit" onClick={() => fitRef.current()}>
+          Voir tout le dessin
+        </button>
+      )}
     </div>
   );
 }

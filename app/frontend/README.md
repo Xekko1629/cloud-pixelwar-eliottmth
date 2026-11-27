@@ -60,10 +60,30 @@ de 1024 × 1024 pixels (16 × 16 tuiles), chargées par `GET /api/regions/{rx}/{
 - Une région en échec est redemandée 10 s plus tard si elle est toujours visible ;
   après une coupure du temps réel ou du réseau, les régions visibles sont redemandées
   ([coupure et reprise](../../docs/realtime.md#coupure-et-reprise-draw-03b)).
-- Au-delà de 30 régions visibles (vue éloignée, WEB-03d), rien n'est chargé. Avec le
-  zoom minimal actuel (×1), un écran 2560 × 1440 en montre au plus 12.
+- Sous le zoom ×1, la [vue éloignée](#vue-éloignée-web-03d) remplace les tuiles : aucune
+  région n'est chargée. Au zoom ×1, un écran 2560 × 1440 montre au plus 12 régions.
 - `/admin clear` (nouvelle `canvas_version`) oublie toutes les régions et recharge
   celles qui sont visibles.
+
+## Vue éloignée (WEB-03d)
+
+Sous le zoom ×1, la toile affiche les images de la pyramide (DATA-05c,
+[docs/overview.md](../../docs/overview.md)) au lieu des tuiles (`src/canvas/overview.ts`) :
+
+- **Niveau selon le zoom** : le niveau le plus grossier dont un pixel d'image couvre encore
+  au moins un pixel d'écran. Niveau 1 de ×1 à ×1/4, niveau 2 jusqu'à ×1/16, niveau 3 jusqu'à
+  ×1/64, le dézoom minimal : la grille est infinie, on s'y déplace sans fin mais sans tout
+  voir d'un coup.
+- **Images** : `GET /api/overview/{niveau}/{cx}/{cy}` (session) donne une URL signée de
+  15 minutes, puis le navigateur charge l'image depuis Cloud Storage (`img-src` de la CSP).
+  Une zone vide n'a pas d'image (404) et reste blanche. Au plus 160 images en mémoire.
+- **Temps réel** : le listener suit toutes les régions et les pixels reçus sont peints
+  par-dessus les images, un pixel d'écran au moins. Le worker reconstruit les images chaque
+  minute : une image affichée depuis plus de 2 minutes est redemandée au prochain dessin de
+  la toile (déplacement ou delta), jamais par minuterie. Un pixel reçu cesse d'être peint
+  par-dessus quand une image demandée au moins 3 minutes après lui est arrivée.
+- **« Voir tout le dessin »** : le bouton cadre la zone peinte (`config/global.bounds`),
+  avec une marge, dans les limites du zoom.
 
 ## Pause et grille bornée en temps réel (DRAW-04)
 
