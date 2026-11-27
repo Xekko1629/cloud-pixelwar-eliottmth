@@ -50,9 +50,11 @@ pixels validés, même si certains sont ignorés car déjà dépassés.
 
 Les refus `paused`, `expired`, `out_of_bounds`, `batch_budget_exceeded` et
 `rate_limit` produisent un résultat durable `pixel-rejected`, sans dessin ni
-consommation supplémentaire. Le lot est refusé en entier. Un utilisateur déjà
-présent reçoit aussi un `last_rejection` ; un document utilisateur absent n'est
-pas créé pour un refus.
+consommation supplémentaire. Le lot est refusé en entier. Le refus est écrit dans
+`users/{uid}.last_rejection` ; un dessin accepté le remet à `null`. Si le document
+n'existe pas encore (première action refusée, par exemple pendant une pause), il est
+créé sans rien consommer : fenêtre courante, `used_pixels = 0`, limite effective
+(override compris). Le navigateur peut ainsi expliquer ce premier refus (DRAW-04).
 
 Une configuration invalide, une tuile corrompue, un ID réutilisé ou une panne
 Firestore lèvent une erreur. L'adaptateur HTTP devra conserver ces traitements
