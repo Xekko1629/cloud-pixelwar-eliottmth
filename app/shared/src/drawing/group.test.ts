@@ -199,13 +199,24 @@ describe('createGroupDrawProcessor', () => {
     expect(tx.update.mock.calls.length).toBe(updates);
   });
 
-  it('reports the attempts and read times of the transaction, retries included', async () => {
+  it('fits a full group of 128 pixels of one stroke in one transaction (MAX_DRAW_GROUP of the draw-worker)', async () => {
+    const { db, store } = fakeStore({ default_limit_per_minute: 1000 });
+    // A brush stroke: 128 neighbouring pixels across 2 tiles of 64 x 64.
+    const commands = Array.from({ length: 128 }, (_, i) => input({ pixels: [{ x: 60 + (i % 8), y: Math.floor(i / 8), color: 1 }] }));
+    const results = await createGroupDrawProcessor(db, { now: () => now })(commands);
+    expect(results.every((result) => result.type === 'pixel-processed' && result.applied_pixels === 1)).toBe(true);
+    expect([...store.keys()].filter((path) => path.startsWith('processed_events/'))).toHaveLength(128);
+  });
+
+  it('replays a transaction aborted on contention and reports its attempts and read times', async () => {
     const { db } = fakeStore();
     const run = db.runTransaction.bind(db);
-    // First attempt aborted by Firestore after its reads, as on contention; the SDK replays it.
+    let aborted = false;
+    // First attempt aborted by Firestore after its reads, as on contention; runDrawTransaction replays it.
     (db as unknown as { runTransaction: typeof run }).runTransaction = (async (work: Parameters<typeof run>[0]) => {
-      await run(async (tx) => { await work(tx); throw new Error('ABORTED'); }).catch(() => undefined);
-      return run(work);
+      if (aborted) return run(work);
+      aborted = true;
+      await run(async (tx) => { await work(tx); throw Object.assign(new Error('ABORTED'), { code: 10 }); });
     }) as typeof run;
     const timings: unknown[] = [];
     await createGroupDrawProcessor(db, { now: () => now }, (timing) => { timings.push({ ...timing }); })(

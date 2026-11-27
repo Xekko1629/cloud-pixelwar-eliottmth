@@ -21,7 +21,7 @@ flowchart LR
 | --- | --- | --- |
 | `discord-proxy` | `infra/serverless/discord-proxy.tf` | Go (ADR-0016), `min_instances = 0` : le proxy Node avait besoin d'une instance toujours prête (3,03 s à froid pour une limite Discord de 3 s) ; le binaire Go répond en 5 à 11 ms en local. Revenir à 1 si le premier appel à froid mesuré en dev dépasse 1 s |
 | `command-worker` | `infra/serverless/discord-command.tf` | Remplace le worker de diagnostic `discord-command-verify`, supprimé. Concurrence 8 |
-| `draw-worker` | `infra/serverless/draw-path.tf` | `concurrency = 32`, `draw_worker_max_instances` instances maximum (5 par défaut), timeout 300 s, `roles/datastore.user` |
+| `draw-worker` | `infra/serverless/draw-path.tf` | `concurrency = 128`, `draw_worker_max_instances` instances maximum (5 par défaut), timeout 300 s, `roles/datastore.user` |
 | `discord-notifier` | `infra/serverless/draw-path.tf` | Timeout 30 s, concurrence 8, abonné à `pixel-processed` et `pixel-rejected` |
 | Topics `pixel-draw`, `pixel-processed`, `pixel-rejected` | `infra/serverless/draw-path.tf` | Un seul publisher par topic : le runtime du producteur |
 | 4 abonnements push, chacun avec sa DLQ | module `modules/push-subscription` | `command-worker`, `draw-worker`, `discord-notifier-processed`, `discord-notifier-rejected` |
@@ -30,7 +30,7 @@ flowchart LR
 
 Paramètres communs à chaque abonnement (docs/events.md, section 7.2) : push OIDC
 avec l'invoker dédié du worker, audience égale à son URI, retry de 10 à 60 s,
-DLQ après environ 5 tentatives (10 pour `draw-worker`), rétention de 7 jours, abonnement
+DLQ après environ 5 tentatives (20 pour `draw-worker`), rétention de 7 jours, abonnement
 `<abonnement>-dlq-inspect` pour lire la DLQ. L'alerte « DLQ non vide »
 (`infra/serverless/alerts.tf`) ouvre un incident dès qu'un message y arrive.
 

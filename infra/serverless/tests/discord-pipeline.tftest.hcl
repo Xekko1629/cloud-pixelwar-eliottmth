@@ -160,11 +160,11 @@ run "delivery_wires_the_draw_path" {
   }
   assert {
     condition = (
-      module.draw_worker_subscription[0].max_delivery_attempts == 10 &&
+      module.draw_worker_subscription[0].max_delivery_attempts == 20 &&
       module.command_worker_subscription[0].max_delivery_attempts == 5 &&
       module.notifier_processed_subscription[0].max_delivery_attempts == 5
     )
-    error_message = "Only the draw-worker, saturated by 500-pixel strokes, keeps a message 10 attempts before its DLQ."
+    error_message = "Only the draw-worker, saturated by 500-pixel strokes, keeps a message 20 attempts before its DLQ (a 429 counts as a delivery)."
   }
   assert {
     condition = (

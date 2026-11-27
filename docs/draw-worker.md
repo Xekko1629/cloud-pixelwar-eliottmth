@@ -120,7 +120,7 @@ Profil du Terraform dev (`infra/serverless/draw-path.tf`) :
 
 ```hcl
 service_type    = "worker"
-concurrency     = 32
+concurrency     = 128
 min_instances   = 0
 max_instances   = var.draw_worker_max_instances   # 5 par défaut, de 1 à 10
 timeout_seconds = 300
@@ -134,6 +134,27 @@ memory          = "512Mi"
 et Cloud Run refusait les autres livraisons (« no available instance »), d'où des
 relivraisons et un pixel en DLQ. Le traitement réel d'un pixel ne prenait que 0,2 s.
 
+**Pourquoi 128 (27/11).** Avec 32, un seul joueur qui dessine 5 000 pixels produisait
+environ 300 transactions, qui écrivent toutes `users/{uid}` : sur 5 instances, 81 % étaient
+annulées par Firestore puis rejouées (mesure du 27/11 à 14:08 UTC). Avec 128 pixels par
+groupe, il y a 4 fois moins de transactions pour le même tracé. Un groupe de 128 pixels
+voisins tient dans le budget de 450 documents (`group.test.ts`) ; un groupe qui le
+dépasse est traité pixel par pixel.
+
+**Reprises rapides** (`app/shared/src/drawing/retry.ts`). Une transaction annulée
+(`ABORTED`, contention) était rejouée par le SDK après 1 s, puis 1,5 s, puis 2,25 s… : la
+transaction médiane prenait 4,6 s pour 0,3 s de travail. `runDrawTransaction` fait une
+seule tentative SDK à la fois et rejoue elle-même, jusqu'à 10 fois, après une attente
+aléatoire entre 0 et min(400, 25 × 2ⁿ⁻¹) ms : au pire environ 2,4 s d'attente au total.
+Elle reprend les mêmes codes d'erreur que le SDK ; une erreur métier n'est jamais rejouée.
+Les deux chemins (pixel seul et groupe) l'utilisent.
+
+**20 livraisons avant la DLQ.** Un refus `429` de Cloud Run compte comme une livraison :
+à 56 instances, 1 961 pixels sont partis en DLQ après 10 livraisons (27/11, 13:13–13:23
+UTC). Avec 20, le délai total peut dépasser les 15 minutes du token Discord : le pixel
+est quand même posé, seule la réponse Discord est sautée (`discord-notifier` acquitte un
+token expiré).
+
 Mesures avant et après : [protocole de mesure du débit](draw-throughput.md).
 
 **Regroupement d'écriture** ([ADR-0014](adr/0014-un-evenement-par-pixel.md)) :
@@ -143,7 +164,7 @@ Mesures avant et après : [protocole de mesure du débit](draw-throughput.md).
 - Un pixel qui trouve l'instance libre part tout de suite, seul, avec la transaction
   d'origine : aucune attente ajoutée quand l'activité est faible.
 - Les pixels qui arrivent pendant une transaction forment le groupe suivant, au plus
-  32 (`MAX_DRAW_GROUP`, égal à la concurrence). Le groupe est appliqué en **une**
+  128 (`MAX_DRAW_GROUP`, égal à la concurrence). Le groupe est appliqué en **une**
   transaction (`app/shared/src/drawing/group.ts`) : `users/{uid}`, chaque tuile,
   `config/global` et un delta par région ne sont écrits qu'une fois.
 - Chaque pixel garde son message Pub/Sub, sa déduplication par `event_id`, sa
@@ -168,7 +189,7 @@ Champs de ces deux lignes, pour savoir où passe le temps d'un groupe :
 | `group_size` | Pixels du groupe |
 | `wait_ms` | Attente du plus vieux pixel du groupe dans l'instance, le temps que la transaction précédente finisse |
 | `attempts` | Tentatives de la transaction ; plus de 1 : Firestore l'a annulée (contention) et le SDK l'a rejouée |
-| `read_processed_ms` | Lecture des `processed/{event_id}` (déduplication), dernière tentative |
+| `read_processed_ms` | Lecture des `processed_events/{event_id}` (déduplication), dernière tentative |
 | `read_people_ms` | Lecture de `config/global`, des `users/{uid}` et des surcharges de quota, dernière tentative |
 | `read_tiles_ms` | Lecture des tuiles, dernière tentative (0 si aucun pixel n'arrive jusqu'aux tuiles) |
 | `transaction_ms` | Durée totale de la transaction, reprises comprises |

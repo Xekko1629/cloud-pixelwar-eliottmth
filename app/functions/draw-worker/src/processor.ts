@@ -8,9 +8,12 @@ export type ProcessDraw = (command: DrawCommand) => Promise<DrawResult>;
 /**
  * Same value as the Cloud Run concurrency of the draw-worker (infra/serverless/draw-path.tf):
  * an instance never holds more requests than that, so a larger group could not form.
- * 32 pixels stay far below the 450-document budget of a transaction.
+ * 128 pixels leave room for their tiles, deltas and users in the 450-document budget of a
+ * transaction; a group above it falls back to one transaction per pixel (DrawGroupTooLargeError).
+ * 32 (until 27/11) meant about 300 transactions for 5 000 pixels of one user, each one
+ * colliding on users/{uid}: 4 times fewer with 128.
  */
-export const MAX_DRAW_GROUP = 32;
+export const MAX_DRAW_GROUP = 128;
 
 /** Group commit of ADR-0014: concurrent pushes of one instance share one Firestore transaction. */
 export function createLazyDrawProcessor(projectId: string, write?: (line: string) => void): ProcessDraw {
