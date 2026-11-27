@@ -106,4 +106,30 @@ describe('CanvasController', () => {
     c.moveTo({ x: 9, y: 9, zoom: 2 });
     expect(onChange).toHaveBeenCalledWith({ x: 9, y: 9, zoom: 2 });
   });
+
+  describe('taps', () => {
+    it('reports a press that barely moved as a tap, where it started', () => {
+      const c = new CanvasController(() => viewport, () => {});
+      c.pointerDown(1, { x: 10, y: 10 });
+      c.pointerMove(1, { x: 13, y: 12 });
+      expect(c.pointerUp(1)).toEqual({ x: 10, y: 10 });
+    });
+
+    it('is not a tap after a drag, a second finger or a cancel', () => {
+      const c = new CanvasController(() => viewport, () => {});
+      c.pointerDown(1, { x: 10, y: 10 });
+      c.pointerMove(1, { x: 40, y: 10 });
+      expect(c.pointerUp(1)).toBeNull();
+
+      c.pointerDown(1, { x: 10, y: 10 });
+      c.pointerDown(2, { x: 50, y: 50 });
+      expect(c.pointerUp(2)).toBeNull();
+      expect(c.pointerUp(1)).toBeNull();
+
+      c.pointerDown(3, { x: 10, y: 10 });
+      c.pointerCancel(3);
+      expect(c.pointerUp(3)).toBeNull();
+      expect(c.dragging).toBe(false);
+    });
+  });
 });
