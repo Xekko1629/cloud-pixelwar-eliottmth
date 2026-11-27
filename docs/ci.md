@@ -38,6 +38,7 @@ tag ; la convention de signature et les protections GitHub sont distinctes.
 | `_fmt.yml`, `_lint.yml` | Format Terraform et règles tflint |
 | `_validate.yml`, `_test.yml` | Validation et tests Terraform par stack/module |
 | `_plan.yml` | Plan PR avec l'identité de lecture de `<env>-plan` |
+| `_security.yml` | gitleaks sur tout l'historique ([secrets et dépendances](#secrets-et-dépendances)) |
 | `_apply.yml` | Authentification, build serverless, plan et apply du stack |
 | `_destroy.yml` | Authentification, build serverless pour rafraîchir les archives, puis destroy |
 | `deploy.yml`, `destroy.yml` | Orchestration et choix des environnements/stacks |
@@ -228,6 +229,51 @@ release vers prd. Pour vérifier à la main :
 ```sh
 scripts/check-no-public.sh cloud-pixelwar-dev
 ```
+
+## Secrets et dépendances
+
+- **Aucun secret dans le dépôt** : le job `security` (`_security.yml`) lance gitleaks
+  sur tout l'historique à chaque PR, quels que soient les fichiers modifiés, et compte
+  dans `CI result`. Les faux positifs connus sont listés dans `.gitleaksignore`, avec
+  leur raison. En local, le hook `pre-commit` lance gitleaks sur ce qui est indexé
+  (`just leaks`).
+- **Permissions minimales** : `contents: read` au niveau de chaque workflow, y compris
+  les workflows réutilisables. `id-token: write` est donné job par job, seulement aux
+  plans et aux applies qui s'authentifient à GCP.
+
+### Dépendances open source
+
+| Dépendance | Où | Pourquoi |
+| --- | --- | --- |
+| `actions/checkout`, `setup-node`, `setup-java`, `setup-go`, `setup-python`, `cache`, `upload-artifact`, `download-artifact` | workflows | Actions officielles GitHub : récupération du code, environnements de build et de test, rapports. |
+| `actions/create-github-app-token` | `_apply.yml`, `_destroy.yml` | Token d'installation de courte durée pour la GitHub App des runners. |
+| `google-github-actions/auth` | plans et applies | Fédération d'identité Workload Identity, sans clé de compte de service. |
+| `hashicorp/setup-terraform`, `terraform-linters/setup-tflint` | workflows Terraform | Terraform et tflint aux versions fixées. |
+| `dorny/paths-filter` | `ci.yml` | Ne vérifier et planifier que les stacks modifiés. |
+| `docker/setup-buildx-action` | `_frontend-image.yml` | Build reproductible de l'image du frontend en archive OCI. |
+| gitleaks | `_security.yml`, hook `pre-commit` | Détection de secrets dans l'historique. |
+| Providers `hashicorp/google`, `google-beta`, `helm`, `integrations/github` | `infra/*` | Ressources GCP, API Gateway (beta), releases Helm des runners, accès GitHub. Versions verrouillées par `.terraform.lock.hcl`. |
+| Plugin tflint `google` | `.tflint.hcl` | Règles propres aux ressources GCP. |
+| Charts `gha-runner-scale-set-controller` et `gha-runner-scale-set` (ARC), `external-secrets` | `infra/runners` | Runners auto-hébergés éphémères, secret de la GitHub App lu dans Secret Manager. Versions fixées par variable. |
+| `@google-cloud/functions-framework`, `@google-cloud/firestore`, `@google-cloud/pubsub`, `google-auth-library` | fonctions, `app/shared` | Runtime des fonctions et clients officiels GCP. |
+| `@opentelemetry/*` | `app/shared`, proxy Go | Traces et métriques OTLP (`docs/observability.md`). |
+| `github.com/GoogleCloudPlatform/functions-framework-go`, `go.opentelemetry.io/otel/*` | `app/go/discord-proxy` | Runtime Go du proxy Discord (ADR-0016) et sa télémétrie. |
+| `react`, `react-dom`, `firebase` | `app/frontend` | Interface, et listeners Firestore en lecture seule (ADR-0015). |
+| `vite`, `vitest`, `typescript`, `esbuild`, `tsx`, `jsdom`, `firebase-tools`, `@firebase/rules-unit-testing` | outillage `app/` | Build, tests, émulateurs et tests des Security Rules. Jamais livrés en production. |
+| Images `node` (build) et `nginxinc/nginx-unprivileged` | `app/frontend/Dockerfile` | Build du frontend, puis service statique sans root. Épinglées par tag et digest. |
+
+Les versions npm et Go directes sont fixées dans les `package.json` et `go.mod`,
+les transitives par `app/package-lock.json` et `go.sum`.
+
+Toutes sont utilisées et maintenues (vérifié le 27/11/2026 : aucun projet abandonné,
+une release ou un commit dans les derniers mois, éditeur officiel pour la plupart). Deux
+cas à connaître :
+
+- `@google-cloud/firestore`, `@google-cloud/pubsub` et `google-auth-library` : leurs
+  anciens dépôts GitHub sont archivés car Google les a déplacés dans le monorepo
+  `googleapis/google-cloud-node`, où ils sont publiés chaque mois.
+- `functions-framework-go` : pas de release depuis mars 2025, mais c'est le framework
+  officiel de Google, requis par le runtime Go de Cloud Run functions, avec une API stable.
 
 ## Vérification, concurrence et diagnostic
 

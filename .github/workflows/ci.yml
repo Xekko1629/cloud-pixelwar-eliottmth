@@ -191,6 +191,10 @@ jobs:
   application:
     uses: ./.github/workflows/_app-test.yml
 
+  # No secret anywhere in the history, whatever the PR changes
+  security:
+    uses: ./.github/workflows/_security.yml
+
   # Every component declared in Terraform is drawn, and the committed diagram is up to date
   # (docs/architecture/diagram.py). Standard library only: no Graphviz, no write permission.
   diagram:
@@ -207,7 +211,7 @@ jobs:
   # Always reported, even when every other job is skipped: use it as the required status check
   result:
     name: CI result
-    needs: [changes, fmt, lint, validate, test, plan, plan-serverless, plan-bootstrap, plan-gateway, frontend-image, plan-frontend, application, diagram]
+    needs: [changes, fmt, lint, validate, test, plan, plan-serverless, plan-bootstrap, plan-gateway, frontend-image, plan-frontend, application, security, diagram]
     if: always()
     runs-on: ubuntu-latest
     steps:
