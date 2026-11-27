@@ -144,6 +144,18 @@ variable "realtime_extra_referrers" {
   }
 }
 
+variable "enable_overview" {
+  description = "Far-view pyramid (DATA-05c): overview-worker, its Cloud Scheduler tick and the signed URLs of the tile-reader; needs the web API and the /draw delivery"
+  type        = bool
+  default     = false
+}
+
+variable "overview_schedule" {
+  description = "Cron schedule of the overview-tick job (UTC)"
+  type        = string
+  default     = "* * * * *"
+}
+
 variable "alert_notification_channels" {
   description = "Monitoring notification channels of the alerts (OBS-01); empty: incidents are only shown in the console"
   type        = list(string)

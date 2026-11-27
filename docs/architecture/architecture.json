@@ -202,7 +202,7 @@
       "label": "overview-tick",
       "view": "application",
       "group": "Pub/Sub · suites",
-      "status": "planned",
+      "status": "deployed",
       "terraform": [
         "serverless:module.overview_tick"
       ]
@@ -212,9 +212,9 @@
       "label": "Cloud Scheduler",
       "view": "application",
       "group": "Pub/Sub · suites",
-      "status": "planned",
+      "status": "deployed",
       "terraform": [
-        "serverless:google_cloud_scheduler_job.overview"
+        "serverless:google_cloud_scheduler_job.overview_tick"
       ]
     },
     {
@@ -292,7 +292,7 @@
       "label": "overview-worker",
       "view": "application",
       "group": "Workers · étape 2 (ingress interne)",
-      "status": "planned",
+      "status": "deployed",
       "terraform": [
         "serverless:module.overview_worker"
       ]
@@ -776,21 +776,35 @@
       "to": "t_overview",
       "label": "publish",
       "kind": "event",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "t_overview",
       "to": "overview_worker",
       "label": "push OIDC",
       "kind": "event",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "overview_worker",
       "to": "b_overview",
       "label": "images basse résolution",
       "kind": "request",
-      "status": "planned"
+      "status": "deployed"
+    },
+    {
+      "from": "overview_worker",
+      "to": "firestore",
+      "label": "deltas et tuiles (lecture)",
+      "kind": "read",
+      "status": "deployed"
+    },
+    {
+      "from": "tile_reader",
+      "to": "b_overview",
+      "label": "URL signées (15 min)",
+      "kind": "read",
+      "status": "deployed"
     },
     {
       "from": "t_discord_command",

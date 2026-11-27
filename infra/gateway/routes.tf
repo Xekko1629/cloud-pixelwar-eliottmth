@@ -87,6 +87,15 @@ locals {
       cors         = true
     },
     {
+      # Far-view pyramid (DATA-05c): a 15-minute signed URL of one image of the overview bucket.
+      path         = "/api/overview/{level}/{cx}/{cy}"
+      method       = "get"
+      backend      = "tiles"
+      operation_id = "overviewImage"
+      summary      = "Signed URL of one 256x256 far-view image (levels 1 to 3)"
+      cors         = true
+    },
+    {
       # Temporary end-to-end check of the C05 checklist (SRV-09, #39): called through
       # the gateway with authentication, hence the default session auth.
       path         = "/hello"

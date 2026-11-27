@@ -17,3 +17,6 @@ enable_web_api = true
 # the browser key too: the Security Rules still only allow reading deltas and config/global.
 enable_realtime          = true
 realtime_extra_referrers = ["http://localhost:5173/*"]
+
+# Far-view pyramid (DATA-05c): overview-worker every minute and signed URLs of the tile-reader.
+enable_overview = true

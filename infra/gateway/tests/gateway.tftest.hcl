@@ -187,10 +187,12 @@ run "web_backends_publish_draw_and_reads" {
       "GET /api/regions/{rx}/{ry}/tiles (session)",
       "GET /api/tiles/{tx}/{ty}/meta (session)",
       "GET /api/state (session)",
+      "GET /api/overview/{level}/{cx}/{cy} (session)",
       "OPTIONS /api/pixels (none)",
       "OPTIONS /api/regions/{rx}/{ry}/tiles (none)",
       "OPTIONS /api/tiles/{tx}/{ty}/meta (none)",
       "OPTIONS /api/state (none)",
+      "OPTIONS /api/overview/{level}/{cx}/{cy} (none)",
     ])
     error_message = "The web backends publish the draw route and the three grid reads behind the session JWT, plus their unauthenticated CORS preflights."
   }
