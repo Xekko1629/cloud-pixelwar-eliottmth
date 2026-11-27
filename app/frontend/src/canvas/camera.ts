@@ -30,9 +30,11 @@ export interface PixelRect {
   max_y: number;
 }
 
-// Below MIN_ZOOM the far view takes over (WEB-03d): at zoom 1, a 2560×1440 screen shows
-// about 920 tiles, well under the image cache. MAX_ZOOM shows one pixel as a large square.
-export const MIN_ZOOM = 1;
+// Below zoom 1 the far view takes over (WEB-03d, canvas/overview.ts). MIN_ZOOM stops at the
+// last level of the pyramid, where one image pixel covers 64 × 64 grid pixels: the grid is
+// infinite, one moves across it but never sees all of it at once. MAX_ZOOM shows one pixel
+// as a large square.
+export const MIN_ZOOM = 1 / 64;
 export const MAX_ZOOM = 64;
 export const DEFAULT_ZOOM = 4;
 
@@ -90,6 +92,19 @@ export function zoomAt(camera: Camera, viewport: Viewport, factor: number, ancho
     x: world.x - (anchor.x - viewport.width / 2) / zoom,
     y: world.y - (anchor.y - viewport.height / 2) / zoom,
     zoom,
+  });
+}
+
+// Camera that shows the whole rectangle, within the zoom limits ("voir tout le dessin").
+export function fitCamera(area: PixelRect, viewport: Viewport, maxZoom = DEFAULT_ZOOM): Camera {
+  const width = area.max_x - area.min_x + 1;
+  const height = area.max_y - area.min_y + 1;
+  // A margin of 10 % around the drawing.
+  const zoom = Math.min(viewport.width / width, viewport.height / height) * 0.9;
+  return clampCamera({
+    x: (area.min_x + area.max_x + 1) / 2,
+    y: (area.min_y + area.max_y + 1) / 2,
+    zoom: Math.min(zoom, maxZoom),
   });
 }
 

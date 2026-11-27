@@ -18,8 +18,11 @@ export type TileChange = readonly TileKey[] | 'all';
 /** What PixelCanvas needs from the realtime: tiles to draw, and redraw notifications. */
 export interface CanvasUpdates {
   readonly source: TileColorsSource;
-  viewportChanged(rect: { min_x: number; min_y: number; max_x: number; max_y: number }): void;
+  // far: the far view is shown (WEB-03d), the regions are not loaded.
+  viewportChanged(rect: { min_x: number; min_y: number; max_x: number; max_y: number }, far?: boolean): void;
   subscribe(listener: (change: TileChange) => void): () => void;
+  // Every realtime pixel as it arrives, for the far view drawn over images.
+  subscribePixels?(listener: (pixels: ReadonlyArray<{ x: number; y: number; color: number }>) => void): () => void;
 }
 
 export interface RealtimeState {
@@ -36,6 +39,7 @@ export class LiveCanvas implements CanvasUpdates {
   // Realtime pixels received while their region loads: the answer may predate them.
   private readonly pending = new Map<string, Array<{ x: number; y: number; color: number }>>();
   private readonly tileListeners = new Set<(change: TileChange) => void>();
+  private readonly pixelListeners = new Set<(pixels: ReadonlyArray<{ x: number; y: number; color: number }>) => void>();
   private readonly stateListeners = new Set<() => void>();
   private state: RealtimeState;
   private feed: RealtimeFeed | null = null;
@@ -105,6 +109,7 @@ export class LiveCanvas implements CanvasUpdates {
           const { tx, ty } = locatePixel(pixel.x, pixel.y);
           this.pending.get(regionKey(regionOfTile(tx, ty)))?.push(pixel);
         }
+        for (const listener of this.pixelListeners) listener(pixels);
         const changed = this.tiles.apply(pixels);
         if (changed.length > 0) this.notify(changed);
       },
@@ -118,15 +123,20 @@ export class LiveCanvas implements CanvasUpdates {
     if (this.viewport) this.feed.setViewport(this.viewport);
   }
 
-  viewportChanged(rect: { min_x: number; min_y: number; max_x: number; max_y: number }): void {
+  viewportChanged(rect: { min_x: number; min_y: number; max_x: number; max_y: number }, far = false): void {
     this.viewport = rect;
-    this.regions.show(rect);
+    this.regions.show(rect, far);
     this.feed?.setViewport(rect);
   }
 
   subscribe(listener: (change: TileChange) => void): () => void {
     this.tileListeners.add(listener);
     return () => this.tileListeners.delete(listener);
+  }
+
+  subscribePixels(listener: (pixels: ReadonlyArray<{ x: number; y: number; color: number }>) => void): () => void {
+    this.pixelListeners.add(listener);
+    return () => this.pixelListeners.delete(listener);
   }
 
   stop(): void {

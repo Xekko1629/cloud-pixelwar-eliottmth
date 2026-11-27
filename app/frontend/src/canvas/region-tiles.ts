@@ -106,8 +106,9 @@ export class RegionTileStore implements TileColorsSource {
   }
 
   /** The canvas shows these pixels: request the missing regions, release the others. */
-  show(rect: { min_x: number; min_y: number; max_x: number; max_y: number }): void {
-    this.visible = visibleRegions(rect)?.map(parse) ?? null;
+  // far: the far view shows images (WEB-03d), no region is loaded whatever their number.
+  show(rect: { min_x: number; min_y: number; max_x: number; max_y: number }, far = false): void {
+    this.visible = far ? null : visibleRegions(rect)?.map(parse) ?? null;
     this.load();
   }
 

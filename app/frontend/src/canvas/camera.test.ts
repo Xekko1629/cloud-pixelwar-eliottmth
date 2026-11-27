@@ -4,6 +4,7 @@ import {
   MAX_ZOOM,
   MIN_ZOOM,
   clampCamera,
+  fitCamera,
   initialCamera,
   pan,
   pixelAt,
@@ -54,6 +55,14 @@ describe('camera', () => {
     expect(zoomAt(initialCamera(), viewport, 1e-6, { x: 0, y: 0 }).zoom).toBe(MIN_ZOOM);
     expect(clampCamera({ x: 5e9, y: -5e9, zoom: 4 })).toEqual({ x: COORDINATE_LIMIT + 1, y: -COORDINATE_LIMIT, zoom: 4 });
     expect(pixelAt({ x: COORDINATE_LIMIT + 1, y: 0, zoom: 1 }, viewport, { x: 799, y: 300 })).toBeNull();
+  });
+
+  it('frames a drawing with a margin, within the zoom limits', () => {
+    const camera = fitCamera({ min_x: -100, min_y: 0, max_x: 99, max_y: 49 }, viewport);
+    // 200×50 pixels in 800×600: zoom 4 fits, the default zoom caps it.
+    expect(camera).toEqual({ x: 0, y: 25, zoom: 3.6 });
+    expect(fitCamera({ min_x: 0, min_y: 0, max_x: 0, max_y: 0 }, viewport).zoom).toBe(4);
+    expect(fitCamera({ min_x: -1e8, min_y: 0, max_x: 1e8, max_y: 0 }, viewport).zoom).toBe(MIN_ZOOM);
   });
 
   it('keeps the screen centre on a bounded grid', () => {

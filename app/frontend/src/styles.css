@@ -275,3 +275,10 @@ section.app__status .app__paused {
   cursor: progress;
   opacity: 0.6;
 }
+
+/* "Voir tout le dessin" (WEB-03d): over the canvas, top right. */
+.pixel-canvas__fit {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}

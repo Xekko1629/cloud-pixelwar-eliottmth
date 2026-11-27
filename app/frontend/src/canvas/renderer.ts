@@ -1,5 +1,7 @@
-import { TILE_SIDE, type GridSize } from '@pixelwar/shared/grid';
+import { PALETTE, TILE_SIDE, type GridSize } from '@pixelwar/shared/grid';
+import { overviewSpan, type OverviewLevel } from '@pixelwar/shared/overview';
 import { screenX, screenY, visiblePixels, visibleTiles, type Camera, type PixelRect, type Viewport } from './camera';
+import { visibleCells } from './overview';
 
 // The subset of CanvasRenderingContext2D the renderer uses, so tests can record the calls.
 export interface DrawContext {
@@ -185,6 +187,54 @@ export function drawLayer(
     drawn += 1;
   }
   return drawn;
+}
+
+// Image of a far-view cell, or null for an empty or not yet loaded area (left white).
+export type OverviewLookup = (level: OverviewLevel, cx: number, cy: number) => CanvasImageSource | null;
+
+/**
+ * Far view (WEB-03d): the images of one pyramid level, then the realtime pixels they do not
+ * show yet, one CSS pixel at least so that a single pixel stays visible.
+ */
+export function drawOverview(
+  context: DrawContext,
+  camera: Camera,
+  viewport: Viewport,
+  pixelRatio: number,
+  level: OverviewLevel,
+  image: OverviewLookup,
+  pixels: Iterable<{ x: number; y: number; color: number }>,
+  grid: GridSize | null = null,
+): FrameStats {
+  context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  context.imageSmoothingEnabled = false;
+  context.fillStyle = BACKGROUND;
+  context.fillRect(0, 0, viewport.width, viewport.height);
+
+  const span = overviewSpan(level);
+  const cells = visibleCells(camera, viewport, level);
+  const stats = { tiles: 0, drawn: 0 };
+  for (let cy = cells.min_y; cy <= cells.max_y; cy += 1) {
+    const top = snap(screenY(camera, viewport, cy * span), pixelRatio);
+    const bottom = snap(screenY(camera, viewport, (cy + 1) * span), pixelRatio);
+    for (let cx = cells.min_x; cx <= cells.max_x; cx += 1) {
+      stats.tiles += 1;
+      const picture = image(level, cx, cy);
+      if (picture === null) continue;
+      const left = snap(screenX(camera, viewport, cx * span), pixelRatio);
+      const right = snap(screenX(camera, viewport, (cx + 1) * span), pixelRatio);
+      context.drawImage(picture, left, top, right - left, bottom - top);
+      stats.drawn += 1;
+    }
+  }
+
+  const size = Math.max(camera.zoom, 1);
+  for (const { x, y, color } of pixels) {
+    context.fillStyle = PALETTE[color - 1] ?? BACKGROUND;
+    context.fillRect(Math.floor(screenX(camera, viewport, x)), Math.floor(screenY(camera, viewport, y)), size, size);
+  }
+  drawEdge(context, camera, viewport, pixelRatio, grid);
+  return stats;
 }
 
 // Lines around the pixels of `pixels`, across the whole viewport (a clip may cut them).

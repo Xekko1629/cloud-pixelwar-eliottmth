@@ -34,6 +34,16 @@ describe('RegionTileStore', () => {
     expect(status).toHaveBeenLastCalledWith('signed-out');
   });
 
+  it('loads nothing in the far view, whatever the number of regions', () => {
+    const { fetcher, calls } = deferredFetcher();
+    const status = vi.fn();
+    const store = new RegionTileStore({ status });
+    store.setFetcher(fetcher);
+    store.show(LEFT, true);
+    expect(calls).toHaveLength(0);
+    expect(status).toHaveBeenLastCalledWith('far');
+  });
+
   it('loads each visible region once and serves its tiles', async () => {
     const { fetcher, calls } = deferredFetcher();
     const events = { loading: vi.fn(), loaded: vi.fn(), status: vi.fn() };

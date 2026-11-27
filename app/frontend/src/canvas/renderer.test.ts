@@ -1,6 +1,6 @@
 import { COORDINATE_LIMIT, TILE_SIDE } from '@pixelwar/shared/grid';
 import { describe, expect, it } from 'vitest';
-import { BACKGROUND, GRID_ZOOM, OUTSIDE, drawLayer, drawTiles, drawViewport, type DrawContext } from './renderer';
+import { BACKGROUND, GRID_ZOOM, OUTSIDE, drawLayer, drawOverview, drawTiles, drawViewport, type DrawContext } from './renderer';
 
 interface DrawCall { tile: string; x: number; y: number; width: number; height: number }
 
@@ -37,6 +37,19 @@ function recordingContext() {
 const image = (tx: number, ty: number) => ({ id: `${tx},${ty}` }) as unknown as CanvasImageSource;
 const everyTile = (tx: number, ty: number) => image(tx, ty);
 const viewport = { width: 800, height: 600 };
+
+describe('drawOverview', () => {
+  it('draws the images of the level in view, then the recent pixels on top', () => {
+    const { context, draws, fills } = recordingContext();
+    // Zoom 1/4: level 1 cells of 1024 pixels are 256 CSS pixels wide.
+    const stats = drawOverview(context, { x: 0, y: 0, zoom: 1 / 4 }, viewport, 1, 1,
+      (level, cx, cy) => (cx === 0 && cy === 0 ? image(cx, cy) : null), [{ x: 4, y: 8, color: 2 }]);
+    expect(stats).toEqual({ tiles: 4 * 4, drawn: 1 });
+    expect(draws).toEqual([{ tile: '0,0', x: 400, y: 300, width: 256, height: 256 }]);
+    // One CSS pixel at least for a grid pixel.
+    expect(fills.at(-1)).toEqual({ style: '#E4E4E4', rect: [401, 302, 1, 1] });
+  });
+});
 
 describe('edge of a bounded grid', () => {
   it('greys what lies outside the grid and outlines it', () => {
