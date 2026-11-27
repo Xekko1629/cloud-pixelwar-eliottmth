@@ -20,7 +20,8 @@ describe('createGroupCommit', () => {
     const one = vi.fn(async (input: DrawCommand) => result(input, 'one'));
     const group = vi.fn();
     const onGroup = vi.fn();
-    const process = createGroupCommit(one, group, { max_group: 32, onGroup });
+    // Fixed clock: with the real one, a busy machine can count 1 ms before the drain starts.
+    const process = createGroupCommit(one, group, { max_group: 32, onGroup, now: () => 0 });
     const pending = process(command(1));
     expect(one).toHaveBeenCalledTimes(1); // Synchronously: no timer, no added wait.
     expect(await pending).toMatchObject({ tag: 'one' });

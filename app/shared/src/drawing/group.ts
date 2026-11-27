@@ -11,6 +11,7 @@ import {
   type DrawCommand, type DrawOptions, type DrawResult, type PreparedDraw,
 } from './command';
 import { planTileChanges } from './tiles';
+import { runDrawTransaction } from './retry';
 import { expandedBounds, validateConfig } from './transaction';
 
 /**
@@ -38,8 +39,8 @@ interface Person {
 
 /**
  * Where the time of one group transaction goes (DRAW-05): reads of the LAST attempt, and the
- * whole runTransaction call, retries included. attempts > 1 means Firestore aborted the
- * transaction on contention (another one wrote a document it read) and the SDK replayed it.
+ * whole transaction, retries included (runDrawTransaction). attempts > 1 means Firestore aborted the
+ * transaction on contention (another one wrote a document it read) and it was replayed.
  */
 export interface GroupTiming {
   attempts: number;
@@ -88,7 +89,7 @@ export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {
       try { return await read; } finally { timing[field] = Math.round(performance.now() - started); }
     };
     const started = performance.now();
-    const results = await db.runTransaction(async (tx) => {
+    const results = await runDrawTransaction(db, async (tx) => {
       timing.attempts += 1;
       timing.read_processed_ms = 0; timing.read_people_ms = 0; timing.read_tiles_ms = 0;
       const distinct = [...unique.values()];

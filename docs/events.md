@@ -376,7 +376,7 @@ Chaque abonnement pousse vers l'URL `run.app` de son worker, avec un service acc
 |---|---|---|
 | DLQ | Un topic de DLQ par abonnement | SRV-05 ; ADR-0002 |
 | Abonnement de debug sur la DLQ | Un par DLQ, pour inspecter et rejouer | SRV-05 |
-| Nombre de tentatives avant DLQ | `max_delivery_attempts = 5` par défaut, **10 pour `draw-worker`** : **valeur approximative**, pas une garantie d'un nombre exact d'exécutions. Le test de charge du 26/11 (1 trait de 500 pixels) a saturé les 2 instances du `draw-worker` et envoyé 1 pixel en DLQ après 5 tentatives | SRV-05 ; ADR-0002 (« 5 par défaut ») ; #35 |
+| Nombre de tentatives avant DLQ | `max_delivery_attempts = 5` par défaut, **20 pour `draw-worker`** : **valeur approximative**, pas une garantie d'un nombre exact d'exécutions. Le test de charge du 26/11 (1 trait de 500 pixels) a saturé les 2 instances du `draw-worker` et envoyé 1 pixel en DLQ après 5 tentatives ; le 27/11, à 56 instances, 1 961 pixels sont partis en DLQ après 10 (un `429` compte comme une livraison). Avec 20, le token Discord de 15 minutes peut expirer avant le résultat : le pixel est posé, la réponse Discord est sautée | SRV-05 ; ADR-0002 (« 5 par défaut ») ; #35 |
 | Backoff | Exponentiel, de 10 s à 60 s pour tous les abonnements | SRV-05 ; ADR-0002 ; `modules/push-subscription` |
 | Rétention | Au moins 7 jours | SRV-05 ; `docs/rate-limits.md` (« rejeu Pub/Sub/DLQ (7 jours prévus) ») |
 | Délai d'acquittement | Supérieur au timeout du worker, 600 s au maximum en push : 60 s pour `command-worker` et le notifier, 330 s pour `draw-worker` | ADR-0002 ; #35 ; `docs/deploy-draw-path.md` |

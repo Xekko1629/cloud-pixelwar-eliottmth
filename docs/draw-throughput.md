@@ -3,8 +3,8 @@
 ## Objectif
 
 Depuis l'[ADR-0014](adr/0014-un-evenement-par-pixel.md), chaque pixel est un message
-`pixel-draw`. Le `draw-worker` en regroupe jusqu'à 32 par transaction
-(`concurrency = 32`), avec au plus `draw_worker_max_instances` instances
+`pixel-draw`. Le `draw-worker` en regroupe jusqu'à 128 par transaction
+(`concurrency = 128`), avec au plus `draw_worker_max_instances` instances
 ([profil](draw-worker.md)). Cette mesure répond à deux
 questions, en dev seulement :
 
@@ -101,3 +101,31 @@ du service `draw-worker`.
 - 1 291 refus `429` « no available instance » : 2 instances × 32 places saturées ;
   les relivraisons Pub/Sub (10 à 60 s) font la traîne, jusqu'à 83 s après le clic.
 - Nombre de comptes non relevé (`user_id` absent des logs de `web-proxy`).
+
+**27/11, 14:08:51–14:20:21 UTC, dev, `6576355`, 5 instances × 32, un seul compte**
+(champs de temps de `draw.group.committed`) : 112 requêtes web, dont 106 à 14:11
+(origine à identifier), soit environ 53 000 pixels envoyés ; 8 266 traités, le reste
+supprimé à 14:19:52 (`gcloud pubsub subscriptions seek`).
+
+| Mesure (470 groupes) | Médiane | p90 | p99 |
+| --- | --- | --- | --- |
+| `read_processed_ms` | 18 | 27 | 81 |
+| `read_people_ms` | 14 | 193 | 895 |
+| `read_tiles_ms` | 54 | 167 | 592 |
+| `wait_ms` | 3 827 | 12 510 | 20 088 |
+| `transaction_ms` | 4 614 | 13 989 | 20 199 |
+
+| `attempts` | Groupes | `transaction_ms` moyen |
+| --- | --- | --- |
+| 1 | 89 | 324 |
+| 2 | 92 | 2 309 |
+| 3 | 135 | 5 396 |
+| 4 | 112 | 10 386 |
+| 5 | 42 | 16 607 |
+
+- Débit : environ 12 px/s, soit 2,4 px/s par instance.
+- Les lectures sont rapides ; 81 % des transactions sont rejouées. Presque tout le temps
+  est l'attente du SDK entre deux tentatives, sur le document `users/{uid}` du seul
+  compte (`config/global` n'a pas changé depuis 12:48).
+- Le 13:04–13:05 à 56 instances : 1 961 pixels en DLQ après 10 livraisons.
+- Suite : groupes de 128, reprises rapides, 20 livraisons ([profil](draw-worker.md)).

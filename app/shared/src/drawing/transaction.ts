@@ -11,6 +11,7 @@ import {
   prepareDraw, processingTime, storedResult,
   type DrawCommand, type DrawOptions, type DrawResult, type PreparedDraw,
 } from './command';
+import { runDrawTransaction } from './retry';
 import { planTileChanges } from './tiles';
 
 export function validateConfig(config: GlobalConfigDocument): void {
@@ -37,7 +38,7 @@ export function createDrawProcessor(db: Firestore, options: DrawOptions = {}) {
     const eventRef = ref(`${COLLECTIONS.processed}/${command.event_id}`);
     const userRef = ref(`${COLLECTIONS.users}/${command.author.uid}`);
     const configRef = ref(`${COLLECTIONS.config}/global`);
-    return db.runTransaction(async (tx) => {
+    return runDrawTransaction(db, async (tx) => {
       const existing = await tx.get(eventRef);
       if (existing.exists) return storedResult(existing.data()!, command);
 

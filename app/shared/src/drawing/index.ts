@@ -6,3 +6,4 @@ export {
   DrawProcessingError, MAX_DRAW_AGE_MS, RESULT_RETENTION_MS, MAX_FUTURE_SKEW_MS,
   type DrawCommand, type DrawResult, type DrawOptions,
 } from './command';
+export { runDrawTransaction, isRetryableTransactionError, TRANSACTION_ATTEMPTS } from './retry';
