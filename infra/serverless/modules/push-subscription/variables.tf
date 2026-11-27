@@ -49,6 +49,17 @@ variable "ack_deadline_seconds" {
   }
 }
 
+variable "max_delivery_attempts" {
+  description = "Approximate delivery attempts before the DLQ (Pub/Sub allows 5 to 100)"
+  type        = number
+  default     = 5
+
+  validation {
+    condition     = var.max_delivery_attempts >= 5 && var.max_delivery_attempts <= 100 && floor(var.max_delivery_attempts) == var.max_delivery_attempts
+    error_message = "max_delivery_attempts must be an integer between 5 and 100."
+  }
+}
+
 variable "labels" {
   description = "Labels of the subscriptions and the DLQ topic"
   type        = map(string)

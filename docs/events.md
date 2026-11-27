@@ -378,7 +378,7 @@ Chaque abonnement pousse vers l'URL `run.app` de son worker, avec un service acc
 |---|---|---|
 | DLQ | Un topic de DLQ par abonnement | SRV-05 ; ADR-0002 |
 | Abonnement de debug sur la DLQ | Un par DLQ, pour inspecter et rejouer | SRV-05 |
-| Nombre de tentatives avant DLQ | `max_delivery_attempts = 5` : **valeur approximative**, pas une garantie de cinq exécutions exactes | SRV-05 ; ADR-0002 (« 5 par défaut ») ; #35 |
+| Nombre de tentatives avant DLQ | `max_delivery_attempts = 5` par défaut, **10 pour `draw-worker`** : **valeur approximative**, pas une garantie d'un nombre exact d'exécutions. Le test de charge du 26/11 (1 trait de 500 pixels) a saturé les 2 instances du `draw-worker` et envoyé 1 pixel en DLQ après 5 tentatives | SRV-05 ; ADR-0002 (« 5 par défaut ») ; #35 |
 | Backoff | Exponentiel, de 10 s à 60 s pour tous les abonnements | SRV-05 ; ADR-0002 ; `modules/push-subscription` |
 | Rétention | Au moins 7 jours | SRV-05 ; `docs/rate-limits.md` (« rejeu Pub/Sub/DLQ (7 jours prévus) ») |
 | Délai d'acquittement | Supérieur au timeout du worker, 600 s au maximum en push : 60 s pour `command-worker` et le notifier, 330 s pour `draw-worker` | ADR-0002 ; #35 ; `docs/deploy-draw-path.md` |
@@ -389,9 +389,11 @@ Chaque abonnement pousse vers l'URL `run.app` de son worker, avec un service acc
 
 | Alerte | Seuil | Origine |
 |---|---|---|
-| DLQ non vide | Plus de 0 message, par abonnement | SRV-05 ; ADR-0002 ; OBS-02 |
+| DLQ non vide | Plus de 0 message, par abonnement : **en place** (`infra/serverless/alerts.tf`), un incident par abonnement `*-dlq-inspect` | SRV-05 ; ADR-0002 ; OBS-02 |
 | Âge du plus vieux message non acquitté (abonnement source) | Plus de 60 s | SRV-05 ; #35 |
 | Taux d'erreur des workers du pipeline de dessin | Plus de 5 % | DRAW-05 |
+
+L'alerte « DLQ non vide » notifie les canaux de `alert_notification_channels` (variable du stack serverless, au format `projects/<projet>/notificationChannels/<id>`). Tant que le canal d'OBS-01 n'existe pas, la liste est vide : l'incident n'apparaît que dans la console Cloud Monitoring. Il reste ouvert tant que les messages sont dans l'abonnement d'inspection (7 jours) : le traiter, c'est les rejouer ou les acquitter. L'alerte sur l'âge du plus vieux message n'est pas encore en place : un trait de 500 pixels la déclencherait à chaque fois avec le débit actuel.
 
 ## 8. Consommateurs : idempotence, ordre, messages invalides
 

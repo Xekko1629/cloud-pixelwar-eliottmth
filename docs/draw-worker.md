@@ -114,13 +114,13 @@ La configuration `config/global`, les index et politiques TTL DATA-02 doivent
 être provisionnés séparément. Ne pas créer de configuration par défaut depuis
 le worker pour contourner un environnement incomplet.
 
-## Concurrence : profil initial à valider en dev
+## Concurrence et regroupement d'écriture
 
-Profil prudent proposé pour le futur appel du module `function` :
+Profil du Terraform dev (`infra/serverless/draw-path.tf`) :
 
 ```hcl
 service_type    = "worker"
-concurrency     = 1
+concurrency     = 32
 min_instances   = 0
 max_instances   = 2
 timeout_seconds = 300
@@ -128,20 +128,48 @@ cpu             = "1"
 memory          = "512Mi"
 ```
 
-Configurer l'ack deadline push à 330 secondes, inférieur au maximum de 600 s et
-supérieur au timeout de fonction. La marge tient compte des transactions
-Firestore réessayées et de la publication finale ; ce sont des valeurs de départ,
-pas le résultat d'un benchmark. Deux instances permettent déjà de tester les
-conflits ; une requête par instance limite la pression initiale. La file conserve
-les autres messages. Le plafond d'instances ne remplace ni les transactions ni
-l'idempotence et n'est pas une preuve d'un plafond strict de charge à tout instant.
+**Pourquoi 32.** Le profil de départ était `concurrency = 1`. Mesuré en dev le
+26/11 (un trait de 500 pixels), il traitait 3,7 pixels par seconde : chaque pixel
+était une transaction qui attendait la précédente sur `users/{uid}` et sur sa tuile,
+et Cloud Run refusait les autres livraisons (« no available instance »), d'où des
+relivraisons et un pixel en DLQ. Le traitement réel d'un pixel ne prenait que 0,2 s.
 
-Mesurer en dev conflits, latence, débit, backlog et coût avant augmentation.
-Le document global des bornes peut créer de la contention. Le timeout total et
-les reprises doivent aussi rester compatibles avec le token Discord de 15 minutes.
+Mesures avant et après : [protocole de mesure du débit](draw-throughput.md).
 
-Ce profil est celui du Terraform dev (`infra/serverless/draw-path.tf`), avec
-l'abonnement `draw-worker` à 330 s et `roles/datastore.user` pour le runtime.
+**Regroupement d'écriture** ([ADR-0014](adr/0014-un-evenement-par-pixel.md)) :
+
+- Une instance n'exécute qu'**une** transaction à la fois
+  (`app/shared/src/drawing/group-commit.ts`).
+- Un pixel qui trouve l'instance libre part tout de suite, seul, avec la transaction
+  d'origine : aucune attente ajoutée quand l'activité est faible.
+- Les pixels qui arrivent pendant une transaction forment le groupe suivant, au plus
+  32 (`MAX_DRAW_GROUP`, égal à la concurrence). Le groupe est appliqué en **une**
+  transaction (`app/shared/src/drawing/group.ts`) : `users/{uid}`, chaque tuile,
+  `config/global` et un delta par région ne sont écrits qu'une fois.
+- Chaque pixel garde son message Pub/Sub, sa déduplication par `event_id`, sa
+  décision de quota dans l'ordre `compareEvents`, son résultat et son acquittement.
+  Le résultat d'un groupe est identique à celui de transactions successives dans cet
+  ordre (test d'équivalence de `group.test.ts`).
+- Si la transaction du groupe échoue (tuile corrompue, budget dépassé, contention
+  persistante), l'instance rejoue chaque pixel **seul**, l'un après l'autre : un pixel
+  défectueux n'échoue que sa propre requête, que Pub/Sub relivre seule.
+
+Logs d'un groupe, une ligne par transaction (pas par pixel) :
+
+| `event_type` | Sévérité | Quand |
+| --- | --- | --- |
+| `draw.group.committed` | INFO | Un groupe de `group_size` pixels a été écrit en une transaction |
+| `draw.group.fallback` | WARNING | Le groupe a échoué ; ses `group_size` pixels sont rejoués un par un |
+
+Un pixel traité seul n'écrit pas de ligne de groupe. Chaque pixel garde son log
+`draw.result.published`. Le débit par instance de DRAW-05 se lit sur ces logs et sur
+la métrique de tentatives du worker.
+
+`max_instances = 2` reste le plafond de dépense. Le timeout total et les reprises
+doivent rester compatibles avec le token Discord de 15 minutes (tentatives avant la
+DLQ : `docs/events.md`, section 7.2).
+
+L'abonnement `draw-worker` à 330 s et `roles/datastore.user` pour le runtime.
 Voir le [déploiement dev du parcours `/draw`](deploy-draw-path.md).
 
 ## Tests

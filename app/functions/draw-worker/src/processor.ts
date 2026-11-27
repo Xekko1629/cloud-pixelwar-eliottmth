@@ -1,11 +1,35 @@
 import { Firestore } from '@google-cloud/firestore';
-import { createDrawProcessor, type DrawCommand, type DrawResult } from '@pixelwar/shared/drawing';
+import {
+  createDrawProcessor, createGroupCommit, createGroupDrawProcessor, type DrawCommand, type DrawResult,
+} from '@pixelwar/shared/drawing';
 
 export type ProcessDraw = (command: DrawCommand) => Promise<DrawResult>;
-export function createLazyDrawProcessor(projectId: string): ProcessDraw {
+
+/**
+ * Same value as the Cloud Run concurrency of the draw-worker (infra/serverless/draw-path.tf):
+ * an instance never holds more requests than that, so a larger group could not form.
+ * 32 pixels stay far below the 450-document budget of a transaction.
+ */
+export const MAX_DRAW_GROUP = 32;
+
+/** Group commit of ADR-0014: concurrent pushes of one instance share one Firestore transaction. */
+export function createLazyDrawProcessor(projectId: string, write?: (line: string) => void): ProcessDraw {
   let process: ProcessDraw | undefined;
   return async (command) => {
-    process ??= createDrawProcessor(new Firestore({ projectId }));
+    if (!process) {
+      const db = new Firestore({ projectId });
+      process = createGroupCommit(createDrawProcessor(db), createGroupDrawProcessor(db), {
+        max_group: MAX_DRAW_GROUP,
+        // One line per transaction (not per pixel): group size is what DRAW-05 shows.
+        onGroup: ({ size, outcome }) => {
+          if (outcome === 'single') return;
+          write?.(`${JSON.stringify({
+            severity: outcome === 'fallback' ? 'WARNING' : 'INFO', function: 'draw-worker',
+            event_type: outcome === 'fallback' ? 'draw.group.fallback' : 'draw.group.committed', group_size: size,
+          })}\n`);
+        },
+      });
+    }
     return process(command);
   };
 }

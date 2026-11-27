@@ -2,7 +2,7 @@ import { Timestamp, type Firestore } from '@google-cloud/firestore';
 import {
   COLLECTIONS, DELTA_ENCODING_VERSION, assertCanvasVersion, countBatchDocuments,
   encodeDelta, evaluateRateLimit, groupPixelsByRegion, groupPixelsByTile, isInsideGrid,
-  resolveRateLimit, validateGridSize,
+  RATE_LIMIT_WINDOW_MS, resolveRateLimit, validateGridSize,
   type Bounds, type GlobalConfigDocument, type RateLimitOverrideDocument,
   type TileColorsDocument, type TileMetadataDocument, type UserStateDocument,
 } from '../grid';
@@ -13,7 +13,7 @@ import {
 } from './command';
 import { planTileChanges } from './tiles';
 
-function validateConfig(config: GlobalConfigDocument): void {
+export function validateConfig(config: GlobalConfigDocument): void {
   try {
     if (!config || typeof config.paused !== 'boolean') throw new Error();
     assertCanvasVersion(config.canvas_version);
@@ -45,7 +45,7 @@ export function createDrawProcessor(db: Firestore, options: DrawOptions = {}) {
       const config = global.data() as GlobalConfigDocument;
       validateConfig(config);
       const overrideData = override.exists ? override.data() as RateLimitOverrideDocument : null;
-      resolveRateLimit(config, overrideData); // Fail closed even for a paused/expired command.
+      const limit = resolveRateLimit(config, overrideData); // Fail closed even for a paused/expired command.
       const usage = user.exists ? user.data() as UserStateDocument : null;
       let now = processingTime(settings.now, settings.delta_ttl_ms);
       assertNotFuture(command, now);
@@ -68,8 +68,15 @@ export function createDrawProcessor(db: Firestore, options: DrawOptions = {}) {
       const reject = (reason: DrawResult['reason'], quota?: DrawResult['quota']): DrawResult => {
         const result = { ...makeResult(), type: 'pixel-rejected' as const, reason: reason! };
         const rejection = { event_id: command.event_id, reason: reason!, at: Timestamp.fromMillis(now) };
-        // Preserve quota/window on rejection. A missing user document is left absent.
+        // Preserve quota/window on rejection. A first action refused (pause, out of bounds…)
+        // creates the document with nothing consumed, so GET /api/state can explain it (DRAW-04).
         if (user.exists) tx.update(userRef, { last_rejection: rejection, updated_at: Timestamp.fromMillis(now) });
+        else {
+          tx.set(userRef, {
+            window_start: Timestamp.fromMillis(Math.floor(now / RATE_LIMIT_WINDOW_MS) * RATE_LIMIT_WINDOW_MS),
+            used_pixels: 0, limit_per_minute: limit, updated_at: Timestamp.fromMillis(now), last_rejection: rejection,
+          });
+        }
         return persist(quota ? { ...result, quota } : result);
       };
       if (now - command.occurred_ms > MAX_DRAW_AGE_MS) return reject('expired');
@@ -135,7 +142,7 @@ export function createDrawProcessor(db: Firestore, options: DrawOptions = {}) {
   };
 }
 
-function expandedBounds(bounds: Bounds | null, pixels: PreparedDraw['pixels']): Bounds {
+export function expandedBounds(bounds: Bounds | null, pixels: PreparedDraw['pixels']): Bounds {
   const result = bounds ? { ...bounds } : { min_x: pixels[0].x, min_y: pixels[0].y, max_x: pixels[0].x, max_y: pixels[0].y };
   for (const pixel of pixels) {
     result.min_x = Math.min(result.min_x, pixel.x);

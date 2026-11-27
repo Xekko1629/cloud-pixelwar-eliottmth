@@ -32,6 +32,7 @@
 - [Contrat du calcul des quotas utilisateur](rate-limits.md)
 - [Écriture transactionnelle et idempotence — DATA-02](drawing-transactions.md)
 - [Draw worker : consommation, dessin et publication des résultats](draw-worker.md)
+- [Mesure du débit du parcours de dessin](draw-throughput.md)
 - [Notifier Discord : réponse au dessin, doublons et expiration](discord-notifier.md)
 - [Worker d'administration : `/admin`, pause, effacement et quotas — BOT-08, DATA-04](admin-worker.md)
 - [Catalogue des événements Pub/Sub](events.md)

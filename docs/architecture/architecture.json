@@ -360,7 +360,7 @@
       "label": "Alertes et dashboards",
       "view": "application",
       "group": "Observabilité",
-      "status": "planned",
+      "status": "deployed",
       "terraform": [
         "*:google_monitoring_alert_policy.*",
         "*:google_monitoring_dashboard.*"

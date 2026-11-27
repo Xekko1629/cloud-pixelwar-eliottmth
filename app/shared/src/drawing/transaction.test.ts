@@ -74,10 +74,27 @@ describe('transaction orchestration', () => {
     const { store, process } = setup(); store.delete('config/global');
     await expect(process(input())).rejects.toMatchObject({ code: 'invalid_state' });
   });
-  it('persists a pause rejection without creating a quota document', async () => {
+  it('records a first refused action in a new user document, with nothing consumed (DRAW-04)', async () => {
     const { config, process, store } = setup(); config.paused = true;
-    expect(await process(input())).toMatchObject({ type: 'pixel-rejected', reason: 'paused' });
-    expect(store.has(`users/${uid}`)).toBe(false);
+    const command = input();
+    expect(await process(command)).toMatchObject({ type: 'pixel-rejected', reason: 'paused' });
+    expect(store.get(`users/${uid}`)).toEqual({
+      window_start: Timestamp.fromMillis(Date.parse('2026-11-19T10:00:00.000Z')), used_pixels: 0, limit_per_minute: 20,
+      updated_at: Timestamp.fromMillis(now), last_rejection: { event_id: command.event_id, reason: 'paused', at: Timestamp.fromMillis(now) },
+    });
+  });
+  it('keeps the full quota after a first refused action, then clears the rejection on success', async () => {
+    const { config, process, store } = setup(); config.paused = true;
+    await process(input());
+    config.paused = false;
+    expect(await process(input())).toMatchObject({ type: 'pixel-processed', quota: { used_before: 0, remaining_pixels: 19 } });
+    expect(store.get(`users/${uid}`)).toMatchObject({ used_pixels: 1, last_rejection: null });
+  });
+  it('uses the override as the recorded limit of a new user', async () => {
+    const { config, process, store } = setup(); config.paused = true;
+    store.set(`ratelimit_overrides/${uid}`, { limit_per_minute: 5, updated_at: Timestamp.fromMillis(now) });
+    await process(input());
+    expect(store.get(`users/${uid}`)).toMatchObject({ limit_per_minute: 5, used_pixels: 0 });
   });
   it('preserves existing usage while recording a rejection', async () => {
     const { process, store } = setup();
@@ -101,7 +118,7 @@ describe('transaction orchestration', () => {
   it.each([{ max_write_documents: 1 }, { max_estimated_bytes: 1 }])('rejects lots beyond the transaction budget: %j', async (options) => {
     const { process, store } = setup(options);
     expect((await process(input())).reason).toBe('batch_budget_exceeded');
-    expect(store.has(`users/${uid}`)).toBe(false);
+    expect(store.get(`users/${uid}`)).toMatchObject({ used_pixels: 0, last_rejection: { reason: 'batch_budget_exceeded' } });
   });
   it('uses an override and refuses the whole batch at its limit', async () => {
     const { process, store } = setup();

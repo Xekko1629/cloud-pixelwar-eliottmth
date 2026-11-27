@@ -46,13 +46,35 @@ récente gagne. À dates égales, l'ordre déterministe des IDs départage les
 commandes, conformément au modèle de grille. Un lot accepté consomme tous ses
 pixels validés, même si certains sont ignorés car déjà dépassés.
 
+## Regroupement d'écriture
+
+`createGroupDrawProcessor(db)` applique plusieurs commandes dans **une** transaction
+(ADR-0014). Le résultat est celui qu'auraient produit des transactions successives
+dans l'ordre `compareEvents` :
+
+- déduplication de chaque `event_id` ; un doublon dans le groupe reçoit le même
+  résultat, un même id avec un autre contenu échoue en `event_id_conflict` ;
+- quota évalué commande par commande, avec le compteur mis à jour en mémoire ;
+- règle « le plus récent gagne » entre deux commandes du groupe sur le même pixel ;
+- `last_rejection` : le dernier refus depuis le dernier dessin accepté, dans l'ordre
+  des événements ;
+- `users/{uid}`, chaque tuile et `config/global` écrits une fois ; un delta par
+  région pour tout le groupe, qui ne contient que la couleur finale de chaque pixel.
+
+Toute erreur (tuile corrompue, configuration invalide, budget de documents ou
+d'octets dépassé : `DrawGroupTooLargeError`) fait échouer le groupe entier sans rien
+écrire. `createGroupCommit` rejoue alors chaque commande seule avec
+`createDrawProcessor`.
+
 ## Refus et erreurs techniques
 
 Les refus `paused`, `expired`, `out_of_bounds`, `batch_budget_exceeded` et
 `rate_limit` produisent un résultat durable `pixel-rejected`, sans dessin ni
-consommation supplémentaire. Le lot est refusé en entier. Un utilisateur déjà
-présent reçoit aussi un `last_rejection` ; un document utilisateur absent n'est
-pas créé pour un refus.
+consommation supplémentaire. Le lot est refusé en entier. Le refus est écrit dans
+`users/{uid}.last_rejection` ; un dessin accepté le remet à `null`. Si le document
+n'existe pas encore (première action refusée, par exemple pendant une pause), il est
+créé sans rien consommer : fenêtre courante, `used_pixels = 0`, limite effective
+(override compris). Le navigateur peut ainsi expliquer ce premier refus (DRAW-04).
 
 Une configuration invalide, une tuile corrompue, un ID réutilisé ou une panne
 Firestore lèvent une erreur. L'adaptateur HTTP devra conserver ces traitements
@@ -99,7 +121,12 @@ npm run test:integration
 Les tests unitaires couvrent validation, budgets et planification des écritures.
 Les tests sur émulateur vérifient les transactions réelles : doublons concurrents,
 écritures concurrentes sur une tuile ou un pixel, quota concurrent et reprise
-après échec de publication. Ils utilisent uniquement `demo-pixelwar-test` et
+après échec de publication. Pour le regroupement : un trait entier en une
+transaction, deux groupes concurrents sur le même utilisateur et la même tuile
+(quota exact, pixel le plus récent), la relivraison d'un groupe et l'isolement d'une
+commande défectueuse. Le test unitaire `group.test.ts` compare 40 scénarios
+pseudo-aléatoires (collisions, quota, override, pause, hors grille, pixel plus récent
+déjà stocké) avec des transactions successives. Ils utilisent uniquement `demo-pixelwar-test` et
 des racines de documents isolées, nettoyées après exécution.
 
 Ces preuves ne valident ni IAM/OIDC, ni le nettoyage TTL cloud, ni les limites

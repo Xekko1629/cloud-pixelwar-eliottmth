@@ -8,10 +8,14 @@ const WHEEL_SENSITIVITY = 0.0015;
 const LINE_HEIGHT = 16;
 const KEY_PAN = 64;
 const KEY_ZOOM = 1.25;
+// A press that moves less than this (CSS pixels) is a tap: it selects a pixel (WEB-04).
+export const TAP_SLOP = 6;
 
 export class CanvasController {
   private camera: Camera;
   private readonly pointers = new Map<number, Point>();
+  // The single press that may still become a tap; a second finger or a drag cancels it.
+  private tap: { id: number; start: Point; moved: boolean } | null = null;
 
   constructor(
     private readonly viewport: () => Viewport,
@@ -37,12 +41,15 @@ export class CanvasController {
 
   pointerDown(id: number, point: Point): void {
     // Two fingers at most: a third one is ignored until one is lifted.
-    if (this.pointers.size < 2) this.pointers.set(id, point);
+    if (this.pointers.size >= 2) return;
+    this.tap = this.pointers.size === 0 ? { id, start: point, moved: false } : null;
+    this.pointers.set(id, point);
   }
 
   pointerMove(id: number, point: Point): void {
     const previous = this.pointers.get(id);
     if (!previous) return;
+    if (this.tap?.id === id && distance(this.tap.start, point) > TAP_SLOP) this.tap.moved = true;
     if (this.pointers.size === 1) {
       this.pointers.set(id, point);
       this.set(pan(this.camera, point.x - previous.x, point.y - previous.y));
@@ -58,8 +65,19 @@ export class CanvasController {
     this.set(zoomAt(moved, this.viewport(), factor, after.centre));
   }
 
-  pointerUp(id: number): void {
+  /** Returns where the press started when it was a tap, else null. */
+  pointerUp(id: number): Point | null {
     this.pointers.delete(id);
+    const tap = this.tap;
+    if (tap?.id !== id) return null;
+    this.tap = null;
+    return tap.moved ? null : tap.start;
+  }
+
+  /** The press was cancelled by the browser (pointercancel): never a tap. */
+  pointerCancel(id: number): void {
+    this.pointers.delete(id);
+    if (this.tap?.id === id) this.tap = null;
   }
 
   // deltaMode: 0 = pixels, 1 = lines (Firefox), 2 = pages.
