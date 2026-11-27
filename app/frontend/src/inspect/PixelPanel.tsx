@@ -61,9 +61,11 @@ interface PanelProps {
   brush: Brush;
   tool: CanvasTool;
   onTool: (tool: CanvasTool) => void;
+  previewOn: boolean;
+  onPreview: (on: boolean) => void;
 }
 
-export function PixelPanel({ inspector, brush, tool, onTool }: PanelProps) {
+export function PixelPanel({ inspector, brush, tool, onTool, previewOn, onPreview }: PanelProps) {
   const state = useSyncExternalStore(inspector.subscribe, inspector.getState);
   const brushState = useSyncExternalStore(brush.subscribe, brush.getState);
   // Re-evaluated on each render; the inspector re-renders at the end of the quota minute.
@@ -109,6 +111,10 @@ export function PixelPanel({ inspector, brush, tool, onTool }: PanelProps) {
           />
         ))}
       </div>
+      <label className="pixel-panel__option">
+        <input type="checkbox" checked={previewOn} onChange={(event) => onPreview(event.target.checked)} />
+        Aperçu de l’envoi (calque semi-transparent)
+      </label>
       {tool === 'brush' ? <BrushControls brush={brush} /> : selected === null ? (
         <p className="pixel-panel__hint">Clique sur un pixel pour voir son auteur et le dessiner.</p>
       ) : (

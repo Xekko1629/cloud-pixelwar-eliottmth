@@ -173,6 +173,12 @@ section.app__status p {
   gap: 4px;
 }
 
+.pixel-panel__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .pixel-canvas__surface[data-tool="brush"] {
   cursor: cell;
 }

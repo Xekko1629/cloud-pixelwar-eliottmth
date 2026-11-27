@@ -113,6 +113,9 @@ de 1024 × 1024 pixels (16 × 16 tuiles), chargées par `GET /api/regions/{rx}/{
   que marquer ce qui est en cours d'envoi, sans jamais passer pour un pixel posé. Un
   pixel de l'aperçu disparaît quand la toile montre sa couleur (son delta est arrivé),
   dès que son refus est connu, sinon au bout de 5 s ; un `/admin clear` vide l'aperçu.
+  La case « Aperçu de l'envoi » du panneau le désactive : seule la toile reste, mise à
+  jour par les deltas. Le choix est gardé dans le `localStorage` du navigateur
+  (`pixelwar.preview`).
 - **Quota et refus** : chaque pixel couvert est **décompté tout de suite** du quota
   affiché (`PixelInspector.consume`), car `/api/state` ne le voit qu'une fois traité par
   le worker : deux traits rapides ne croient donc pas avoir tout le quota. Le trait

@@ -56,6 +56,19 @@ describe('PreviewLayer', () => {
     expect(delays).toEqual([5_000]);
   });
 
+  it('shows nothing while turned off, and clears what was shown', () => {
+    const { preview, changes } = setup();
+    preview.add([{ x: 1, y: 0, color: 4 }]);
+    preview.setEnabled(false);
+    expect(preview.size).toBe(0);
+    expect(changes).toHaveBeenLastCalledWith('all');
+    preview.add([{ x: 2, y: 0, color: 4 }]);
+    expect(preview.size).toBe(0);
+    preview.setEnabled(true);
+    preview.add([{ x: 2, y: 0, color: 4 }]);
+    expect(preview.size).toBe(1);
+  });
+
   it('is cleared by a new canvas version', () => {
     const { preview, changes, timers, source } = setup();
     preview.add([{ x: 1, y: 0, color: 4 }]);

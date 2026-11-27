@@ -23,10 +23,21 @@ export class PreviewLayer implements TileColorsSource {
   private readonly ttlMs: number;
   private readonly setTimer: (callback: () => void, ms: number) => unknown;
   private generation = 0;
+  private on = true;
 
   constructor(options: PreviewOptions = {}) {
     this.ttlMs = options.ttlMs ?? 5_000;
     this.setTimer = options.setTimer ?? ((callback, ms) => setTimeout(callback, ms));
+  }
+
+  get enabled(): boolean {
+    return this.on;
+  }
+
+  /** Turned off, the layer stays empty: only the canvas state is shown, nothing pending. */
+  setEnabled(enabled: boolean): void {
+    this.on = enabled;
+    if (!enabled) this.clear();
   }
 
   get size(): number {
@@ -54,7 +65,7 @@ export class PreviewLayer implements TileColorsSource {
 
   /** Shows the pixels just sent, until their delta arrives or `ttlMs` passes. */
   add(pixels: readonly DrawPixel[]): void {
-    if (pixels.length === 0) return;
+    if (!this.on || pixels.length === 0) return;
     const touched = new Map<string, TileKey>();
     for (const { x, y, color } of pixels) {
       const { tx, ty, index } = locatePixel(x, y);
