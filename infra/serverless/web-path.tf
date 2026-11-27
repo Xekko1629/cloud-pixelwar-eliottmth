@@ -40,8 +40,11 @@ module "web_proxy" {
     GOOGLE_CLOUD_PROJECT = var.project_id
     PIXEL_DRAW_TOPIC     = local.pixel_draw_topic
     FRONTEND_ORIGIN      = local.frontend_origin
-    # ADR-0017: the quota of each request is reserved there before publication.
-    QUOTA_RESERVER_URL = module.quota_reserver[0].uri
+    # ADR-0017: the quota of each request is reserved there before publication. Deterministic
+    # Cloud Run URL, known at plan time: module.quota_reserver[0].uri is only known after the
+    # function exists, and an unknown value in this map makes the google provider fail the
+    # apply ("inconsistent final plan", dev 27/11 16:20 UTC).
+    QUOTA_RESERVER_URL = local.quota_reserver_url
   }
 }
 

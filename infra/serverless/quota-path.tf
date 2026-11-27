@@ -1,6 +1,10 @@
 # Quota of a web request, reserved before its pixels are published (ADR-0017). web-proxy calls
 # quota-reserver with an ID token of its own service account; the draw-worker then no longer
 # writes users/{uid} for an accepted web pixel. No gateway route: it is not in gateway_contract.
+locals {
+  quota_reserver_url = "https://quota-reserver-${data.google_project.current.number}.${var.region}.run.app"
+}
+
 module "quota_reserver_source" {
   source = "./modules/function-source"
   count  = local.web_api_enabled ? 1 : 0
