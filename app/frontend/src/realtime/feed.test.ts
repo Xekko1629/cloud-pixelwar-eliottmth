@@ -79,8 +79,8 @@ describe('visibleRegions', () => {
 });
 
 function fakeBackend() {
-  const config = { next: (_data: unknown) => {}, error: (_error: unknown) => {}, stopped: false };
-  const listeners: Array<{ query: DeltaQuery; added: (docs: unknown[]) => void; error: (e: unknown) => void; stopped: boolean }> = [];
+  const config = { next: (_data: unknown, _fromCache?: boolean) => {}, error: (_error: unknown) => {}, stopped: false };
+  const listeners: Array<{ query: DeltaQuery; added: (docs: unknown[], fromCache?: boolean) => void; error: (e: unknown) => void; stopped: boolean }> = [];
   const backend: FirestoreBackend = {
     watchConfig(next, error) {
       Object.assign(config, { next, error });
@@ -203,6 +203,23 @@ describe('RealtimeFeed', () => {
     expect(handlers.reset).toHaveBeenCalledWith({ paused: false, canvasVersion: 2, size: null, bounds: null });
     expect(active()).toHaveLength(1);
     expect(active()[0]!.query.canvasVersion).toBe(2);
+  });
+
+  it('reports a network cut as offline, keeps the configuration, and is live again after it', () => {
+    const { feed, config, listeners, handlers, fire } = setup();
+    feed.start();
+    config.next({ canvas_version: 1 });
+    feed.setViewport(VIEW);
+    fire();
+    config.next({ canvas_version: 1 }, true);
+    expect(handlers.status).toHaveBeenLastCalledWith('offline');
+    expect(handlers.config).toHaveBeenCalledTimes(1);
+    // A snapshot of the deltas from the cache does not mean the connection is back.
+    listeners[0]!.added([], true);
+    expect(handlers.status).toHaveBeenLastCalledWith('offline');
+    config.next({ canvas_version: 1 }, false);
+    expect(handlers.status).toHaveBeenLastCalledWith('live');
+    expect(listeners).toHaveLength(1);
   });
 
   it('reports errors of either listener, and an invalid configuration', () => {

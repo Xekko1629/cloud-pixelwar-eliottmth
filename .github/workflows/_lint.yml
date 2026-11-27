@@ -11,6 +11,9 @@ on:
 env:
   TFLINT_VERSION: "v0.64.0"
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: tflint

@@ -33,12 +33,15 @@ describe('createFirestoreBackend', () => {
     const error = vi.fn();
     const stop = createFirestoreBackend({ projectId: 'p', apiKey: 'k' }).watchConfig(next, error);
     expect(stop).toBe(unsubscribe);
-    const [ref, onNext, onError] = sdk.onSnapshot.mock.calls[0]! as unknown as [unknown, (s: unknown) => void, unknown];
+    const [ref, options, onNext, onError] = sdk.onSnapshot.mock.calls[0]! as unknown as [unknown, unknown, (s: unknown) => void, unknown];
     expect(ref).toEqual({ path: 'config/global' });
+    // Metadata changes too: a snapshot from the cache tells that the connection is lost.
+    expect(options).toEqual({ includeMetadataChanges: true });
     expect(onError).toBe(error);
-    onNext({ data: () => ({ canvas_version: 1 }) });
-    onNext({ data: () => undefined });
-    expect(next.mock.calls).toEqual([[{ canvas_version: 1 }], [null]]);
+    onNext({ data: () => ({ canvas_version: 1 }), metadata: { fromCache: false } });
+    onNext({ data: () => undefined, metadata: { fromCache: false } });
+    onNext({ data: () => ({ canvas_version: 1 }), metadata: { fromCache: true } });
+    expect(next.mock.calls).toEqual([[{ canvas_version: 1 }, false], [null, false], [{ canvas_version: 1 }, true]]);
   });
 
   it('queries the deltas of the visible regions with the indexed filters, added documents only', () => {
@@ -55,12 +58,13 @@ describe('createFirestoreBackend', () => {
       ],
     });
     onNext({
+      metadata: { fromCache: false },
       docChanges: () => [
         { type: 'added', doc: { data: () => ({ id: 1 }) } },
         { type: 'removed', doc: { data: () => ({ id: 2 }) } },
       ],
     });
-    expect(added).toHaveBeenCalledWith([{ id: 1 }]);
+    expect(added).toHaveBeenCalledWith([{ id: 1 }], false);
   });
 
   it('drops the region filter in the far view', () => {

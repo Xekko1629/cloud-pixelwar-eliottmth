@@ -46,6 +46,7 @@ export const REALTIME_LABELS = {
   disabled: 'pas encore configuré',
   connecting: 'connexion…',
   live: 'connecté',
+  offline: 'hors ligne, reprise automatique',
   error: 'interrompu',
 } as const;
 

@@ -7,7 +7,7 @@ import { LiveCanvas } from './live';
 
 function backend() {
   const state = {
-    config: (_data: unknown) => {},
+    config: (_data: unknown, _fromCache?: boolean) => {},
     deltas: [] as Array<(docs: unknown[]) => void>,
   };
   const fake: FirestoreBackend = {
@@ -23,9 +23,9 @@ function backend() {
   return { fake, state };
 }
 
-const delta = (x: number, y: number, color: number) => ({
+const delta = (x: number, y: number, color: number, at = 1) => ({
   encoding_version: 1, canvas_version: 1, region: '0_0', event_id: 'e',
-  created_at: { toMillis: () => 1 }, pixels: encodeDelta([{ x, y, color }]),
+  created_at: { toMillis: () => at }, pixels: encodeDelta([{ x, y, color }]),
 });
 
 describe('LiveCanvas', () => {
@@ -119,6 +119,24 @@ describe('LiveCanvas', () => {
       answers[1]!({ canvas_version: 1, tiles: [{ tx: 0, ty: 0, colors: tile(4) }] });
       await flush();
       expect(live.source.get(0, 0)![1]).toBe(4);
+    });
+
+    it('asks the regions again after a network cut, and ends on the newest colour', async () => {
+      const { live, state, answers } = await signedIn();
+      answers[0]!({ canvas_version: 1, tiles: [{ tx: 0, ty: 0, colors: tile(2) }] });
+      await flush();
+      state.config({ canvas_version: 1 }, true);
+      expect(live.getState().status).toBe('offline');
+      expect(answers).toHaveLength(1);
+      state.config({ canvas_version: 1 }, false);
+      expect(live.getState().status).toBe('live');
+      expect(answers).toHaveLength(2);
+      // The listener resyncs what it missed, in any snapshot order: 9 then 5 on the same pixel.
+      state.deltas[0]!([delta(1, 0, 5, 20), delta(1, 0, 9, 10)]);
+      // The answer was read after both: it already shows 5. Replayed in order, 9 never wins.
+      answers[1]!({ canvas_version: 1, tiles: [{ tx: 0, ty: 0, colors: tile(5) }] });
+      await flush();
+      expect(live.source.get(0, 0)![1]).toBe(5);
     });
 
     it('forgets the tiles on sign-out and on a new canvas version', async () => {

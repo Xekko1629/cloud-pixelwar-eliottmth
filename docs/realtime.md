@@ -63,8 +63,29 @@ Les fonctions ne sont pas concernées : elles passent par IAM avec leur compte d
 Les deltas sont peints sur les tuiles chargées par `tile-reader` (WEB-03b, voir le
 [README du frontend](../app/frontend/README.md#tuiles-web-03b)). Les pixels reçus pendant
 le chargement d'une région sont repeints sur la réponse, qui peut être plus ancienne.
-Sans session, la toile est masquée : elle ne montrerait que les deltas, pas l'état à jour. WEB-03c ignorera
-un delta plus ancien que la tuile chargée.
+Sans session, la toile est masquée : elle ne montrerait que les deltas, pas l'état à jour.
+
+### Coupure et reprise (DRAW-03b)
+
+- **Détection** : le SDK ne signale pas d'erreur quand le réseau tombe, il garde les
+  listeners et se resynchronise seul. Le listener de `config/global` suit donc aussi
+  les métadonnées (`includeMetadataChanges`) : un snapshot servi depuis le cache passe
+  le statut à « hors ligne, reprise automatique », le snapshot suivant venu du serveur
+  le remet à « connecté ».
+- **Au retour** : le listener des deltas renvoie ceux qu'il a manqués, puisque sa borne
+  `created_at > T0` n'a pas bougé. Ceux qui ont dépassé leur TTL (1 h) ont pu être
+  supprimés : les régions visibles sont donc redemandées à `tile-reader`, ce qui ne
+  coûte qu'un `304` si rien n'a changé.
+- **Jamais de retour à une couleur plus ancienne** : les deltas sont appliqués triés par
+  `created_at`, et ceux reçus pendant le rechargement d'une région sont repeints sur la
+  réponse, dans l'ordre. Un delta plus ancien que la tuile n'est jamais rejoué seul :
+  ceux qui le suivent sur le même pixel arrivent avec lui et le recouvrent. Le format
+  binaire des tuiles ne porte pas d'`updated_at` : la règle 3 d'ADR-0003 est tenue par
+  cet ordre plutôt que par une comparaison de dates.
+
+Pour le vérifier à la main : ouvrir la toile, passer l'onglet hors ligne (DevTools,
+Network, *Offline*), faire dessiner quelqu'un d'autre, puis revenir en ligne. Le bandeau
+passe à « hors ligne », puis à « connecté », et les pixels manqués apparaissent.
 
 ## Tests
 
