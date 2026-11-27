@@ -136,7 +136,8 @@ conflits ; une requête par instance limite la pression initiale. La file conser
 les autres messages. Le plafond d'instances ne remplace ni les transactions ni
 l'idempotence et n'est pas une preuve d'un plafond strict de charge à tout instant.
 
-Mesurer en dev conflits, latence, débit, backlog et coût avant augmentation.
+Mesurer en dev conflits, latence, débit, backlog et coût avant augmentation
+([protocole de mesure du débit](draw-throughput.md)).
 Le document global des bornes peut créer de la contention. Le timeout total et
 les reprises doivent aussi rester compatibles avec le token Discord de 15 minutes.
 
