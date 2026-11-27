@@ -182,7 +182,7 @@
       "label": "snapshot-requested",
       "view": "application",
       "group": "Pub/Sub · suites",
-      "status": "planned",
+      "status": "deployed",
       "terraform": [
         "serverless:module.snapshot_requested"
       ]
@@ -272,7 +272,7 @@
       "label": "snapshot-worker",
       "view": "application",
       "group": "Workers · étape 2 (ingress interne)",
-      "status": "planned",
+      "status": "deployed",
       "terraform": [
         "serverless:module.snapshot_worker"
       ]
@@ -282,7 +282,7 @@
       "label": "snapshot-notifier",
       "view": "application",
       "group": "Workers · étape 2 (ingress interne)",
-      "status": "planned",
+      "status": "deployed",
       "terraform": [
         "serverless:module.snapshot_notifier"
       ]
@@ -692,7 +692,7 @@
       "to": "t_snapshot",
       "label": "/snapshot",
       "kind": "event",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "t_pixel_draw",
@@ -748,14 +748,21 @@
       "to": "snapshot_worker",
       "label": "push OIDC",
       "kind": "event",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "snapshot_worker",
       "to": "b_snapshots",
       "label": "PNG horodaté",
       "kind": "request",
-      "status": "planned"
+      "status": "deployed"
+    },
+    {
+      "from": "snapshot_worker",
+      "to": "firestore",
+      "label": "tuiles (lecture)",
+      "kind": "read",
+      "status": "deployed"
     },
     {
       "from": "b_snapshots",
@@ -769,7 +776,7 @@
       "to": "snapshot_notifier",
       "label": "push OIDC",
       "kind": "event",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "scheduler",
@@ -818,7 +825,7 @@
       "to": "discord_api",
       "label": "HTTPS (URL signée)",
       "kind": "request",
-      "status": "planned"
+      "status": "deployed"
     },
     {
       "from": "tile_reader",

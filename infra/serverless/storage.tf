@@ -7,9 +7,11 @@ locals {
   # Shared hardening: IAM only (no ACL), never public.
   application_buckets = {
     # /snapshot PNGs (BOT-07a), shared through a signed URL (BOT-07b).
-    snapshots = { expire_after_days = var.snapshot_retention_days }
+    # requests/<event_id>.json holds the interaction token for the notifier (BOT-07b): the
+    # token lives 15 minutes, its request is deleted after one day.
+    snapshots = { expire_after_days = var.snapshot_retention_days, requests_expire_after_days = 1 }
     # Low-resolution pyramid of the far view (DATA-05c): active images never expire.
-    overview = { expire_after_days = null }
+    overview = { expire_after_days = null, requests_expire_after_days = null }
   }
 }
 
@@ -30,6 +32,20 @@ resource "google_storage_bucket" "application" {
     content {
       condition {
         age = lifecycle_rule.value
+      }
+      action {
+        type = "Delete"
+      }
+    }
+  }
+
+  dynamic "lifecycle_rule" {
+    for_each = each.value.requests_expire_after_days == null ? [] : [each.value.requests_expire_after_days]
+
+    content {
+      condition {
+        age            = lifecycle_rule.value
+        matches_prefix = ["requests/"]
       }
       action {
         type = "Delete"
@@ -66,6 +82,8 @@ resource "google_storage_notification" "snapshot_ready" {
   topic          = module.snapshot_ready.id
   payload_format = "JSON_API_V1"
   event_types    = ["OBJECT_FINALIZE"]
+  # Images only: the request objects of the snapshot-worker must not wake the notifier.
+  object_name_prefix = "snapshots/"
 
   # GCS checks the publisher grant when the notification is created.
   depends_on = [google_pubsub_topic_iam_member.snapshot_ready_storage_publisher]

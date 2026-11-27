@@ -24,6 +24,7 @@
 - [Déploiement dev du parcours web et checklist de test](deploy-web-path.md)
 - [Déploiement dev du parcours `/admin` et checklist de test](deploy-admin-path.md)
 - [Déploiement dev du parcours `/get` (image de la toile) et checklist de test — BOT-06](deploy-get-path.md)
+- [`/snapshot` : image horodatée, fiche de demande et URL signée — BOT-07a, BOT-07b](snapshot.md)
 - [Proxy d'écriture web : `POST /api/pixels` — DRAW-01](web-proxy.md)
 - [Lecteur de la grille pour le web : tuiles, métadonnées et état — SRV-11](tile-reader.md)
 - [Temps réel du navigateur : listeners Firestore et Security Rules — DRAW-03a](realtime.md)

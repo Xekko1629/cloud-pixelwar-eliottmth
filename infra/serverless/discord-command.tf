@@ -51,8 +51,7 @@ module "command_worker" {
     ADMIN_REQUESTED_TOPIC        = local.admin_requested_topic
     COMMAND_REJECTED_TOPIC       = local.command_rejected_topic
     RENDER_REQUESTED_TOPIC       = local.render_requested_topic
-    # snapshot-requested is added with its worker (BOT-07); the proxy does not forward
-    # /snapshot yet.
+    SNAPSHOT_REQUESTED_TOPIC     = local.snapshot_requested_topic
   }
   secrets = {
     DISCORD_APPLICATION_ID  = { secret = "discord-application-id", version = var.discord_application_id_version }
@@ -74,11 +73,13 @@ locals {
 
   # One tokenCreator per worker invoker, shared by all the subscriptions of that worker.
   push_invokers = local.discord_delivery_enabled ? {
-    command_worker   = module.command_worker[0].invoker_service_account_name
-    draw_worker      = module.draw_worker[0].invoker_service_account_name
-    discord_notifier = module.discord_notifier[0].invoker_service_account_name
-    admin_worker     = module.admin_worker[0].invoker_service_account_name
-    render_worker    = module.render_worker[0].invoker_service_account_name
+    command_worker    = module.command_worker[0].invoker_service_account_name
+    draw_worker       = module.draw_worker[0].invoker_service_account_name
+    discord_notifier  = module.discord_notifier[0].invoker_service_account_name
+    admin_worker      = module.admin_worker[0].invoker_service_account_name
+    render_worker     = module.render_worker[0].invoker_service_account_name
+    snapshot_worker   = module.snapshot_worker[0].invoker_service_account_name
+    snapshot_notifier = module.snapshot_notifier[0].invoker_service_account_name
   } : {}
 }
 

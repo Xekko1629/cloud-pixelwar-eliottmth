@@ -10,7 +10,7 @@ function snowflake(value: unknown): value is string {
 }
 
 /** Commands this proxy forwards; the others get an immediate ephemeral answer. */
-export const FORWARDED_COMMANDS = ['draw', 'admin', 'get'] as const;
+export const FORWARDED_COMMANDS = ['draw', 'admin', 'get', 'snapshot'] as const;
 export type ForwardedCommand = (typeof FORWARDED_COMMANDS)[number];
 
 /** Same names as the command-worker, which validates ranges and the width/height pair. */
@@ -18,7 +18,7 @@ export type AdminOptions = { subcommand: string } & Record<string, string | numb
 export type CommandPayload =
   | { command: 'draw'; options: { x: number; y: number; color: number } }
   | { command: 'admin'; options: AdminOptions }
-  | { command: 'get'; options: Record<string, never> };
+  | { command: 'get' | 'snapshot'; options: Record<string, never> };
 
 /** An interaction the user can fix: answered at once instead of failing in a worker. */
 export class UserInputError extends Error {
@@ -87,10 +87,10 @@ function adminOptions(options: unknown): CommandPayload {
   return { command: 'admin', options: values };
 }
 
-// /get has no option: Discord omits the field (an empty list is accepted too).
-function getOptions(options: unknown): CommandPayload {
+// /get and /snapshot have no option: Discord omits the field (an empty list is accepted too).
+function noOptions(command: 'get' | 'snapshot', options: unknown): CommandPayload {
   if (options !== undefined && !(Array.isArray(options) && options.length === 0)) throw new Error('Invalid options');
-  return { command: 'get', options: {} };
+  return { command, options: {} };
 }
 
 export function commandEvent(interaction: Record<string, unknown>, applicationId: string): DiscordCommandEvent {
@@ -105,7 +105,7 @@ export function commandEvent(interaction: Record<string, unknown>, applicationId
     throw new Error('Invalid interaction');
   }
   const command = data.name === 'admin' ? adminOptions(data.options)
-    : data.name === 'get' ? getOptions(data.options) : drawOptions(data.options);
+    : data.name === 'get' || data.name === 'snapshot' ? noOptions(data.name, data.options) : drawOptions(data.options);
   // UUID-shaped, namespaced SHA-256 (UUIDv8). Stable across delivery attempts.
   const bytes = createHash('sha256').update(`pixelwar:discord-command:v1:${applicationId}:${interaction.id}`).digest().subarray(0, 16);
   bytes[6] = (bytes[6] & 0x0f) | 0x80;

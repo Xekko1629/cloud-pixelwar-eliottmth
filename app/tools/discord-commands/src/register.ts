@@ -64,7 +64,7 @@ export async function registerHelloCommand(
 }
 
 /** Slash commands that can be registered alone, without the PUT that replaces the catalogue. */
-export type TargetedCommand = 'draw' | 'admin' | 'get';
+export type TargetedCommand = 'draw' | 'admin' | 'get' | 'snapshot';
 
 /** Offline preview: the exact POST/PATCH decision requires an authorized GET. */
 export function targetedRegistrationPlan(target: Target, name: TargetedCommand) {
@@ -81,6 +81,7 @@ export function targetedRegistrationPlan(target: Target, name: TargetedCommand) 
 export const drawRegistrationPlan = (target: Target) => targetedRegistrationPlan(target, 'draw');
 export const adminRegistrationPlan = (target: Target) => targetedRegistrationPlan(target, 'admin');
 export const getRegistrationPlan = (target: Target) => targetedRegistrationPlan(target, 'get');
+export const snapshotRegistrationPlan = (target: Target) => targetedRegistrationPlan(target, 'snapshot');
 
 export async function registerDrawCommand(
   target: Target, token: string, confirmation: string,
@@ -101,6 +102,13 @@ export async function registerGetCommand(
   dependencies: Dependencies = { fetch: globalThis.fetch, sleep: async (ms) => { await setTimeout(ms); } },
 ): Promise<void> {
   await registerTargetedCommand(target, token, confirmation, 'get', dependencies);
+}
+
+export async function registerSnapshotCommand(
+  target: Target, token: string, confirmation: string,
+  dependencies: Dependencies = { fetch: globalThis.fetch, sleep: async (ms) => { await setTimeout(ms); } },
+): Promise<void> {
+  await registerTargetedCommand(target, token, confirmation, 'snapshot', dependencies);
 }
 
 /** GET the scope, then POST the command if absent or PATCH its validated ID: nothing else changes. */

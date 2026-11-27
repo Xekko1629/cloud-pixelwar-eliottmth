@@ -78,11 +78,11 @@ Les exemples ci-dessous donnent le `payload` seul ; l'enveloppe de la section 1 
 
 ### 3.1 `discord-command`
 
-Contrat v1 implémenté (`app/functions/discord-proxy/src/event.ts`). Le proxy publie `/draw`, `/admin` et `/get` (options `{}`) ; `/snapshot` suivra le même schéma.
+Contrat v1 implémenté (`app/functions/discord-proxy/src/event.ts`). Le proxy publie `/draw`, `/admin`, `/get` et `/snapshot` (options `{}` pour les deux derniers).
 
 | Champ | Type | Obligatoire | Contrainte | Origine |
 |---|---|---|---|---|
-| `command` | string | oui | `draw`, `admin` ou `get` (puis `snapshot`) | BOT-02 ; BOT-04 (routage) |
+| `command` | string | oui | `draw`, `admin`, `get` ou `snapshot` | BOT-02 ; BOT-04 (routage) |
 | `options` | object | oui | Objet aplati. Pour `draw` : exactement `x`, `y`, `color`, entiers, avec les bornes de `pixel-draw` (section 3.2). Pour `admin` : `subcommand` et ses options (section 3.6). | `event.ts` ; le `command-worker` revalide (`docs/discord-commands.md`) |
 | `interaction_id` | string | oui | Snowflake Discord | BOT-04 (idempotence par id d'interaction) |
 | `application_id` | string | oui | Snowflake, égal à l'application de l'environnement | `event.ts` : un callback d'une autre application est refusé |
@@ -317,11 +317,9 @@ Ce que le `snapshot-notifier` reçoit :
 
 Ces noms d'attributs et le contenu exact du corps viennent de la documentation Cloud Storage, non citée dans le dépôt : **à vérifier** avant implémentation.
 
-Retrouver la corrélation : le `snapshot-worker` écrit les informations de la demande dans les métadonnées personnalisées de l'objet (BOT-07a : token d'interaction et canal). Le `snapshot-notifier` les lit dans la ressource objet (champ `metadata`) ou par une lecture de l'objet. Proposition : y ajouter aussi `correlation_id`, `event_id` de la demande et `interaction_id`, pour relier la notification à la trace de la commande (BOT-09). BOT-07a ne le demande pas explicitement.
+Retrouver la corrélation (tranché par BOT-07a/b, 26/11) : le nom de l'image porte l'`event_id` de la demande (`snapshots/<date>_<event_id>.png`). Le `snapshot-worker` écrit d'abord `requests/<event_id>.json` (token, `correlation_id`, `traceparent`), puis l'image ; le `snapshot-notifier` relit cette fiche et continue la trace de la commande (BOT-09). Le token n'est **jamais** dans les métadonnées de l'image : Cloud Storage les renvoie en en-têtes `x-goog-meta-*` à chaque téléchargement, URL signée comprise. La notification est filtrée sur `snapshots/`, et une règle d'expiration supprime `requests/` après un jour ([snapshot.md](snapshot.md)).
 
-Idempotence : le message n'a pas de `event_id`. La clé proposée est `bucketId` + `objectId` + `objectGeneration`. Une notification rejouée pour la même génération ne doit pas reposter le lien. Stockage de la trace d'envoi : **À valider**.
-
-Le token d'interaction est un secret valide 15 min (BOT-05). Le stocker dans les métadonnées d'un objet est **À valider** (section 9).
+Idempotence : l'image est créée une seule fois (précondition « n'existe pas »), et le notifier modifie la réponse d'origine (`@original`) : une notification rejouée réécrit le même message, sans en créer un second. Aucune trace d'envoi n'est stockée.
 
 ## 6. Vue éloignée
 
@@ -407,8 +405,8 @@ Pub/Sub livre au moins une fois, sans ordre garanti. Chaque consommateur doit do
 | `admin-worker` | `event_id`, document `admin_events/<event_id>` écrit dans la même transaction que l'effet | Le résultat enregistré est repris : un `clear` relivré n'incrémente pas deux fois `canvas_version`. Même `event_id` avec une autre sous-commande : message invalide. La purge des anciennes tuiles reprend où elle s'était arrêtée. |
 | `discord-notifier` | Aucune clé stockée : effet idempotent | Le `PATCH` de la réponse d'origine (`@original`, BOT-05) est rejoué avec le même contenu : le message reste identique, aucun second message n'est créé (`docs/discord-notifier.md`). |
 | `render-worker` | `event_id` (proposition) | BOT-06 demande de tester qu'une nouvelle livraison ne produit pas de notification en double, mais ne fixe pas de mécanisme : **À valider**. |
-| `snapshot-worker` | Clé d'objet stable par demande (BOT-07a, #54) | Proposition : `snapshots/<occurred_at de la demande>-<event_id>.png`, pour que le rejeu écrive le même objet. Le format exact est **À valider**. |
-| `snapshot-notifier` | `bucketId` + `objectId` + `objectGeneration` (section 5) | Une notification rejouée ne doit pas reposter le lien (#55). Le stockage de la trace d'envoi est **À valider**. |
+| `snapshot-worker` | Clé d'objet stable par demande : `snapshots/<date de l'interaction>_<event_id>.png` | La fiche et l'image sont créées avec la précondition « n'existe pas » : un rejeu ne crée rien de plus (`snapshot.already_stored`). |
+| `snapshot-notifier` | Aucune clé stockée : effet idempotent | Le `PATCH` de la réponse d'origine est rejoué : le message est réécrit (lien re-signé), aucun second message n'est créé. |
 | Consommateur de marquage (vue éloignée) | Marquage idempotent par construction (proposition) | Marquer deux fois une région ne change rien. |
 | `overview-worker` | Re-rendu depuis l'état courant (proposition) | Rejouable sans effet de bord. Les exécutions concurrentes sont **À valider**. |
 
@@ -443,8 +441,8 @@ Décisions que les sources ne tranchent pas. Chacune est à valider avant SRV-05
 10. **Noms** : topic `overview-tick`, consommateur de marquage, et adoption de la convention de nommage des abonnements (section 7.1).
 11. **Backoff** des autres workers ; `max_delivery_attempts = 5` reste approximatif.
 12. **Droit de publication de Cloud Scheduler** sur `overview-tick` (non cité dans ADR-0002).
-13. **Secrets dans les messages** : le `interaction_token` circule dans `discord-command`, `pixel-draw`, `pixel-processed`, `pixel-rejected`, `render-requested`, `snapshot-requested`, `admin-requested` et `command-rejected` (toujours dans `payload.discord`, jamais dans les attributs ni dans Firestore), et serait stocké dans les métadonnées de l'objet snapshot. Il est valide 15 min : une livraison retardée au-delà ne peut plus éditer le message. Le stocker dans GCS est-il acceptable ?
-14. **`snapshot-ready`** : confirmer que le topic reste natif Cloud Storage, et ajouter `correlation_id` aux métadonnées de l'objet (BOT-07a ne le prévoit pas).
+13. **Secrets dans les messages** : le `interaction_token` circule dans `discord-command`, `pixel-draw`, `pixel-processed`, `pixel-rejected`, `render-requested`, `snapshot-requested`, `admin-requested` et `command-rejected` (toujours dans `payload.discord`, jamais dans les attributs ni dans Firestore), et, pour `/snapshot`, dans `requests/<event_id>.json` du bucket privé `snapshots` (jamais dans les métadonnées de l'image), lisible par le seul `snapshot-notifier` et supprimé après un jour. Il est valide 15 min : une livraison retardée au-delà ne peut plus éditer le message. Tranché par BOT-07b pour le stockage GCS.
+14. ~~**`snapshot-ready`**~~ Tranché par BOT-07b : topic natif Cloud Storage, filtré sur `snapshots/` ; la corrélation passe par la fiche `requests/<event_id>.json` (section 5).
 15. ~~**Rejeu tardif du `discord-notifier`.**~~ Tranché par BOT-05 : après 15 min, un log sûr est écrit et le message est acquitté (`204`) sans appeler Discord (`docs/discord-notifier.md`).
 16. ~~**Filtre `source` du `discord-notifier`.**~~ Tranché par BOT-05 : dans le worker, qui acquitte un résultat web sans action.
 17. **Idempotence des `render-worker` et `snapshot-worker`** : BOT-06 et BOT-07a demandent des tests, sans mécanisme (section 8.1).

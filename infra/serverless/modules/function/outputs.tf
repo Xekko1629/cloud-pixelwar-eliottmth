@@ -28,6 +28,11 @@ output "service_account_email" {
   value       = google_service_account.runtime.email
 }
 
+output "service_account_name" {
+  description = "Runtime identity resource name, for grants on the identity itself (signBlob)"
+  value       = google_service_account.runtime.name
+}
+
 output "service_account_member" {
   description = "IAM member for topic, bucket and other resource-scoped grants"
   value       = google_service_account.runtime.member
@@ -51,6 +56,11 @@ output "runtime" {
 output "concurrency" {
   description = "Maximum concurrent requests per instance"
   value       = var.concurrency
+}
+
+output "max_instances" {
+  description = "Maximum number of instances: the cost ceiling of the function"
+  value       = var.max_instances
 }
 
 output "memory" {

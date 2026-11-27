@@ -5,7 +5,8 @@ import type { Severity } from './logger';
 
 type Runtime = ReturnType<typeof createObservability>;
 type Carrier = { correlation_id: string; traceparent: string };
-type Service = 'discord-proxy' | 'web-proxy' | 'tile-reader' | 'command-worker' | 'draw-worker' | 'discord-notifier' | 'admin-worker' | 'render-worker';
+type Service = 'discord-proxy' | 'web-proxy' | 'tile-reader' | 'command-worker' | 'draw-worker' | 'discord-notifier' | 'admin-worker' | 'render-worker'
+  | 'snapshot-worker' | 'snapshot-notifier';
 export interface FunctionOperation {
   attributes(): Carrier;
   logFields(): Record<string, string | boolean>;
