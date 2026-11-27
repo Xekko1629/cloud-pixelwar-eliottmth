@@ -122,7 +122,7 @@ Profil du Terraform dev (`infra/serverless/draw-path.tf`) :
 service_type    = "worker"
 concurrency     = 32
 min_instances   = 0
-max_instances   = 2
+max_instances   = var.draw_worker_max_instances   # 5 par défaut, de 1 à 10
 timeout_seconds = 300
 cpu             = "1"
 memory          = "512Mi"
@@ -165,7 +165,27 @@ Un pixel traité seul n'écrit pas de ligne de groupe. Chaque pixel garde son lo
 `draw.result.published`. Le débit par instance de DRAW-05 se lit sur ces logs et sur
 la métrique de tentatives du worker.
 
-`max_instances = 2` reste le plafond de dépense. Le timeout total et les reprises
+**Pourquoi 5 instances.** Une instance ne fait qu'une transaction à la fois, soit
+environ 10 pixels par seconde (dev, 27/11 : 19 à 24 px/s avec 2 instances saturées,
+et 1 291 refus `429` « no available instance » pendant 4 tracés de 500 pixels). Le
+débit se règle donc en instances : 5 instances, c'est environ 50 px/s, soit environ
+150 joueurs au quota par défaut de 20 pixels par minute.
+
+Le coût suit le nombre de pixels, pas le plafond : 500 pixels prennent environ
+50 secondes d'instance, sur 2 comme sur 5 instances. Le plafond borne seulement
+l'heure la plus chère, environ 0,2 $ par instance saturée, Firestore compris (ordre
+de grandeur, tarifs publics à revérifier). Au repos, `min_instances = 0` ne coûte
+rien. Au-delà de 10, la validation refuse : revoir d'abord le budget
+(`docs/gcp.md`).
+
+La démonstration de montée en charge change seulement
+`draw_worker_max_instances` (2, puis 4, puis 5) ; voir le
+[protocole de mesure](draw-throughput.md). Le passage à l'échelle n'est linéaire que
+si les pixels viennent de joueurs différents : chaque transaction écrit
+`users/{uid}`, donc un seul joueur sur plusieurs instances crée de la contention
+(`draw.group.fallback`).
+
+Le timeout total et les reprises
 doivent rester compatibles avec le token Discord de 15 minutes (tentatives avant la
 DLQ : `docs/events.md`, section 7.2).
 

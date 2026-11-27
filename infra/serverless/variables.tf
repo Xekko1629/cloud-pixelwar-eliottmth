@@ -156,6 +156,17 @@ variable "overview_schedule" {
   default     = "* * * * *"
 }
 
+variable "draw_worker_max_instances" {
+  description = "Instance ceiling of draw-worker: about 10 pixels per second each (dev, 27/11); cost is per pixel, the ceiling bounds the worst hour"
+  type        = number
+  default     = 5
+
+  validation {
+    condition     = var.draw_worker_max_instances >= 1 && var.draw_worker_max_instances <= 10 && floor(var.draw_worker_max_instances) == var.draw_worker_max_instances
+    error_message = "draw_worker_max_instances must be an integer from 1 to 10; above 10, raise the budget first."
+  }
+}
+
 variable "alert_notification_channels" {
   description = "Monitoring notification channels of the alerts (OBS-01); empty: incidents are only shown in the console"
   type        = list(string)

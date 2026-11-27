@@ -3,8 +3,9 @@
 ## Objectif
 
 Depuis l'[ADR-0014](adr/0014-un-evenement-par-pixel.md), chaque pixel est un message
-`pixel-draw`. Le `draw-worker` en traite un par instance (`concurrency = 1`), avec au
-plus deux instances ([profil](draw-worker.md)). Cette mesure répond à deux
+`pixel-draw`. Le `draw-worker` en regroupe jusqu'à 32 par transaction
+(`concurrency = 32`), avec au plus `draw_worker_max_instances` instances
+([profil](draw-worker.md)). Cette mesure répond à deux
 questions, en dev seulement :
 
 - combien de pixels par seconde le parcours traite avec ce profil ;
@@ -78,9 +79,25 @@ du service `draw-worker`.
 
 - Remettre la limite à sa valeur précédente avec `/admin ratelimit`.
 - Si besoin, `/admin clear` pour effacer les pixels de test.
-- Reporter les résultats datés ci-dessous. Changer `concurrency` ou
-  `max_instances` est une décision séparée, avec sa propre PR.
+- Reporter les résultats datés ci-dessous. Changer `concurrency` est une décision
+  séparée, avec sa propre PR. Pour la démonstration de montée en charge, refaire le
+  palier 3 avec `draw_worker_max_instances` à 2, puis 4, puis 5, avec **quatre
+  comptes différents**, et relever pour chaque valeur : débit, refus `429` de
+  `draw-worker`, âge du plus vieux message, taille moyenne des groupes
+  (`draw.group.committed`) et nombre de `draw.group.fallback`.
 
 ## Résultats
 
-Pas encore mesuré.
+**27/11, 12:14–12:18 UTC, dev, `89eb0cc`, 2 instances, tracés au pinceau web** (pas
+`npm run loadtest`) : 10 tracés, 2 385 pixels, tous traités, un résultat par pixel.
+
+| Rafale | Pixels | Durée | Débit |
+| --- | --- | --- | --- |
+| 12:16:15, 4 tracés simultanés | 1 548 | 83 s | ≈ 19 px/s |
+| 12:17:48, 3 tracés | 777 | 32 s | ≈ 24 px/s |
+
+- 144 groupes, 16 pixels en moyenne, 31 au plus.
+- Une requête occupe sa place 1,9 s en médiane (span `pixel-draw` : 1,7 s).
+- 1 291 refus `429` « no available instance » : 2 instances × 32 places saturées ;
+  les relivraisons Pub/Sub (10 à 60 s) font la traîne, jusqu'à 83 s après le clic.
+- Nombre de comptes non relevé (`user_id` absent des logs de `web-proxy`).
