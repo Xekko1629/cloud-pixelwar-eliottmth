@@ -24,7 +24,7 @@ export class DrawGroupTooLargeError extends Error {
 
 type Decision =
   | { type: 'pixel-rejected'; reason: NonNullable<DrawResult['reason']>; quota?: DrawResult['quota'] }
-  | { type: 'pixel-processed'; applied: DrawPixel[]; quota: DrawResult['quota'] };
+  | { type: 'pixel-processed'; applied: DrawPixel[]; quota?: DrawResult['quota'] };
 
 interface Person {
   ref: DocumentReference;
@@ -65,6 +65,10 @@ interface TileState {
  *
  * Any error fails the whole group and nothing is written: the caller then processes each
  * command alone, so that one faulty command never blocks the others.
+ *
+ * A command of a reserved source (ADR-0017) skips the quota: its users/{uid} is neither read
+ * nor written when it is accepted, so that the transactions of one web user stop colliding
+ * on that document. It is read and written only to remember a refusal (last_rejection).
  */
 export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {}, onTiming?: (timing: GroupTiming) => void) {
   const settings = drawOptions(options);
@@ -103,7 +107,10 @@ export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {
       if (!pending.length) return done;
 
       const configRef = ref(`${COLLECTIONS.config}/global`);
-      const uids = [...new Set(pending.map((c) => c.author.uid))];
+      const reserved = (command: PreparedDraw) => settings.reserved_sources.has(command.source);
+      const allUids = [...new Set(pending.map((c) => c.author.uid))];
+      // Only the users whose quota this transaction evaluates: never the reserved ones.
+      const uids = [...new Set(pending.filter((c) => !reserved(c)).map((c) => c.author.uid))];
       const snapshots = await timed('read_people_ms', tx.getAll(configRef, ...uids.flatMap((uid) => [
         ref(`${COLLECTIONS.overrides}/${uid}`), ref(`${COLLECTIONS.users}/${uid}`),
       ])));
@@ -149,7 +156,7 @@ export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {
       if (candidates.length) {
         const regions = new Set([...tiles.values()].map((tile) => tile.region));
         // Tiles (colors + metadata), deltas, one result per command, users and config.
-        const documents = countBatchDocuments(tiles.size, regions.size) + pending.length + uids.length + 1;
+        const documents = countBatchDocuments(tiles.size, regions.size) + pending.length + allUids.length + 1;
         if (documents > settings.max_write_documents) throw new DrawGroupTooLargeError();
 
         // All tile reads before ANY write. Refresh the worker clock after reads.
@@ -170,17 +177,21 @@ export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {
       const allApplied: DrawPixel[] = [];
       for (const command of candidates) {
         if (now - command.occurred_ms > MAX_DRAW_AGE_MS) { reject(command, 'expired'); continue; }
-        const person = people.get(command.author.uid)!;
-        const quota = evaluateRateLimit({
-          config, override: person.override, usage: person.usage, now_ms: now, pixel_count: command.pixels.length,
-        });
-        if (!quota.allowed) { reject(command, 'rate_limit', quota); continue; }
-        const next = quota.next_usage;
-        person.usage = {
-          window_start: Timestamp.fromMillis(next.window_start_ms), used_pixels: next.used_pixels,
-          limit_per_minute: next.limit_per_minute, updated_at: Timestamp.fromMillis(next.updated_at_ms), last_rejection: null,
-        };
-        person.accepted = true;
+        let quota: DrawResult['quota'];
+        if (!reserved(command)) {
+          const person = people.get(command.author.uid)!;
+          const decision = evaluateRateLimit({
+            config, override: person.override, usage: person.usage, now_ms: now, pixel_count: command.pixels.length,
+          });
+          if (!decision.allowed) { reject(command, 'rate_limit', decision); continue; }
+          const next = decision.next_usage;
+          person.usage = {
+            window_start: Timestamp.fromMillis(next.window_start_ms), used_pixels: next.used_pixels,
+            limit_per_minute: next.limit_per_minute, updated_at: Timestamp.fromMillis(next.updated_at_ms), last_rejection: null,
+          };
+          person.accepted = true;
+          quota = decision;
+        }
         const applied: DrawPixel[] = [];
         for (const [id, group] of commandTiles.get(command.event_id)!) {
           const tile = tiles.get(id)!;
@@ -195,7 +206,7 @@ export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {
         }
         for (const pixel of applied) finalPixels.set(`${pixel.x},${pixel.y}`, pixel);
         allApplied.push(...applied);
-        decisions.set(command.event_id, { type: 'pixel-processed', applied, quota });
+        decisions.set(command.event_id, { type: 'pixel-processed', applied, ...(quota ? { quota } : {}) });
       }
 
       const touched = [...tiles.values()].filter((tile) => tile.touched);
@@ -203,6 +214,28 @@ export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {
         + allApplied.length * 5 + 16_384; // Headroom for config, users, results and document framing.
       if (estimatedBytes > settings.max_estimated_bytes) throw new DrawGroupTooLargeError();
 
+      // Last refusal since the last accepted draw, in event order: some refusals are decided
+      // before the accepted draws (pause, bounds), but may come after them in time.
+      // An accepted reserved command does not touch users/{uid}, so it does not clear a refusal
+      // either: same result as one transaction per command.
+      const lastRejection = new Map<string, Person['rejection']>();
+      for (const command of ordered) {
+        const decision = decisions.get(command.event_id)!;
+        if (decision.type === 'pixel-rejected') lastRejection.set(command.author.uid, { event_id: command.event_id, reason: decision.reason });
+        else if (!reserved(command)) lastRejection.set(command.author.uid, null);
+      }
+      for (const [uid, rejection] of lastRejection) { const person = people.get(uid); if (person) person.rejection = rejection; }
+      // Reserved-only users are read only when their last command of the group was refused,
+      // still before any write; an accepted reserved command leaves users/{uid} alone.
+      const refusedReserved = [...lastRejection].filter(([uid, rejection]) => rejection && !people.has(uid)).map(([uid]) => uid);
+      if (refusedReserved.length) {
+        const read = await tx.getAll(...refusedReserved.map((uid) => ref(`${COLLECTIONS.users}/${uid}`)));
+        refusedReserved.forEach((uid, index) => people.set(uid, {
+          ref: ref(`${COLLECTIONS.users}/${uid}`), exists: read[index].exists, override: null,
+          limit: resolveRateLimit(config, null), usage: read[index].exists ? read[index].data() as UserStateDocument : null,
+          accepted: false, rejection: lastRejection.get(uid),
+        }));
+      }
       for (const tile of touched) {
         tx.set(ref(`${COLLECTIONS.colors}/${tile.id}`), tile.colors!);
         tx.set(ref(`${COLLECTIONS.metadata}/${tile.id}`), tile.metadata!);
@@ -218,13 +251,6 @@ export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {
             pixels: Buffer.from(encodeDelta(group.pixels, finalPixels.size)),
           });
         }
-      }
-      // Last refusal since the last accepted draw, in event order: some refusals are decided
-      // before the accepted draws (pause, bounds), but may come after them in time.
-      for (const command of ordered) {
-        const decision = decisions.get(command.event_id)!;
-        people.get(command.author.uid)!.rejection = decision.type === 'pixel-rejected'
-          ? { event_id: command.event_id, reason: decision.reason } : null;
       }
       const at = Timestamp.fromMillis(now);
       for (const person of people.values()) {
@@ -264,7 +290,7 @@ export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {
           : {
             ...base, applied_pixels: decision.applied.length, ignored_pixels: command.pixels.length - decision.applied.length,
             regions: decision.applied.length ? [...groupPixelsByRegion(decision.applied, settings.max_pixels).keys()].sort() : [],
-            quota: decision.quota,
+            ...(decision.quota ? { quota: decision.quota } : {}),
           };
         tx.create(ref(`${COLLECTIONS.processed}/${command.event_id}`), {
           schema_version: 1, event_id: command.event_id, request_digest: command.request_digest,

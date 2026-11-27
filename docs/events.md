@@ -58,7 +58,7 @@ Les autres champs (`event_id`, `occurred_at`, `source`, `actor`, `payload`) ne v
 | Topic | Producteur(s) | Consommateur(s) (abonnement) | Ticket(s) |
 |---|---|---|---|
 | `discord-command` | `discord-proxy` (après réponse différée `type: 5`) | `command-worker` | BOT-03, BOT-04 |
-| `pixel-draw` | `web-proxy` (`POST /api/pixels`, un message par pixel de la requête, [ADR-0014](adr/0014-un-evenement-par-pixel.md)) ; `command-worker` pour `/draw` (`source = discord`) | `draw-worker` | DRAW-01, DRAW-02, BOT-04 |
+| `pixel-draw` | `web-proxy` (`POST /api/pixels`, un message par pixel accordé de la requête, [ADR-0014](adr/0014-un-evenement-par-pixel.md), [ADR-0017](adr/0017-quota-reserve-avant-publication.md)) ; `command-worker` pour `/draw` (`source = discord`) | `draw-worker` | DRAW-01, DRAW-02, BOT-04 |
 | `pixel-processed` | `draw-worker`, un message par `pixel-draw` | `discord-notifier` (acquitte sans action les résultats `source = web`) | DRAW-02, BOT-05 |
 | `pixel-rejected` | `draw-worker`, un message par `pixel-draw` | `discord-notifier` | DRAW-02, BOT-05 |
 | `command-rejected` | `command-worker` (`/admin` ou `/snapshot` non autorisé) | `discord-notifier` (réponse du refus) | BOT-04, BOT-08 |
@@ -122,6 +122,7 @@ Identifiants :
 
 - Pour `source = discord`, le `command-worker` reprend l'`event_id`, le `correlation_id` et l'`occurred_at` du `discord-command`. Un `discord-command` relivré produit donc le même `pixel-draw`, que DATA-02 déduplique par `event_id`. Le `draw-worker` vérifie que l'`event_id` correspond bien à `discord.interaction_id`, et que `occurred_at` est la date du snowflake.
 - Pour `source = web`, le `web-proxy` (DRAW-01) reçoit de 1 à 500 pixels par requête et publie un message par pixel : un `event_id` neuf (UUID v4) par pixel, un `correlation_id` commun à toute la requête (le trait), et un `occurred_at` commun, à l'heure du proxy. Une requête renvoyée par le navigateur est donc un second trait, sans changement visuel mais comptée deux fois dans le quota (`docs/web-proxy.md`).
+- Pour `source = web`, le quota est **déjà réservé** par `quota-reserver` avant la publication ([ADR-0017](adr/0017-quota-reserve-avant-publication.md)) : seuls les pixels accordés sont publiés, et le `draw-worker` ne recompte pas leur quota. Il leur fait confiance parce que seul `web-proxy` peut publier des pixels web sur ce topic (IAM). Le schéma du message ne change pas.
 - Le `pixel-draw` issu de `/draw` contient exactement un pixel.
 
 Contraintes complémentaires :

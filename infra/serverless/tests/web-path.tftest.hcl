@@ -29,6 +29,24 @@ mock_provider "archive" {
 }
 
 override_resource {
+  target = module.web_proxy[0].google_service_account.runtime
+  values = {
+    email  = "web-proxy@pixelwar-test.iam.gserviceaccount.com"
+    member = "serviceAccount:web-proxy@pixelwar-test.iam.gserviceaccount.com"
+    name   = "projects/pixelwar-test/serviceAccounts/web-proxy@pixelwar-test.iam.gserviceaccount.com"
+  }
+}
+
+override_resource {
+  target = module.quota_reserver[0].google_service_account.runtime
+  values = {
+    email  = "quota-reserver@pixelwar-test.iam.gserviceaccount.com"
+    member = "serviceAccount:quota-reserver@pixelwar-test.iam.gserviceaccount.com"
+    name   = "projects/pixelwar-test/serviceAccounts/quota-reserver@pixelwar-test.iam.gserviceaccount.com"
+  }
+}
+
+override_resource {
   target = module.tile_reader[0].google_service_account.runtime
   values = {
     email  = "tile-reader@pixelwar-test.iam.gserviceaccount.com"
@@ -51,6 +69,7 @@ run "disabled_by_default" {
     condition = (
       length(module.web_proxy) == 0 && length(module.tile_reader) == 0 &&
       length(google_project_iam_member.tile_reader_firestore) == 0 &&
+      length(module.quota_reserver) == 0 && length(google_cloud_run_service_iam_member.quota_reserver_invoker) == 0 &&
       !contains(keys(output.gateway_contract.backends), "api") &&
       !contains(keys(output.gateway_contract.backends), "tiles")
     )
@@ -82,6 +101,19 @@ run "web_api_exports_two_proxies" {
   assert {
     condition     = local.frontend_origin == "https://frontend-123456789.europe-west1.run.app"
     error_message = "Both proxies allow the deterministic frontend origin only (CORS)."
+  }
+  assert {
+    condition = (
+      module.quota_reserver[0].name == "quota-reserver" && module.quota_reserver[0].invoker_service_account_email == null &&
+      google_cloud_run_service_iam_member.quota_reserver_invoker[0].role == "roles/run.invoker" &&
+      google_cloud_run_service_iam_member.quota_reserver_invoker[0].service == "quota-reserver" &&
+      google_cloud_run_service_iam_member.quota_reserver_invoker[0].member == "serviceAccount:web-proxy@pixelwar-test.iam.gserviceaccount.com" &&
+      google_project_iam_member.quota_reserver_firestore[0].role == "roles/datastore.user" &&
+      google_project_iam_member.quota_reserver_firestore[0].member == "serviceAccount:quota-reserver@pixelwar-test.iam.gserviceaccount.com" &&
+      module.web_proxy[0].environment_variables.QUOTA_RESERVER_URL == module.quota_reserver[0].uri &&
+      !contains([for backend in values(output.gateway_contract.backends) : backend.function_name], "quota-reserver")
+    )
+    error_message = "ADR-0017: quota-reserver writes Firestore, is invoked by web-proxy only and has no gateway route."
   }
 }
 

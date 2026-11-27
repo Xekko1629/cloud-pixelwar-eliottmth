@@ -86,6 +86,14 @@ depuis 1970 et la fenêtre, y compris sa fin, doit tenir dans la plage Firestore
 
 ## Contrat transactionnel de l'appelant
 
+**Source `web` ([ADR-0017](adr/0017-quota-reserve-avant-publication.md)).** Le quota
+d'une requête web est réservé par `quota-reserver` (`createQuotaReservation` de
+`@pixelwar/shared/drawing`) dans **une transaction séparée, avant la publication** :
+les N premiers pixels qui tiennent dans le quota sont accordés, les autres ne sont
+jamais publiés. `users/{uid}.last_reservation` rend la même réponse à une reprise
+du même `reservation_id`. Le `draw-worker` ne recompte pas ces pixels. Le contrat
+ci-dessous reste celui des pixels Discord.
+
 Dans **la même transaction serveur** :
 
 1. Lire le document de déduplication par `event_id`. S'il existe, reprendre son
@@ -104,8 +112,8 @@ Dans **la même transaction serveur** :
 6. Erreur technique : pas de résultat définitif ni de commit partiel. Laisser
    les mécanismes de reprise agir ; ne pas lancer une boucle immédiate infinie.
 
-Ne pas consommer le quota dans une transaction séparée, ni faire confiance au
-frontend pour l'autorisation. Sérialiser les modifications concurrentes via
+Pour Discord, ne pas consommer le quota dans une transaction séparée ; pour
+aucune source, ne faire confiance au frontend pour l'autorisation. Sérialiser les modifications concurrentes via
 `users/{uid}`, commun à Discord/web (identité ADR-0005). Ne pas supprimer ce
 compteur ou changer son `window_start` lors d'un override admin.
 

@@ -40,6 +40,8 @@ module "web_proxy" {
     GOOGLE_CLOUD_PROJECT = var.project_id
     PIXEL_DRAW_TOPIC     = local.pixel_draw_topic
     FRONTEND_ORIGIN      = local.frontend_origin
+    # ADR-0017: the quota of each request is reserved there before publication.
+    QUOTA_RESERVER_URL = module.quota_reserver[0].uri
   }
 }
 

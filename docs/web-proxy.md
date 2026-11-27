@@ -7,15 +7,20 @@
 son droit de publication sur `pixel-draw` et le backend `api` sont déclarés dans
 `infra/serverless/web-path.tf` ([déploiement dev](deploy-web-path.md)).
 
-Le proxy valide toute la requête (1 à 500 pixels), puis publie **un message
-`pixel-draw` par pixel** ([ADR-0014](adr/0014-un-evenement-par-pixel.md), catalogue
+Le proxy valide toute la requête (1 à 500 pixels), réserve son quota auprès de
+[`quota-reserver`](quota-reserver.md) ([ADR-0017](adr/0017-quota-reserve-avant-publication.md)),
+puis publie **un message `pixel-draw` par pixel accordé** ([ADR-0014](adr/0014-un-evenement-par-pixel.md), catalogue
 des événements, [section 3.2](events.md#32-pixel-draw)) et répond `202`. Il attend
 la confirmation de **toutes** les publications avant de répondre. Aucun traitement n'est lancé après la
 réponse.
 
-Il n'écrit pas Firestore et ne le lit pas. Le quota, la pause, la taille courante
-de la grille et l'ordre des pixels sont appliqués par le `draw-worker` dans la
-transaction DATA-02 ([drawing-transactions.md](drawing-transactions.md)).
+Il n'écrit pas Firestore et ne le lit pas. Le quota est réservé **une fois par
+requête** par `quota-reserver`, appelé avec un ID token du compte de service
+`web-proxy` (variable `QUOTA_RESERVER_URL`) : seuls les **N premiers** pixels de la
+requête sont accordés et publiés. La pause, la taille courante de la grille et
+l'ordre des pixels restent appliqués par le `draw-worker` dans la transaction
+DATA-02 ([drawing-transactions.md](drawing-transactions.md)), qui ne recompte pas
+le quota d'un pixel web.
 
 ## Authentification
 
@@ -63,7 +68,10 @@ message invalide, qui partirait en DLQ au lieu de répondre à l'utilisateur.
 
 | Situation | Réponse |
 | --- | --- |
-| Tous les pixels publiés sur `pixel-draw` | `202 { "correlation_id", "event_ids": [...] }`, un `event_id` par pixel, dans l'ordre de la requête |
+| Tous les pixels accordés et publiés | `202 { "correlation_id", "event_ids": [...] }`, un `event_id` par pixel, dans l'ordre de la requête |
+| Quota suffisant pour une partie seulement | `202 { "correlation_id", "event_ids": [...], "refused": { "count", "reason", "retry_after_seconds" } }` : les `event_ids` des N premiers pixels ; les autres ne sont jamais publiés |
+| Rien d'accordé (`insufficient_quota`, `paused`, `drawing_disabled`) | `429 { "error": reason, "retry_after_seconds" }`, avec `Retry-After` quand une attente suffit ; rien n'est publié |
+| `quota-reserver` indisponible | `503 quota_unavailable` : rien n'est publié |
 | Identité absente ou invalide | `401 unauthenticated` |
 | Lot refusé | `400` ou `413`, avec le code ci-dessus |
 | Mauvais chemin ou méthode | `404 not_found`, `405 method_not_allowed` |
@@ -93,7 +101,8 @@ messages ou 10 ms) : c'est un regroupement de transport, chaque message restant 
 
 Conséquence assumée : une requête renvoyée par le navigateur, par exemple après
 une coupure réseau qui a perdu le `202`, est un **second trait**. La grille ne
-change pas visuellement (mêmes couleurs), mais le quota est compté deux fois et
+change pas visuellement (mêmes couleurs), mais le quota est compté deux fois (nouveau
+`correlation_id`, donc nouvelle réservation) et
 un second delta est diffusé. Le frontend ne doit donc pas renvoyer
 automatiquement une requête dont l'issue est incertaine.
 

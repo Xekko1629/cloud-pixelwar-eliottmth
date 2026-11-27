@@ -87,6 +87,8 @@
 
 ### Quotas
 
+> Pour la source `web`, remplacé par [ADR-0017](0017-quota-reserve-avant-publication.md) : le quota est réservé une fois par requête, avant la publication. Ce qui suit reste vrai pour `/draw` Discord.
+
 - Chaque pixel est évalué seul. Pour un trait plus long que le quota restant, les
   premiers pixels traités passent et les suivants sont rejetés avec
   `insufficient_quota`. Dans le mode de base, l'ordre de livraison n'étant pas

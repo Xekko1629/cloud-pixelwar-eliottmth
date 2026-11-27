@@ -86,6 +86,16 @@
       ]
     },
     {
+      "id": "quota_reserver",
+      "label": "quota-reserver",
+      "view": "application",
+      "group": "Proxies (Cloud Run functions)",
+      "status": "deployed",
+      "terraform": [
+        "serverless:module.quota_reserver"
+      ]
+    },
+    {
       "id": "auth_proxy",
       "label": "auth-proxy",
       "view": "application",
@@ -703,9 +713,23 @@
       "status": "deployed"
     },
     {
+      "from": "web_proxy",
+      "to": "quota_reserver",
+      "label": "réserve N pixels (ID token)",
+      "kind": "request",
+      "status": "deployed"
+    },
+    {
+      "from": "quota_reserver",
+      "to": "firestore",
+      "label": "transaction : users/{uid}",
+      "kind": "request",
+      "status": "deployed"
+    },
+    {
       "from": "draw_worker",
       "to": "firestore",
-      "label": "transaction : tuile + delta + quota",
+      "label": "transaction : tuile + delta (+ quota Discord)",
       "kind": "request",
       "status": "deployed"
     },

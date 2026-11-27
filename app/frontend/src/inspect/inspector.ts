@@ -1,5 +1,5 @@
 import { isInsideGrid, locatePixel, type DrawPixel } from '@pixelwar/shared/grid';
-import type { ApiClient } from '../api/client';
+import { ApiError, type ApiClient } from '../api/client';
 import { fetchTileMeta, fetchUserQuota, postPixels, type PixelAuthor, type UserQuota } from '../api/grid';
 import type { TileColorsSource } from '../canvas/tiles';
 import type { CanvasConfig } from '../realtime/feed';
@@ -160,6 +160,12 @@ export class PixelInspector {
       this.update({ feedback: { status: 'waiting', eventId } });
       this.confirmTimer = this.setTimer(() => void this.confirm(eventId), this.confirmAfterMs);
     } catch (error) {
+      if (error instanceof ApiError && error.status === 429) {
+        // Refused by the quota before publication (ADR-0017): certain, nothing will be drawn.
+        this.update({ feedback: { status: 'rejected', reason: error.code } });
+        if (this.lastSent) this.forget([this.lastSent]);
+        return;
+      }
       // Never sent again automatically: a lost 202 would make a second stroke (web-proxy.md).
       const code = typeof (error as { code?: unknown }).code === 'string' ? (error as { code: string }).code : 'network';
       this.update({ feedback: { status: 'error', code } });

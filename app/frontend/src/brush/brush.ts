@@ -1,5 +1,5 @@
 import { DEFAULT_MAX_BATCH_PIXELS, type DrawPixel } from '@pixelwar/shared/grid';
-import type { ApiClient } from '../api/client';
+import { ApiError, type ApiClient } from '../api/client';
 import { postPixels, type UserQuota } from '../api/grid';
 import type { CanvasConfig } from '../realtime/feed';
 import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE, Stroke, type BrushShape, type Point } from './stroke';
@@ -62,6 +62,8 @@ export class Brush {
   private sent = 0;
   private ended = false;
   private failed: string | null = null;
+  // The quota refused part of the stroke before publication (ADR-0017): stop sending.
+  private refused: string | null = null;
   private eventIds = new Set<string>();
   private sentPixels: DrawPixel[] = [];
 
@@ -112,6 +114,7 @@ export class Brush {
     this.sent = 0;
     this.ended = false;
     this.failed = null;
+    this.refused = null;
     this.eventIds = new Set();
     this.sentPixels = [];
     this.extend(point);
@@ -140,7 +143,7 @@ export class Brush {
   private pump(): void {
     const stroke = this.stroke;
     if (!stroke) return;
-    while (this.failed === null && this.inFlight < this.concurrency &&
+    while (this.failed === null && this.refused === null && this.inFlight < this.concurrency &&
       (stroke.pending >= DEFAULT_MAX_BATCH_PIXELS || (this.ended && stroke.pending > 0))) {
       void this.send(stroke.take(), this.strokeId);
     }
@@ -153,13 +156,25 @@ export class Brush {
       const accepted = await postPixels(this.api, pixels);
       if (id !== this.strokeId) return;
       for (const eventId of accepted.eventIds) this.eventIds.add(eventId);
-      this.sent += pixels.length;
-      this.sentPixels.push(...pixels);
+      // Only the first pixels of the request may be granted: the others will never be drawn.
+      const granted = pixels.slice(0, accepted.eventIds.length);
+      this.sent += granted.length;
+      this.sentPixels.push(...granted);
+      if (accepted.refused) {
+        this.context.forget?.(pixels.slice(granted.length));
+        this.refused ??= accepted.refused.reason;
+      }
     } catch (error) {
       if (id !== this.strokeId) return;
-      // The rest of the stroke is dropped, never sent again automatically: the outcome
-      // of a failed request is uncertain (docs/web-proxy.md).
-      this.failed ??= typeof (error as { code?: unknown }).code === 'string' ? (error as { code: string }).code : 'network';
+      if (error instanceof ApiError && error.status === 429) {
+        // Refused before publication: certain, unlike a failure. Nothing of it will be drawn.
+        this.context.forget?.(pixels);
+        this.refused ??= error.code;
+      } else {
+        // The rest of the stroke is dropped, never sent again automatically: the outcome
+        // of a failed request is uncertain (docs/web-proxy.md).
+        this.failed ??= typeof (error as { code?: unknown }).code === 'string' ? (error as { code: string }).code : 'network';
+      }
     } finally {
       if (id === this.strokeId) this.inFlight -= 1;
     }
@@ -174,6 +189,11 @@ export class Brush {
     this.stroke = null;
     if (this.failed !== null) {
       this.setStroke({ status: 'error', sent: this.sent, code: this.failed });
+      void this.context.reloadQuota();
+      return;
+    }
+    if (this.refused !== null) {
+      this.setStroke({ status: 'rejected', sent: this.sent, reason: this.refused });
       void this.context.reloadQuota();
       return;
     }

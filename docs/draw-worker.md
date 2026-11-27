@@ -157,6 +157,16 @@ token expiré).
 
 Mesures avant et après : [protocole de mesure du débit](draw-throughput.md).
 
+**Quota des pixels web réservé en amont** ([ADR-0017](adr/0017-quota-reserve-avant-publication.md)).
+Le worker crée ses deux processeurs avec `reserved_sources: ['web']`
+(`processor.ts`) : pour un pixel web, il ne lit ni `ratelimit_overrides/{uid}` ni
+`users/{uid}`, et n'écrit pas `users/{uid}` quand le pixel est accepté. Il ne lit et
+n'écrit ce document que pour mémoriser un refus (pause, hors de la toile, trop
+vieux) dans `last_rejection`, avant toute écriture de la transaction. Les pixels
+Discord gardent leur quota dans la transaction, avec la même règle et le même
+compteur. Le comportement par défaut de `@pixelwar/shared/drawing` (aucune source
+réservée) compte toutes les sources.
+
 **Regroupement d'écriture** ([ADR-0014](adr/0014-un-evenement-par-pixel.md)) :
 
 - Une instance n'exécute qu'**une** transaction à la fois
