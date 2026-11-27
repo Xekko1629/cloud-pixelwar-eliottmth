@@ -49,6 +49,13 @@ describe('PreviewLayer', () => {
     expect(preview.size).toBe(0);
   });
 
+  it('keeps a pixel 5 s at most by default', () => {
+    const delays: number[] = [];
+    const preview = new PreviewLayer({ setTimer: (_callback, ms) => delays.push(ms) });
+    preview.add([{ x: 1, y: 0, color: 4 }]);
+    expect(delays).toEqual([5_000]);
+  });
+
   it('is cleared by a new canvas version', () => {
     const { preview, changes, timers, source } = setup();
     preview.add([{ x: 1, y: 0, color: 4 }]);

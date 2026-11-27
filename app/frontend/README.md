@@ -107,11 +107,12 @@ de 1024 × 1024 pixels (16 × 16 tuiles), chargées par `GET /api/regions/{rx}/{
   requêtes `POST /api/pixels` de 500 au plus, quatre en parallèle au maximum, et le
   reste au relâchement. La toile n'affiche que ce que les deltas apportent.
 - **Aperçu** (`src/brush/preview.ts`) : ce qui vient d'être envoyé (trait ou « Poser le
-  pixel ») s'affiche tout de suite sur un **calque distinct**, un second canvas
-  transparent posé sur la toile, que le ticket autorise. La toile elle-même ne change
-  qu'avec les deltas. Un pixel de l'aperçu disparaît quand la toile montre sa couleur
-  (son delta est arrivé), sinon au bout de 10 s (refusé ou perdu) ; un `/admin clear`
-  vide l'aperçu.
+  pixel ») s'affiche tout de suite sur un **calque distinct et semi-transparent**, un
+  second canvas posé sur la toile. Ce n'est pas l'état : la toile, elle, ne change
+  qu'avec les deltas et montre toujours l'état réel (sujet §3.3), et l'aperçu ne fait
+  que marquer ce qui est en cours d'envoi, sans jamais passer pour un pixel posé. Un
+  pixel de l'aperçu disparaît quand la toile montre sa couleur (son delta est arrivé),
+  dès que son refus est connu, sinon au bout de 5 s ; un `/admin clear` vide l'aperçu.
 - **Quota et refus** : chaque pixel couvert est **décompté tout de suite** du quota
   affiché (`PixelInspector.consume`), car `/api/state` ne le voit qu'une fois traité par
   le worker : deux traits rapides ne croient donc pas avoir tout le quota. Le trait

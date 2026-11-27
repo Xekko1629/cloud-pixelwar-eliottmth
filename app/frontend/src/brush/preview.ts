@@ -3,11 +3,13 @@ import type { TileKey } from '../canvas/live-tiles';
 import type { TileColorsSource } from '../canvas/tiles';
 import type { TileChange } from '../realtime/live';
 
-// Local preview of what the user just sent (WEB-05): a separate layer drawn over the
-// canvas, never mixed with its tiles. The canvas itself only changes with the deltas.
+// Local preview of what the user just sent (WEB-05): a separate, half-transparent layer
+// drawn over the canvas, never mixed with its tiles. The canvas itself only changes with
+// the deltas: it always shows the real state, the preview only marks what is pending.
 //
 // A preview pixel disappears when the canvas shows its colour (its delta arrived), or
-// after `ttlMs` (refused, lost, or drawn over by someone else meanwhile).
+// after `ttlMs` (refused, lost, or drawn over by someone else meanwhile). A refusal is known
+// about 3 s after the send (Brush, PixelInspector), so 5 s is enough and keeps it short.
 
 export interface PreviewOptions {
   ttlMs?: number;
@@ -23,7 +25,7 @@ export class PreviewLayer implements TileColorsSource {
   private generation = 0;
 
   constructor(options: PreviewOptions = {}) {
-    this.ttlMs = options.ttlMs ?? 10_000;
+    this.ttlMs = options.ttlMs ?? 5_000;
     this.setTimer = options.setTimer ?? ((callback, ms) => setTimeout(callback, ms));
   }
 
