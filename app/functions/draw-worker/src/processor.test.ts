@@ -29,11 +29,15 @@ it('initializes Firestore on first use only and groups through the DATA-02 proce
   expect(mocks.process).toHaveBeenCalledTimes(2); // Idle instance: each command alone.
 });
 
-it('logs one line per group and none for a command processed alone', async () => {
+it('logs one line per group, with its wait and Firestore timing, and none for a command processed alone', async () => {
   const lines: string[] = [];
   let release!: () => void;
+  const timing = { attempts: 3, read_processed_ms: 40, read_people_ms: 400, read_tiles_ms: 60, transaction_ms: 1700 };
   mocks.process.mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve({ type: 'pixel-processed' }); }));
-  mocks.processGroup.mockResolvedValueOnce([{ type: 'pixel-processed' }, { type: 'pixel-processed' }]);
+  mocks.processGroup.mockImplementationOnce(async () => {
+    mocks.createGroup.mock.calls.at(-1)![2](timing); // The real group processor reports before it resolves.
+    return [{ type: 'pixel-processed' }, { type: 'pixel-processed' }];
+  });
   const process = createLazyDrawProcessor('demo-pixelwar-test', (line) => lines.push(line));
   const first = process(command);
   await vi.waitFor(() => expect(release).toBeDefined());
@@ -41,6 +45,22 @@ it('logs one line per group and none for a command processed alone', async () =>
   release();
   await Promise.all([first, ...grouped]);
   expect(lines.map((line) => JSON.parse(line))).toEqual([
-    { severity: 'INFO', function: 'draw-worker', event_type: 'draw.group.committed', group_size: 2 },
+    { severity: 'INFO', function: 'draw-worker', event_type: 'draw.group.committed', group_size: 2, wait_ms: expect.any(Number), ...timing },
+  ]);
+});
+
+it('logs a fallback as a warning, without the timing of an earlier group', async () => {
+  const lines: string[] = [];
+  let release!: () => void;
+  mocks.process.mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve({ type: 'pixel-processed' }); }));
+  mocks.processGroup.mockRejectedValueOnce(new Error('aborted'));
+  const process = createLazyDrawProcessor('demo-pixelwar-test', (line) => lines.push(line));
+  const first = process(command);
+  await vi.waitFor(() => expect(release).toBeDefined());
+  const grouped = [process(command), process(command)];
+  release();
+  await Promise.all([first, ...grouped]);
+  expect(lines.map((line) => JSON.parse(line))).toEqual([
+    { severity: 'WARNING', function: 'draw-worker', event_type: 'draw.group.fallback', group_size: 2, wait_ms: expect.any(Number) },
   ]);
 });

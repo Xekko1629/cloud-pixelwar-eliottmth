@@ -25,7 +25,7 @@ describe('createGroupCommit', () => {
     expect(one).toHaveBeenCalledTimes(1); // Synchronously: no timer, no added wait.
     expect(await pending).toMatchObject({ tag: 'one' });
     expect(group).not.toHaveBeenCalled();
-    expect(onGroup).toHaveBeenCalledWith({ size: 1, outcome: 'single' });
+    expect(onGroup).toHaveBeenCalledWith({ size: 1, outcome: 'single', wait_ms: 0 });
   });
 
   it('groups the commands that arrive while a transaction runs, and answers each one', async () => {
@@ -41,7 +41,23 @@ describe('createGroupCommit', () => {
       [command(1).event_id, 'one'], [command(2).event_id, 'group'], [command(3).event_id, 'group'], [command(4).event_id, 'group'],
     ]);
     expect(group).toHaveBeenCalledExactlyOnceWith([command(2), command(3), command(4)]);
-    expect(onGroup.mock.calls.map(([event]) => event)).toEqual([{ size: 1, outcome: 'single' }, { size: 3, outcome: 'committed' }]);
+    expect(onGroup.mock.calls.map(([{ size, outcome }]) => ({ size, outcome }))).toEqual([{ size: 1, outcome: 'single' }, { size: 3, outcome: 'committed' }]);
+  });
+
+  it('reports how long the oldest command of a group waited for the previous transaction', async () => {
+    const first = gate();
+    let clock = 1000;
+    const one = vi.fn(async (input: DrawCommand) => { await first.promise; return result(input, 'one'); });
+    const group = vi.fn(async (inputs: readonly DrawCommand[]) => inputs.map((input) => result(input, 'group')));
+    const onGroup = vi.fn();
+    const process = createGroupCommit(one, group, { max_group: 32, onGroup, now: () => clock });
+    const answers = [process(command(1)), process(command(2))];
+    clock = 1250; answers.push(process(command(3)));
+    clock = 1800; first.open();
+    await Promise.all(answers);
+    expect(onGroup.mock.calls.map(([event]) => event)).toEqual([
+      { size: 1, outcome: 'single', wait_ms: 0 }, { size: 2, outcome: 'committed', wait_ms: 800 },
+    ]);
   });
 
   it('never sends more than max_group commands in one transaction', async () => {
@@ -71,7 +87,7 @@ describe('createGroupCommit', () => {
     const answers = [1, 2, 3, 4].map((id) => process(command(id)).then((r) => r.event_id, (error: Error) => error.message));
     first.open();
     expect(await Promise.all(answers)).toEqual([command(1).event_id, command(2).event_id, 'corrupt tile', command(4).event_id]);
-    expect(onGroup).toHaveBeenCalledWith({ size: 3, outcome: 'fallback' });
+    expect(onGroup).toHaveBeenCalledWith(expect.objectContaining({ size: 3, outcome: 'fallback' }));
     // The fallback runs one command after the other, never two at the same time.
     expect(one.mock.calls.map(([input]) => input.event_id)).toEqual([1, 2, 3, 4].map((id) => command(id).event_id));
   });
