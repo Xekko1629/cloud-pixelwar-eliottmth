@@ -80,9 +80,10 @@ run "disabled_by_default" {
       length(module.notifier_processed_subscription) == 0 && length(module.notifier_rejected_subscription) == 0 &&
       length(google_project_service_identity.discord_pubsub) == 0 &&
       length(google_service_account_iam_member.push_token_creator) == 0 &&
-      length(google_project_iam_member.draw_worker_firestore) == 0
+      length(google_project_iam_member.draw_worker_firestore) == 0 &&
+      length(google_monitoring_alert_policy.dlq_not_empty) == 0
     )
-    error_message = "No /draw function, topic, subscription or IAM grant may exist without opt-in."
+    error_message = "No /draw function, topic, subscription, IAM grant or alert may exist without opt-in."
   }
 }
 
@@ -99,6 +100,7 @@ run "phase_one_creates_functions_and_topics_without_delivery" {
       module.pixel_rejected[0].name == "pixel-rejected" &&
       length(module.command_worker_subscription) == 0 && length(module.draw_worker_subscription) == 0 &&
       length(google_service_account_iam_member.push_token_creator) == 0 &&
+      length(google_monitoring_alert_policy.dlq_not_empty) == 0 &&
       output.gateway_contract.backends.discord.function_name == "discord-hello"
     )
     error_message = "Phase 1 creates the workers and topics, without push delivery and without switching hello."
@@ -156,6 +158,44 @@ run "delivery_wires_the_draw_path" {
     )
     error_message = "Only the draw-worker runtime gets Firestore access on this path."
   }
+  assert {
+    condition = (
+      module.draw_worker_subscription[0].max_delivery_attempts == 10 &&
+      module.command_worker_subscription[0].max_delivery_attempts == 5 &&
+      module.notifier_processed_subscription[0].max_delivery_attempts == 5
+    )
+    error_message = "Only the draw-worker, saturated by 500-pixel strokes, keeps a message 10 attempts before its DLQ."
+  }
+  assert {
+    condition = (
+      length(google_monitoring_alert_policy.dlq_not_empty) == 1 &&
+      length(google_monitoring_alert_policy.dlq_not_empty[0].notification_channels) == 0 &&
+      strcontains(google_monitoring_alert_policy.dlq_not_empty[0].conditions[0].condition_threshold[0].filter, "monitoring.regex.full_match(\".*-dlq-inspect\")") &&
+      google_monitoring_alert_policy.dlq_not_empty[0].conditions[0].condition_threshold[0].threshold_value == 0 &&
+      google_monitoring_alert_policy.dlq_not_empty[0].conditions[0].condition_threshold[0].comparison == "COMPARISON_GT"
+    )
+    error_message = "One alert watches every DLQ inspection subscription and fires on the first message."
+  }
+}
+
+run "dlq_alert_notifies_the_configured_channel" {
+  command = plan
+  variables {
+    enable_discord_pipeline     = true
+    enable_discord_delivery     = true
+    enable_discord_hello        = true
+    alert_notification_channels = ["projects/pixelwar-test/notificationChannels/123"]
+  }
+  assert {
+    condition     = google_monitoring_alert_policy.dlq_not_empty[0].notification_channels == tolist(["projects/pixelwar-test/notificationChannels/123"])
+    error_message = "The OBS-01 channel is passed by variable, never hard-coded."
+  }
+}
+
+run "reject_malformed_notification_channel" {
+  command = plan
+  variables { alert_notification_channels = ["slack-alerts"] }
+  expect_failures = [var.alert_notification_channels]
 }
 
 run "delivery_wires_the_admin_path" {

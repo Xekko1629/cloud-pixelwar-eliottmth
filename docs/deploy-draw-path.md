@@ -30,8 +30,9 @@ flowchart LR
 
 Paramètres communs à chaque abonnement (docs/events.md, section 7.2) : push OIDC
 avec l'invoker dédié du worker, audience égale à son URI, retry de 10 à 60 s,
-DLQ après environ 5 tentatives, rétention de 7 jours, abonnement
-`<abonnement>-dlq-inspect` pour lire la DLQ.
+DLQ après environ 5 tentatives (10 pour `draw-worker`), rétention de 7 jours, abonnement
+`<abonnement>-dlq-inspect` pour lire la DLQ. L'alerte « DLQ non vide »
+(`infra/serverless/alerts.tf`) ouvre un incident dès qu'un message y arrive.
 
 | Abonnement | Délai d'acquittement | Timeout du worker |
 | --- | --- | --- |

@@ -61,6 +61,28 @@ run "push_with_its_own_dlq" {
   }
 }
 
+run "more_attempts_for_a_bursty_worker" {
+  command = plan
+  variables { max_delivery_attempts = 10 }
+
+  assert {
+    condition     = google_pubsub_subscription.main.dead_letter_policy[0].max_delivery_attempts == 10
+    error_message = "A worker saturated by bursts may keep a message longer before its DLQ."
+  }
+}
+
+run "reject_attempts_outside_pubsub_range" {
+  command = plan
+  variables { max_delivery_attempts = 4 }
+  expect_failures = [var.max_delivery_attempts]
+}
+
+run "reject_fractional_attempts" {
+  command = plan
+  variables { max_delivery_attempts = 7.5 }
+  expect_failures = [var.max_delivery_attempts]
+}
+
 run "reject_ack_deadline_above_push_maximum" {
   command = plan
   variables { ack_deadline_seconds = 601 }
