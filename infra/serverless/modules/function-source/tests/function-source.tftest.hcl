@@ -49,3 +49,29 @@ run "reject_invalid_name" {
 
   expect_failures = [var.name]
 }
+
+run "zip_only_the_listed_files" {
+  command = plan
+
+  variables {
+    files = ["package.json", "index.js"]
+  }
+
+  assert {
+    condition = (
+      data.archive_file.source.source_dir == null &&
+      [for file in data.archive_file.source.source : file.filename] == ["index.js", "package.json"]
+    )
+    error_message = "With files, only those files are zipped, in a stable order."
+  }
+}
+
+run "reject_an_empty_file_list" {
+  command = plan
+
+  variables {
+    files = []
+  }
+
+  expect_failures = [var.files]
+}

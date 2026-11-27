@@ -84,6 +84,11 @@ Rien d'autre : ni `.env`, ni tests, ni fichiers locaux. Seul ce qui est importé
 `src/index.ts` entre dans le bundle, et un test atteignable depuis le handler fait échouer
 le build.
 
+Le proxy Discord en Go (ADR-0016) n'a pas d'étape de build : Cloud Build compile ses
+sources. `function-source` reçoit alors une liste fermée de fichiers (`files`) :
+`go.mod`, `go.sum` et les `*.go` hors `*_test.go`. Le README, les tests et tout fichier
+local laissé dans `app/go/discord-proxy` (binaire, `.env`) restent hors de l'archive.
+
 **Pourquoi un bundle ?** `@pixelwar/shared` est un workspace npm, pas un paquet publié : Cloud
 Build ne saurait pas l'installer. Les paquets npm, eux, restent installés par Cloud Build tels
 que publiés, car les bibliothèques Google chargent des fichiers à l'exécution (protos, JSON,
@@ -134,6 +139,33 @@ La CI construit les fonctions avant chaque plan et apply du stack `serverless`
 (`_plan.yml`, `_apply.yml`), et la CI applicative vérifie que toutes se construisent. Un tag
 `v*` applique dev puis prd, comme le reste de l'infrastructure. En local, lancer
 `npm run build:functions` avant `just plan dev serverless`.
+
+## Traçabilité d'une release (SEC-02)
+
+| Étape | Ce qui la fixe | Où le vérifier |
+| --- | --- | --- |
+| Commit ou tag `v*` | `deploy.yml`, déclenché par le tag (dev puis prd) ou à la main sur `prod` (dev) | run GitHub Actions, `github.sha` |
+| Build | `npm ci` depuis `app/package-lock.json`, puis `npm run build:functions` sur le runner, pour chaque environnement | log du job `apply-serverless-<env>` |
+| Archive | `archive_file` : ZIP déterministe (dates fixes, mode `0644`), nommé par son SHA-256 | plan : `functions/<nom>/<sha256>.zip` |
+| Objet GCS | `google_storage_bucket_object` dans le bucket privé du bootstrap, versionné | `gcloud storage objects describe gs://<projet>-function-sources/functions/<nom>/<sha256>.zip` |
+| Déploiement | module `function` : objet **et génération exacte**, jamais la dernière version | `gcloud functions describe <nom> --region=europe-west1` → `buildConfig.source.storageSource` |
+
+Pour relier une fonction déployée à un commit : lire l'objet et la génération dans
+`storageSource`, reconstruire au commit du run (`npm ci && npm run build:functions`),
+zipper avec `terraform plan` et comparer le SHA-256 du nom d'objet. Dev et prd
+reconstruisent chacun depuis le même commit : le code et les versions directes sont
+identiques, pas forcément les octets (ADR-0009).
+
+Ce qui est verrouillé, et ce qui ne l'est pas :
+
+| Élément | Verrouillé par | Limite |
+| --- | --- | --- |
+| Code de la fonction et de `@pixelwar/shared` | le commit, regroupé dans `index.js` | — |
+| Dépendances directes (`@google-cloud/*`, OpenTelemetry…) | version exacte du lockfile, recopiée dans le `package.json` livré | — |
+| Dépendances transitives des fonctions Node | rien : Cloud Build lance `npm install` sans lockfile | peuvent changer entre deux déploiements ; les tests restent la protection |
+| Modules Go du proxy Discord | `go.mod` et `go.sum`, livrés dans l'archive | — |
+| Image de base et runtime (`nodejs24`, `go126`) | Google (buildpacks gérés) | mise à jour par Google, hors de notre contrôle |
+| Outils de la CI (actions, Terraform, tflint) | SHA des actions, versions fixées | voir [la chaîne d'approvisionnement de la CI](ci.md#chaîne-dapprovisionnement) |
 
 ## Installer et publier
 

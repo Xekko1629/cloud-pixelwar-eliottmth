@@ -11,9 +11,14 @@ module "discord_proxy_source" {
   count  = local.discord_pipeline_enabled ? 1 : 0
 
   name = "discord-proxy"
-  # Go sources (ADR-0016): Cloud Build compiles them, no build step in the CI.
+  # Go sources (ADR-0016): Cloud Build compiles them, no build step in the CI. Only the
+  # module files and the non-test sources are delivered (SEC-02): no test, README or
+  # local file (binary, .env) left in the directory.
   source_dir = "${path.root}/../../app/go/discord-proxy"
-  bucket     = local.function_build.sources_bucket
+  files = concat(["go.mod", "go.sum"], [
+    for file in fileset("${path.root}/../../app/go/discord-proxy", "*.go") : file if !endswith(file, "_test.go")
+  ])
+  bucket = local.function_build.sources_bucket
 }
 
 module "discord_proxy" {

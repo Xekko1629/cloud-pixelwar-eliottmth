@@ -19,7 +19,7 @@ variable "name" {
 }
 
 variable "source_archive" {
-  description = "CI-verified ZIP copied unchanged to each environment; content-addressed object and exact GCS generation, never latest"
+  description = "ZIP built by the CI of this environment (ADR-0009): content-addressed object and exact GCS generation, never latest"
   type = object({
     bucket     = string
     object     = string

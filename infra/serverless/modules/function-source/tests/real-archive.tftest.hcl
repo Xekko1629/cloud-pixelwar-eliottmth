@@ -21,3 +21,29 @@ run "content_addressed_object" {
     error_message = "The object name and the SHA-256 given to module function are the same."
   }
 }
+
+run "listed_files_archive" {
+  command = plan
+
+  variables {
+    files = ["index.js", "package.json"]
+  }
+
+  assert {
+    condition     = can(regex("^functions/hello-proxy/[a-f0-9]{64}[.]zip$", google_storage_bucket_object.source.name))
+    error_message = "An allow-listed archive is content-addressed too."
+  }
+}
+
+run "listed_files_archive_is_deterministic" {
+  command = plan
+
+  variables {
+    files = ["package.json", "index.js"]
+  }
+
+  assert {
+    condition     = google_storage_bucket_object.source.name == run.listed_files_archive.source_archive.object
+    error_message = "The same files give the same archive, whatever their order in var.files."
+  }
+}
