@@ -54,8 +54,11 @@ module "draw_worker_source" {
 }
 
 # Group commit (ADR-0014): the pushes an instance holds at the same time share one Firestore
-# transaction, so concurrency is what lets groups form. 128 = MAX_DRAW_GROUP of
-# app/functions/draw-worker/src/processor.ts. With concurrency 1, a 500-pixel stroke ran at
+# transaction, so concurrency is what lets groups form. 512 = 4 x MAX_DRAW_GROUP (128) of
+# app/functions/draw-worker/src/processor.ts: a full instance holds the next groups instead of
+# refusing them. With 128, an instance held a single group: every extra push got a 429 "no
+# available instance", which counts as a delivery and slows Pub/Sub down (dev, 28/11: about
+# 3,000 to 6,000 429s per minute for 30 to 60 px/s). With concurrency 1, a 500-pixel stroke ran at
 # 3.7 px/s and saturated both instances (dev, 26/11). One instance runs one transaction at a
 # time (about 10 px/s, dev 27/11), so max_instances sets both the throughput and the cost
 # ceiling: see var.draw_worker_max_instances.
@@ -72,7 +75,7 @@ module "draw_worker" {
   build_service_account = local.function_build.service_account
   build_repository      = local.function_build.repository
   labels                = local.labels
-  concurrency           = 128
+  concurrency           = 512
   min_instances         = 0
   max_instances         = var.draw_worker_max_instances
   timeout_seconds       = 300

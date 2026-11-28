@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SpanKind, SpanStatusCode } from '@opentelemetry/api';
 import { memoryTelemetry } from '../../testing/telemetry';
-import { createFunctionTelemetry } from './function';
+import { SLOW_FLUSH_MS, createFunctionTelemetry } from './function';
 
 const instances: ReturnType<typeof memoryTelemetry>[] = [];
 const make = (name: Parameters<typeof memoryTelemetry>[0] = 'draw-worker') => {
@@ -80,7 +80,22 @@ describe('function instrumentation', () => {
     expect(await pending).toBe('saved');
     vi.spyOn(runtime, 'flushRequest').mockRejectedValue(new Error('synthetic-interaction-token'));
     expect(await telemetry.message('pixel-draw', attributes, work)).toBe('saved'); expect(work).toHaveBeenCalledTimes(2);
-    expect(JSON.stringify(write.mock.calls)).toContain('telemetry.export_failed'); expect(JSON.stringify(write.mock.calls)).not.toContain('synthetic-interaction-token');
+    expect(JSON.stringify(write.mock.calls)).toContain('telemetry.flush_failed'); expect(JSON.stringify(write.mock.calls)).not.toContain('synthetic-interaction-token');
+  });
+  it('logs the duration of a failed and of a slow export after a request, and nothing for a fast one', async () => {
+    const { telemetry, runtime, write } = make();
+    vi.spyOn(runtime, 'flushRequest').mockRejectedValueOnce(new Error('synthetic-interaction-token'));
+    await telemetry.message('pixel-draw', attributes, async () => 'saved');
+    vi.spyOn(runtime, 'flushRequest').mockImplementationOnce(() => new Promise<void>((resolve) => { setTimeout(resolve, SLOW_FLUSH_MS + 20); }));
+    await telemetry.message('pixel-draw', attributes, async () => 'saved');
+    vi.spyOn(runtime, 'flushRequest').mockResolvedValueOnce();
+    await telemetry.message('pixel-draw', attributes, async () => 'saved');
+    const warnings = write.mock.calls.map(([line]) => JSON.parse(line)).filter((record) => record.severity === 'WARNING');
+    expect(warnings).toEqual([
+      { severity: 'WARNING', function: 'draw-worker', event_type: 'telemetry.flush_failed', flush_ms: expect.any(Number) },
+      { severity: 'WARNING', function: 'draw-worker', event_type: 'telemetry.flush_slow', flush_ms: expect.any(Number) },
+    ]);
+    expect(warnings[1].flush_ms).toBeGreaterThanOrEqual(SLOW_FLUSH_MS);
   });
   it('does not lose a business error if failure logging or export also fails', async () => {
     const { telemetry, runtime } = make(); const business = new Error('business failure');

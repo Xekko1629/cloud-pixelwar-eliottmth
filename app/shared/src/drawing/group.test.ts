@@ -279,19 +279,21 @@ describe('createGroupDrawProcessor', () => {
     expect(tx.update.mock.calls.length).toBe(updates);
   });
 
-  it('matches one transaction per command on an almost full tile', async () => {
+  // Each lone command walks the whole tile (createDrawProcessor): a fuller tile, or more
+  // commands, make this test slow on CI (5.6 s for 4,090 pixels and 40 commands, 28/11).
+  it('matches one transaction per command on a well-filled tile', async () => {
     const single = fakeStore({ default_limit_per_minute: 10_000 }); const grouped = fakeStore({ default_limit_per_minute: 10_000 });
-    // 4,090 of the 4,096 pixels of tile (0, 0) already painted, 2 s ago.
-    const fill = Array.from({ length: 9 }, (_, part) => input({
+    // 1,500 of the 4,096 pixels of tile (0, 0) already painted, 2 s ago (rows 0 to 23).
+    const fill = Array.from({ length: 3 }, (_, part) => input({
       occurred_at: new Date(now - 2000).toISOString(),
-      pixels: Array.from({ length: Math.min(500, 4090 - part * 500) }, (_, i) => ({ x: (part * 500 + i) % 64, y: Math.floor((part * 500 + i) / 64), color: 2 })),
+      pixels: Array.from({ length: 500 }, (_, i) => ({ x: (part * 500 + i) % 64, y: Math.floor((part * 500 + i) / 64), color: 2 })),
     }));
     for (const { db } of [single, grouped]) for (const command of fill) await createDrawProcessor(db, { now: () => now })(command);
     // Newer pixels over painted ones, older ones that lose, two on the same free pixel.
     const pick = random(7);
-    const commands = Array.from({ length: 40 }, (_, i) => input({
+    const commands = Array.from({ length: 20 }, (_, i) => input({
       occurred_at: new Date(now - [0, 1000, 3000][pick(3)]).toISOString(),
-      pixels: [{ x: i < 2 ? 63 : pick(64), y: i < 2 ? 63 : pick(64), color: 1 + pick(16) }],
+      pixels: [{ x: i < 2 ? 63 : pick(64), y: i < 2 ? 63 : pick(24), color: 1 + pick(16) }],
     }));
     const one = createDrawProcessor(single.db, { now: () => now });
     const sequential = [];

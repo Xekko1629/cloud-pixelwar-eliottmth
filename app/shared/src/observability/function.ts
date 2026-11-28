@@ -1,5 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import type { createObservability } from './runtime';
+
+/** A request export at least this long is logged (telemetry.flush_slow). */
+export const SLOW_FLUSH_MS = 250;
 import type { DrawObservation, FunctionOutcome, FunctionReason, PixelSource } from './metrics';
 import type { Severity } from './logger';
 
@@ -31,15 +34,16 @@ interface Options {
 export function createFunctionTelemetry(service: Service, options: Options = {}): FunctionTelemetry {
   const write = options.writeLog ?? ((line: string) => { process.stdout.write(line); });
   const now = options.now ?? Date.now;
-  const warning = (event: string) => {
-    try { write(`${JSON.stringify({ severity: 'WARNING', function: service, event_type: event })}\n`); } catch { /* Best effort only. */ }
+  const warning = (event: string, fields: Record<string, string | number> = {}) => {
+    try { write(`${JSON.stringify({ severity: 'WARNING', function: service, event_type: event, ...fields })}\n`); } catch { /* Best effort only. */ }
   };
   const initialize = async (): Promise<Runtime> => {
     if (options.getRuntime) return options.getRuntime();
     const config = { serviceName: service, projectId: process.env.GOOGLE_CLOUD_PROJECT ?? '',
       environment: process.env.APP_ENV === 'prd' ? 'prd' as const : 'dev' as const,
       region: process.env.FUNCTION_REGION || process.env.GOOGLE_CLOUD_REGION || 'unknown',
-      serviceVersion: process.env.K_REVISION, exportTimeoutMillis: 500, writeLog: write };
+      serviceVersion: process.env.K_REVISION, exportTimeoutMillis: 500, writeLog: write,
+      onExportFailure: (signal: string, reason: string) => { warning('telemetry.export_failed', { signal, reason }); } };
     // Cloud Monitoring rejects every point of an unknown region: export nothing rather than fail each minute.
     if (process.env.NODE_ENV !== 'test' && config.projectId && config.region !== 'unknown' && ['dev', 'prd'].includes(process.env.APP_ENV ?? '')) {
       const { createGoogleObservability } = await import('./google');
@@ -99,7 +103,14 @@ export function createFunctionTelemetry(service: Service, options: Options = {})
       return value;
     } finally {
       safe(() => { obs?.functions.attempt(source, outcome, reason, Math.max(0, performance.now() - started) / 1000); }, undefined);
-      try { await obs?.flushRequest(); } catch { warning('telemetry.export_failed'); }
+      // The request keeps its Cloud Run slot until this export ends: a slow one means 429s.
+      const flushing = performance.now();
+      let failed = false;
+      try { await obs?.flushRequest(); } catch { failed = true; }
+      const flush_ms = Math.round(performance.now() - flushing);
+      // The reason of each failed export is logged by the exporter (telemetry.export_failed).
+      if (failed) warning('telemetry.flush_failed', { flush_ms });
+      else if (flush_ms >= SLOW_FLUSH_MS) warning('telemetry.flush_slow', { flush_ms });
     }
   }
   return {

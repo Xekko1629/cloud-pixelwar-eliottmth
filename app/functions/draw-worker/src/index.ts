@@ -32,14 +32,21 @@ export function createDrawWorkerHandler(options: Options): HttpFunction {
       await telemetry.message('pixel-draw', attributes, async (operation) => {
         operation.source(command.source);
         operation.outcome('error', 'processing');
+        // Where a push spends its time (DRAW-05): waiting for and running its group, then
+        // publishing its result. The telemetry export comes after, in createFunctionTelemetry.
+        const started = performance.now();
         const result = await options.process!(command);
+        const process_ms = Math.round(performance.now() - started);
         operation.drawResult(result);
         const event = resultEvent(result, command, attributes.correlation_id, discord);
         operation.outcome('error', 'publish');
+        const publishing = performance.now();
         await options.publish!(event, operation.attributes());
+        const publish_ms = Math.round(performance.now() - publishing);
         operation.outcome(result.type === 'pixel-rejected' ? 'rejected' : 'published', result.reason ?? 'none');
         write(`${JSON.stringify({ severity: 'INFO', function: 'draw-worker', event_type: 'draw.result.published',
-          event_id: event.event_id, correlation_id: event.correlation_id, message_id, result_type: event.type, ...operation.logFields() })}\n`);
+          event_id: event.event_id, correlation_id: event.correlation_id, message_id, result_type: event.type, process_ms, publish_ms,
+          ...operation.logFields() })}\n`);
       });
     } catch (error) {
       try {

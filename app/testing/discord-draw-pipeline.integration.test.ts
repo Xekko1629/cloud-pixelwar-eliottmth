@@ -184,7 +184,7 @@ describe('signed /draw to original-response update on local services', () => {
       const result = await pipeline(interaction());
       expect((await ref(`users/${result.actor.uid}`).get()).get('used_pixels')).toBe(1);
       expect(api.requests).toHaveLength(1); expect(api.messages.size).toBe(1);
-      expect(JSON.stringify(logs.mock.calls)).toContain('telemetry.export_failed');
+      expect(JSON.stringify(logs.mock.calls)).toContain('telemetry.flush_failed');
     } finally { flush.mockRestore(); }
   });
 });
