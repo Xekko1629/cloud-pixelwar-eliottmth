@@ -99,7 +99,7 @@ export function createFunctionTelemetry(service: Service, options: Options = {})
       return value;
     } finally {
       safe(() => { obs?.functions.attempt(source, outcome, reason, Math.max(0, performance.now() - started) / 1000); }, undefined);
-      try { await obs?.flush(); } catch { warning('telemetry.export_failed'); }
+      try { await obs?.flushRequest(); } catch { warning('telemetry.export_failed'); }
     }
   }
   return {

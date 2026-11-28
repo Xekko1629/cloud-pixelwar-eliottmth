@@ -35,7 +35,7 @@ it('initializes Firestore on first use only and groups through the DATA-02 proce
 it('logs one line per group, with its wait and Firestore timing, and none for a command processed alone', async () => {
   const lines: string[] = [];
   let release!: () => void;
-  const timing = { attempts: 3, read_processed_ms: 40, read_people_ms: 400, read_tiles_ms: 60, transaction_ms: 1700 };
+  const timing = { attempts: 3, read_processed_ms: 40, read_people_ms: 400, read_tiles_ms: 60, work_ms: 520, commit_ms: 900, transaction_ms: 1700 };
   mocks.process.mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve({ type: 'pixel-processed' }); }));
   mocks.processGroup.mockImplementationOnce(async () => {
     mocks.createGroup.mock.calls.at(-1)![2](timing); // The real group processor reports before it resolves.
@@ -55,7 +55,7 @@ it('logs one line per group, with its wait and Firestore timing, and none for a 
 it('logs a contended group as a warning, with its timing', async () => {
   const lines: string[] = [];
   let release!: () => void;
-  const timing = { attempts: 10, read_processed_ms: 20, read_people_ms: 10, read_tiles_ms: 700, transaction_ms: 9000 };
+  const timing = { attempts: 10, read_processed_ms: 20, read_people_ms: 10, read_tiles_ms: 700, work_ms: 750, commit_ms: 60, transaction_ms: 9000 };
   mocks.process.mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve({ type: 'pixel-processed' }); }));
   mocks.processGroup.mockImplementationOnce(async () => {
     mocks.createGroup.mock.calls.at(-1)![2](timing);

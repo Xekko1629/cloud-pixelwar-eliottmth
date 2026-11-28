@@ -208,7 +208,13 @@ Champs de ces deux lignes, pour savoir où passe le temps d'un groupe :
 | `read_processed_ms` | Lecture des `processed_events/{event_id}` (déduplication), dernière tentative |
 | `read_people_ms` | Lecture de `config/global`, des `users/{uid}` et des surcharges de quota, dernière tentative |
 | `read_tiles_ms` | Lecture des tuiles, dernière tentative (0 si aucun pixel n'arrive jusqu'aux tuiles) |
+| `work_ms` | Dernière tentative : notre code, lectures et calcul compris, jusqu'au retour de la fonction de transaction |
+| `commit_ms` | Dernière tentative : de la fin de notre code à la réponse de Firestore, c'est-à-dire la validation |
 | `transaction_ms` | Durée totale de la transaction, reprises comprises |
+
+`transaction_ms − work_ms − commit_ms` est le temps des tentatives annulées et des
+attentes entre elles. `work_ms` nettement plus grand que la somme des lectures : le
+calcul, ou une instance dont le CPU est saturé.
 
 Exemple de requête Cloud Logging :
 `resource.labels.service_name="draw-worker" AND jsonPayload.event_type="draw.group.committed" AND jsonPayload.attempts>1`.

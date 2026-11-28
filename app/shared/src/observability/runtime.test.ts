@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SpanKind, SpanStatusCode } from '@opentelemetry/api';
-import { InMemorySpanExporter } from '@opentelemetry/sdk-trace';
+import { InMemorySpanExporter, type ReadableSpan, type SpanExporter } from '@opentelemetry/sdk-trace';
 import { AggregationTemporality, InMemoryMetricExporter, PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import { createObservability, type ObservabilityOptions } from './index';
 
@@ -85,6 +85,9 @@ describe('observed operations', () => {
   it.each([0, 10_001, 1.5])('rejects an invalid exporter budget: %s', (exportTimeoutMillis) => {
     expect(() => runtime({ exportTimeoutMillis })).toThrow('export timeout');
   });
+  it.each([-1, 600_001, 2.5])('rejects an invalid metric flush interval: %s', (metricFlushIntervalMillis) => {
+    expect(() => runtime({ metricFlushIntervalMillis })).toThrow('metric flush interval');
+  });
   it('does not allow an arbitrary trusted correlation value in a request span', () => {
     const obs = runtime();
     expect(() => obs.request('safe', {}, async () => 1, 'synthetic/token')).toThrow('trusted correlation');
@@ -139,5 +142,51 @@ describe('business metrics', () => {
     expect(() => obs.functions.drawResult({ ...result, processed_at: 'bad' })).toThrow();
     expect(() => obs.functions.notificationAge(-1)).toThrow();
     expect(() => obs.functions.notificationAge(0)).not.toThrow();
+  });
+});
+
+describe('flush after a request', () => {
+  it('shares one trace export between concurrent requests, and queues one for the spans ended meanwhile', async () => {
+    const batches: string[][] = [];
+    const finish: (() => void)[] = [];
+    const exporter: SpanExporter = {
+      export: (spans: ReadableSpan[], done) => { batches.push(spans.map((span) => span.name)); finish.push(() => done({ code: 0 })); },
+      shutdown: async () => undefined,
+    };
+    const obs = runtime({ spanExporter: exporter });
+    await obs.message('first', {}, async () => undefined);
+    const first = obs.flushRequest();
+    await obs.message('second', {}, async () => undefined);
+    const second = obs.flushRequest();
+    await obs.message('third', {}, async () => undefined);
+    const third = obs.flushRequest();
+    await vi.waitFor(() => expect(batches).toEqual([['first']]));
+    finish[0]();
+    await vi.waitFor(() => expect(batches).toEqual([['first'], ['second', 'third']]));
+    finish[1]();
+    await Promise.all([first, second, third]);
+    expect(batches).toHaveLength(2);
+    await obs.message('fourth', {}, async () => undefined);
+    const fourth = obs.flushRequest();
+    await vi.waitFor(() => expect(batches).toHaveLength(3));
+    finish[2]();
+    await fourth;
+  });
+
+  it('exports the metrics at most once per interval, and the next export carries the skipped values', async () => {
+    const exporter = new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE);
+    let clock = 0;
+    const obs = runtime({ metricReader: new PeriodicExportingMetricReader({ exporter, exportIntervalMillis: 60_000 }), now: () => clock });
+    const processed = () => exporter.getMetrics().map((batch) => batch.scopeMetrics.flatMap((scope) => scope.metrics)
+      .find((metric) => metric.descriptor.name === 'pixelwar.pixels.processed')!.dataPoints[0].value);
+    obs.pixels.processed(1, 'web');
+    await obs.flushRequest();
+    clock = 9_999;
+    obs.pixels.processed(2, 'web');
+    await obs.flushRequest();
+    expect(processed()).toEqual([1]);
+    clock = 10_000;
+    await obs.flushRequest();
+    expect(processed()).toEqual([1, 3]);
   });
 });

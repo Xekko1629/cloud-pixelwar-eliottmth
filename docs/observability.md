@@ -173,14 +173,28 @@ avant d'écrire les dashboards/alertes DRAW-05 et OBS-02.
 Le contrat des Cloud Run functions impose de terminer le travail avant la réponse.
 Ne pas compter uniquement sur les timers d'export en arrière-plan lorsque la
 requête est terminée.
-Après `obs.request`/`obs.message`, appeler et attendre `obs.flush()` **avant** la
+Après `obs.request`/`obs.message`, appeler et attendre `obs.flushRequest()` **avant** la
 réponse HTTP/ack Pub/Sub. Le span est alors terminé et peut être exporté.
+`createFunctionTelemetry` le fait déjà pour chaque requête.
+
+`flushRequest()` n'est pas un `forceFlush` complet à chaque requête :
+
+- **Traces** : les requêtes simultanées d'une instance partagent un seul export.
+  Une requête rejoint l'export en cours, ou l'unique export mis en attente derrière
+  lui, qui part après la fin de son span. 128 requêtes à la fois font au plus
+  2 exports au lieu de 128.
+- **Métriques** : au plus un export toutes les 10 s par instance
+  (`metricFlushIntervalMillis`). Cloud Monitoring refuse les points d'une même série
+  écrits plus souvent (`FAILED_PRECONDITION`, d'où les `telemetry.export_failed`
+  mesurés en dev le 27/11). Les valeurs sont cumulatives : l'export suivant porte
+  ce qu'un export sauté aurait envoyé.
+- `obs.flush()` reste l'export complet et immédiat (tests, arrêt).
 Les erreurs d'export ne doivent pas transformer un traitement métier réussi en
 retry : les intercepter et produire un log sûr, sans répéter l'opération métier.
 
 ```ts
 try {
-  await obs.flush();
+  await obs.flushRequest();
 } catch {
   obs.log('WARNING', 'Telemetry flush failed');
 }
