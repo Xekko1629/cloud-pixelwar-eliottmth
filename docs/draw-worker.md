@@ -220,6 +220,8 @@ Champs de ces deux lignes, pour savoir où passe le temps d'un groupe :
 | `work_ms` | Dernière tentative : notre code, lectures et calcul compris, jusqu'au retour de la fonction de transaction |
 | `commit_ms` | Dernière tentative : de la fin de notre code à la réponse de Firestore, c'est-à-dire la validation |
 | `transaction_ms` | Durée totale de la transaction, reprises comprises |
+| `tile_fields` | Dernière tentative : entrées `pixels` envoyées champ par champ aux `tile_metadata` existantes |
+| `tile_rewrites` | Dernière tentative : documents `tile_metadata` écrits en entier (tuiles nouvelles) |
 
 `transaction_ms − work_ms − commit_ms` est le temps des tentatives annulées et des
 attentes entre elles. `work_ms` nettement plus grand que la somme des lectures : le
@@ -229,6 +231,17 @@ Dans un groupe, chaque tuile est validée une fois, à sa lecture dans Firestore
 taille est estimée une fois, avant l'écriture. Avant le 28/11, les deux étaient refaits
 à chaque commande, en parcourant toute la tuile : 127 pixels sur une tuile pleine
 coûtaient environ 12 s de calcul, contre 0,1 s maintenant (mesure locale, 28/11).
+
+Une tuile qui existe déjà n'est plus réécrite en entier : `writeTile`
+(`app/shared/src/drawing/tiles.ts`) remplace le document `tile_colors` (4 Ko), mais
+n'envoie au document `tile_metadata` que `updated_at` et les entrées `pixels` modifiées,
+par chemin de champ (`pixels.<index>`). Une tuile pleine pèse environ 450 à 550 Ko
+(ADR-0007) : la réécrire à chaque groupe faisait grandir `commit_ms` avec la tuile
+(p50 985 ms, p90 1,7 s sur dev, 28/11 14:12). Firestore applique la mise à jour sur la
+version lue par la transaction, donc les autres entrées restent celles qui ont été
+validées. La limite de 1 MiB du document est toujours vérifiée sur le document complet
+(`estimateTileBytes`). Ces deux champs montrent la répartition : un groupe qui dessine
+sur des tuiles existantes a `tile_rewrites` à 0.
 
 Exemple de requête Cloud Logging :
 `resource.labels.service_name="draw-worker" AND jsonPayload.event_type="draw.group.committed" AND jsonPayload.attempts>1`.

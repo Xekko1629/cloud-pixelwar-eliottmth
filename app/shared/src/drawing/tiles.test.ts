@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
-import { Timestamp } from '@google-cloud/firestore';
+import { describe, expect, it, vi } from 'vitest';
+import { FieldPath, Timestamp, type DocumentReference, type Transaction } from '@google-cloud/firestore';
 import { tileId } from '../grid';
 import { prepareDraw } from './command';
-import { estimateTileBytes, planTileChanges, type TileChange } from './tiles';
+import { estimateTileBytes, planTileChanges, writeTile, type TileChange } from './tiles';
 
 const now = Date.parse('2026-11-19T10:00:30.000Z');
 const command = (event_id = randomUUID(), time = now) => prepareDraw({
@@ -72,5 +72,26 @@ describe('tile planning', () => {
   it('refuses provenance attached to an untouched pixel', () => {
     const input = painted(); input.colors.colors[0] = 0;
     expect(() => planTileChanges(input, command(), 1, now)).toThrow('Corrupt tile');
+  });
+});
+
+describe('tile writes', () => {
+  const refs = { colors: { path: 'tile_colors/t' }, metadata: { path: 'tile_metadata/t' } } as unknown as { colors: DocumentReference; metadata: DocumentReference };
+  const transaction = () => ({ set: vi.fn(), update: vi.fn() });
+
+  it('writes a new tile whole', () => {
+    const tx = transaction(); const plan = planTileChanges(tile(), command(), 1, now);
+    expect(writeTile(tx as unknown as Transaction, refs, { ...plan, existed: false })).toBe(0);
+    expect(tx.set.mock.calls).toEqual([[refs.colors, plan.colors], [refs.metadata, plan.metadata]]);
+    expect(tx.update).not.toHaveBeenCalled();
+  });
+  it('sends only the changed entries of an existing tile, once each', () => {
+    const tx = transaction();
+    const plan = planTileChanges({ ...painted(), pixels: [{ x: 0, y: 0, color: 5 }, { x: 3, y: 0, color: 5 }] }, command(randomUUID(), now + 1), 1, now + 1);
+    expect(plan.changed).toEqual(['0', '3']);
+    expect(writeTile(tx as unknown as Transaction, refs, { ...plan, existed: true, changed: [...plan.changed, '0'] })).toBe(2);
+    expect(tx.set.mock.calls).toEqual([[refs.colors, plan.colors]]);
+    expect(tx.update.mock.calls).toEqual([[refs.metadata, 'updated_at', plan.metadata.updated_at,
+      new FieldPath('pixels', '0'), plan.metadata.pixels['0'], new FieldPath('pixels', '3'), plan.metadata.pixels['3']]]);
   });
 });

@@ -4,7 +4,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { testProjectId } from '../../../testing/emulator-environment';
 import { compareEvents, locatePixel, tileId } from '../grid';
 import type { DrawCommand } from './command';
-import { createGroupDrawProcessor } from './group';
+import { createGroupDrawProcessor, type GroupTiming } from './group';
 import { createGroupCommit } from './group-commit';
 import { createDrawProcessor } from './transaction';
 
@@ -66,6 +66,25 @@ describe('group commit on the Firestore emulator (ADR-0014)', () => {
     const first = await group()(commands);
     expect(await group()([...commands].reverse())).toEqual([...first].reverse());
     expect((await ref(`users/${uid}`).get()).get('used_pixels')).toBe(5);
+  });
+
+  it('updates only the changed entries of an existing tile and keeps the others (writeTile)', async () => {
+    const at = (ms: number) => new Date(ms).toISOString();
+    await group()(Array.from({ length: 5 }, (_, x) => command({ occurred_at: at(now - 10_000), pixels: [{ x, y: 0, color: 3 }] })));
+    const timings: GroupTiming[] = [];
+    // A newer group on the same tile, then one lone command (createDrawProcessor).
+    await createGroupDrawProcessor(db, { root, now: () => now }, (timing) => { timings.push(timing); })([
+      command({ occurred_at: at(now - 1000), pixels: [{ x: 2, y: 0, color: 7 }] }),
+      command({ occurred_at: at(now - 1000), pixels: [{ x: 10, y: 0, color: 8 }] }),
+    ]);
+    await single()(command({ occurred_at: at(now), pixels: [{ x: 11, y: 0, color: 9 }] }));
+    expect(timings.map(({ tile_fields, tile_rewrites }) => ({ tile_fields, tile_rewrites }))).toEqual([{ tile_fields: 2, tile_rewrites: 0 }]);
+    const id = tileId(1, 0, 0);
+    const pixels = (await ref(`tile_metadata/${id}`).get()).get('pixels') as Record<string, unknown>;
+    const painted = [0, 1, 2, 3, 4, 10, 11].map((x) => String(locatePixel(x, 0).index));
+    expect(Object.keys(pixels).sort()).toEqual([...painted].sort());
+    const colors = (await ref(`tile_colors/${id}`).get()).get('colors');
+    expect([0, 1, 2, 3, 4, 10, 11].map((x) => colors[locatePixel(x, 0).index])).toEqual([3, 3, 7, 3, 3, 8, 9]);
   });
 
   it('isolates a faulty command: the others of its group are still drawn', async () => {

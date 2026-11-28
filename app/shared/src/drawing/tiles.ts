@@ -1,4 +1,4 @@
-import { Timestamp } from '@google-cloud/firestore';
+import { FieldPath, Timestamp, type DocumentReference, type Transaction } from '@google-cloud/firestore';
 import {
   compareEvents, emptyTileColors, estimateMetadataDocumentBytes, eventIdFromBytes, locatePixel,
   tileRegionId, validateTileColors, validateTimestamp,
@@ -64,6 +64,7 @@ export function planTileChanges(tile: TileChange, command: PreparedDraw, version
   const colors = Uint8Array.from(oldColors);
   const pixels = { ...oldPixels };
   const applied: DrawPixel[] = [];
+  const changed: string[] = [];
   const author = firestorePixel(command.metadata);
   for (const pixel of tile.pixels) {
     const index = locatePixel(pixel.x, pixel.y).index;
@@ -75,13 +76,43 @@ export function planTileChanges(tile: TileChange, command: PreparedDraw, version
     colors[index] = pixel.color;
     pixels[String(index)] = author;
     applied.push(pixel);
+    changed.push(String(index));
   }
   const updated_at = Timestamp.fromMillis(now);
   const metadata: TileMetadataDocument = { ...header, updated_at, pixels };
   return {
     applied,
+    /** Keys of the pixels entries this plan wrote (two pixels of a command may share one). */
+    changed,
     colors: { ...header, updated_at, colors: Buffer.from(colors) },
     metadata,
     estimated_bytes: options.estimate === false ? 0 : estimateTileBytes(metadata, colors),
   };
+}
+
+export interface TileWrite {
+  colors: TileColorsDocument;
+  metadata: TileMetadataDocument;
+  /** The metadata document existed when this transaction read it. */
+  existed: boolean;
+  /** Keys of the pixels entries changed since that read. */
+  changed: Iterable<string>;
+}
+
+/**
+ * Writes a planned tile; returns the number of pixels entries sent (0: whole document).
+ * An existing metadata document only gets its changed entries (field paths) and updated_at:
+ * a full tile is several hundred KB, and rewriting all of it made the commit grow with the
+ * tile (commit_ms p50 985 ms on dev, 28/11 14:12). Firestore applies the update on the
+ * version this transaction read, so the other entries are those that were validated.
+ * The colors document (4 KB) is always replaced.
+ */
+export function writeTile(tx: Transaction, refs: { colors: DocumentReference; metadata: DocumentReference }, tile: TileWrite): number {
+  tx.set(refs.colors, tile.colors);
+  const keys = [...new Set(tile.changed)];
+  if (!tile.existed) { tx.set(refs.metadata, tile.metadata); return 0; }
+  const fields: unknown[] = [];
+  for (const key of keys) fields.push(new FieldPath('pixels', key), tile.metadata.pixels[key]);
+  tx.update(refs.metadata, 'updated_at', tile.metadata.updated_at, ...fields);
+  return keys.length;
 }

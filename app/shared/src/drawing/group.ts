@@ -10,7 +10,7 @@ import {
   processingTime, storedResult,
   type DrawCommand, type DrawOptions, type DrawResult, type PreparedDraw,
 } from './command';
-import { estimateTileBytes, planTileChanges } from './tiles';
+import { estimateTileBytes, planTileChanges, writeTile } from './tiles';
 import { runDrawTransaction } from './retry';
 import { expandedBounds, validateConfig } from './transaction';
 
@@ -52,12 +52,18 @@ export interface GroupTiming {
   /** The last attempt: from the end of our code to Firestore's answer, i.e. the commit. */
   commit_ms: number;
   transaction_ms: number;
+  /** The last attempt: pixels entries sent as field updates of existing tile metadata. */
+  tile_fields: number;
+  /** The last attempt: tile metadata documents written whole (new tiles). */
+  tile_rewrites: number;
 }
 
 interface TileState {
   id: string; tx: number; ty: number; region: string;
   colors?: TileColorsDocument; metadata?: TileMetadataDocument;
   estimated_bytes: number; touched: boolean;
+  /** metadata existed when read; changed: its pixels entries rewritten by this group. */
+  existed: boolean; changed: Set<string>;
 }
 
 /**
@@ -91,7 +97,7 @@ export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {
       if (!first) unique.set(command.event_id, command);
     }
 
-    const timing: GroupTiming = { attempts: 0, read_processed_ms: 0, read_people_ms: 0, read_tiles_ms: 0, work_ms: 0, commit_ms: 0, transaction_ms: 0 };
+    const timing: GroupTiming = { attempts: 0, read_processed_ms: 0, read_people_ms: 0, read_tiles_ms: 0, work_ms: 0, commit_ms: 0, transaction_ms: 0, tile_fields: 0, tile_rewrites: 0 };
     const timed = async <T>(field: 'read_processed_ms' | 'read_people_ms' | 'read_tiles_ms', read: Promise<T>): Promise<T> => {
       const started = performance.now();
       try { return await read; } finally { timing[field] = Math.round(performance.now() - started); }
@@ -99,6 +105,7 @@ export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {
     const apply = async (tx: Transaction): Promise<Map<string, DrawResult>> => {
       timing.attempts += 1;
       timing.read_processed_ms = 0; timing.read_people_ms = 0; timing.read_tiles_ms = 0;
+      timing.tile_fields = 0; timing.tile_rewrites = 0;
       const distinct = [...unique.values()];
       const stored = await timed('read_processed_ms', tx.getAll(...distinct.map((c) => ref(`${COLLECTIONS.processed}/${c.event_id}`))));
       const done = new Map<string, DrawResult>();
@@ -153,7 +160,7 @@ export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {
         const groups = groupPixelsByTile(command.pixels, config.canvas_version, settings.max_pixels);
         commandTiles.set(command.event_id, groups);
         for (const [id, tile] of groups) {
-          if (!tiles.has(id)) tiles.set(id, { id, tx: tile.tx, ty: tile.ty, region: tile.region, estimated_bytes: 0, touched: false });
+          if (!tiles.has(id)) tiles.set(id, { id, tx: tile.tx, ty: tile.ty, region: tile.region, estimated_bytes: 0, touched: false, existed: false, changed: new Set() });
         }
       }
       if (candidates.length) {
@@ -170,6 +177,7 @@ export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {
         entries.forEach((tile, index) => {
           tile.colors = read[index * 2].data() as TileColorsDocument | undefined;
           tile.metadata = read[index * 2 + 1].data() as TileMetadataDocument | undefined;
+          tile.existed = read[index * 2 + 1].exists;
         });
         now = processingTime(settings.now, settings.delta_ttl_ms);
         for (const command of candidates) assertNotFuture(command, now);
@@ -207,6 +215,7 @@ export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {
           if (!plan.applied.length) continue;
           tile.colors = plan.colors; tile.metadata = plan.metadata;
           tile.touched = true;
+          for (const key of plan.changed) tile.changed.add(key);
           applied.push(...plan.applied);
         }
         for (const pixel of applied) finalPixels.set(`${pixel.x},${pixel.y}`, pixel);
@@ -243,8 +252,9 @@ export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {
         }));
       }
       for (const tile of touched) {
-        tx.set(ref(`${COLLECTIONS.colors}/${tile.id}`), tile.colors!);
-        tx.set(ref(`${COLLECTIONS.metadata}/${tile.id}`), tile.metadata!);
+        const fields = writeTile(tx, { colors: ref(`${COLLECTIONS.colors}/${tile.id}`), metadata: ref(`${COLLECTIONS.metadata}/${tile.id}`) },
+          { colors: tile.colors!, metadata: tile.metadata!, existed: tile.existed, changed: tile.changed });
+        if (tile.existed) timing.tile_fields += fields; else timing.tile_rewrites += 1;
       }
       if (finalPixels.size) {
         // One delta per region for the whole group, named after its first applied command.
