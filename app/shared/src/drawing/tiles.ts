@@ -15,12 +15,32 @@ export interface TileChange {
   metadata?: TileMetadataDocument;
 }
 
+export interface PlanOptions {
+  /** The documents come from a previous plan of this same transaction: already validated. */
+  trusted?: boolean;
+  /** false: estimated_bytes is 0, the caller calls estimateTileBytes once after its last plan. */
+  estimate?: boolean;
+}
+
+/**
+ * Stored-size estimate of a planned tile. It walks every pixel entry of the metadata
+ * (about 30 ms for a full tile of 4,096 pixels, dev machine, 28/11): a group calls it once
+ * per tile, not once per command.
+ */
+export function estimateTileBytes(metadata: TileMetadataDocument, colors: Uint8Array): number {
+  // Conservative stored-data estimate, not an exact protobuf/index request size.
+  return estimateMetadataDocumentBytes(metadata) + colors.byteLength + 1024;
+}
+
 /** Computes complete replacement documents; never mutates snapshots or writes. */
-export function planTileChanges(tile: TileChange, command: PreparedDraw, version: number, now: number) {
+export function planTileChanges(tile: TileChange, command: PreparedDraw, version: number, now: number, options: PlanOptions = {}) {
   const header = { canvas_version: version, tx: tile.tx, ty: tile.ty, region: tileRegionId(tile.tx, tile.ty) };
   let oldColors = emptyTileColors();
   let oldPixels: TileMetadataDocument['pixels'] = {};
-  try {
+  if (options.trusted && tile.colors && tile.metadata) {
+    oldColors = tile.colors.colors;
+    oldPixels = tile.metadata.pixels;
+  } else try {
     if (Boolean(tile.colors) !== Boolean(tile.metadata)) throw new Error('Unpaired tile documents');
     if (tile.colors && tile.metadata) {
       for (const document of [tile.colors, tile.metadata]) {
@@ -58,12 +78,10 @@ export function planTileChanges(tile: TileChange, command: PreparedDraw, version
   }
   const updated_at = Timestamp.fromMillis(now);
   const metadata: TileMetadataDocument = { ...header, updated_at, pixels };
-  const metadataBytes = estimateMetadataDocumentBytes(metadata);
   return {
     applied,
     colors: { ...header, updated_at, colors: Buffer.from(colors) },
     metadata,
-    // Conservative stored-data estimate, not an exact protobuf/index request size.
-    estimated_bytes: metadataBytes + colors.byteLength + 1024,
+    estimated_bytes: options.estimate === false ? 0 : estimateTileBytes(metadata, colors),
   };
 }
