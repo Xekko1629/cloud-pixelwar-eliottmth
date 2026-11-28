@@ -8,11 +8,14 @@ vi.mock('google-auth-library', () => ({ GoogleAuth: class {
   constructor(options: unknown) { mocks.auth(options); }
   getClient() { return mocks.getClient(); }
 } }));
+type Done = (result: { code: number; error?: unknown }) => void;
 vi.mock('@opentelemetry/exporter-trace-otlp-proto', () => ({ OTLPTraceExporter: class {
   constructor(options: unknown) { mocks.traces(options); }
+  export(_spans: unknown, done: Done) { done({ code: 1, error: { code: 400, message: 'synthetic-body' } }); }
 } }));
 vi.mock('@opentelemetry/exporter-metrics-otlp-proto', () => ({ OTLPMetricExporter: class {
   constructor(options: unknown) { mocks.metricExporter(options); }
+  export(_metrics: unknown, done: Done) { done({ code: 1, error: new Error('Timeout') }); }
 } }));
 vi.mock('@opentelemetry/sdk-metrics', () => ({ PeriodicExportingMetricReader: class {
   constructor(options: unknown) { mocks.reader(options); }
@@ -52,4 +55,14 @@ it('applies the configured export budget to both HTTP exporters and the SDK read
   expect(mocks.traces.mock.calls[0][0].timeoutMillis).toBe(500);
   expect(mocks.metricExporter.mock.calls[0][0].timeoutMillis).toBe(500);
   expect(mocks.reader.mock.calls[0][0].exportTimeoutMillis).toBe(1500);
+});
+
+it('reports the signal and bounded reason of each failed export, when asked to', async () => {
+  const onExportFailure = vi.fn();
+  await createGoogleObservability({ ...options, onExportFailure });
+  const runtime = mocks.runtime.mock.calls[0][0];
+  expect(runtime).not.toHaveProperty('onExportFailure');
+  runtime.spanExporter.export([], () => undefined);
+  mocks.reader.mock.calls[0][0].exporter.export([], () => undefined);
+  expect(onExportFailure.mock.calls).toEqual([['traces', 'http_400'], ['metrics', 'timeout']]);
 });

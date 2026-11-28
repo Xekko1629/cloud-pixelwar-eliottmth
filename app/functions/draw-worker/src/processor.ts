@@ -6,8 +6,8 @@ import {
 export type ProcessDraw = (command: DrawCommand) => Promise<DrawResult>;
 
 /**
- * Same value as the Cloud Run concurrency of the draw-worker (infra/serverless/draw-path.tf):
- * an instance never holds more requests than that, so a larger group could not form.
+ * A quarter of the Cloud Run concurrency of the draw-worker (512, infra/serverless/draw-path.tf):
+ * the pushes above it wait in the instance for the next group instead of getting a 429.
  * 128 pixels leave room for their tiles, deltas and users in the 450-document budget of a
  * transaction; a group above it falls back to one transaction per pixel (DrawGroupTooLargeError).
  * 32 (until 27/11) meant about 300 transactions for 5 000 pixels of one user, each one

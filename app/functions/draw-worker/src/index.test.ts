@@ -36,6 +36,13 @@ describe('draw-worker handler', () => {
     publish(); await pending;
     expect(res.status).toHaveBeenCalledWith(204); expect(res.send).toHaveBeenCalledWith();
   });
+  it('logs the processing and publication times of each push', async () => {
+    const { invoke, write } = setup();
+    await invoke();
+    const line = write.mock.calls.map(([value]) => JSON.parse(value)).find((record) => record.event_type === 'draw.result.published');
+    expect(line).toMatchObject({ process_ms: expect.any(Number), publish_ms: expect.any(Number) });
+    expect(line.process_ms).toBeGreaterThanOrEqual(0); expect(line.publish_ms).toBeGreaterThanOrEqual(0);
+  });
   it('does not log tokens, names, pixels or raw errors', async () => {
     const { invoke, process, write, publish } = setup();
     await invoke(drawPush(discordDrawEvent()));

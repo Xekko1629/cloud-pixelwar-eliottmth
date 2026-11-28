@@ -120,7 +120,7 @@ Profil du Terraform dev (`infra/serverless/draw-path.tf`) :
 
 ```hcl
 service_type    = "worker"
-concurrency     = 128
+concurrency     = 512
 min_instances   = 0
 max_instances   = var.draw_worker_max_instances   # 5 par défaut, de 1 à 10
 timeout_seconds = 300
@@ -140,6 +140,15 @@ annulées par Firestore puis rejouées (mesure du 27/11 à 14:08 UTC). Avec 128 
 groupe, il y a 4 fois moins de transactions pour le même tracé. Un groupe de 128 pixels
 voisins tient dans le budget de 450 documents (`group.test.ts`) ; un groupe qui le
 dépasse est traité pixel par pixel.
+
+**Pourquoi 512 requêtes pour des groupes de 128 (28/11).** Avec une concurrence égale à
+la taille du groupe, une instance pleine ne pouvait faire attendre qu'un groupe : chaque
+livraison en plus recevait un `429` « no available instance », compté comme une
+livraison, et Pub/Sub ralentissait ses envois (dev, 28/11 : 3 000 à 6 000 `429` par
+minute pour 30 à 60 px/s). Avec 512, une instance garde les livraisons suivantes et
+enchaîne les groupes de 128 (`MAX_DRAW_GROUP` ne change pas, à cause du budget de
+documents) : l'attente passe de Cloud Run et Pub/Sub à l'instance. Le délai
+d'acquittement (330 s) reste bien au-delà des attentes mesurées (moins de 30 s).
 
 **Reprises rapides** (`app/shared/src/drawing/retry.ts`). Une transaction annulée
 (`ABORTED`, contention) était rejouée par le SDK après 1 s, puis 1,5 s, puis 2,25 s… : la
@@ -174,7 +183,7 @@ réservée) compte toutes les sources.
 - Un pixel qui trouve l'instance libre part tout de suite, seul, avec la transaction
   d'origine : aucune attente ajoutée quand l'activité est faible.
 - Les pixels qui arrivent pendant une transaction forment le groupe suivant, au plus
-  128 (`MAX_DRAW_GROUP`, égal à la concurrence). Le groupe est appliqué en **une**
+  128 (`MAX_DRAW_GROUP`, le quart de la concurrence : les suivants attendent le groupe d'après). Le groupe est appliqué en **une**
   transaction (`app/shared/src/drawing/group.ts`) : `users/{uid}`, chaque tuile,
   `config/global` et un delta par région ne sont écrits qu'une fois.
 - Chaque pixel garde son message Pub/Sub, sa déduplication par `event_id`, sa
@@ -225,7 +234,10 @@ Exemple de requête Cloud Logging :
 `resource.labels.service_name="draw-worker" AND jsonPayload.event_type="draw.group.committed" AND jsonPayload.attempts>1`.
 
 Un pixel traité seul n'écrit pas de ligne de groupe. Chaque pixel garde son log
-`draw.result.published`. Le débit par instance de DRAW-05 se lit sur ces logs et sur
+`draw.result.published`, avec `process_ms` (attente et transaction de son groupe) et
+`publish_ms` (publication de son résultat). L'export de télémétrie qui suit est mesuré à
+part (`telemetry.flush_slow`, `docs/observability.md`) : ensemble, ils disent combien de
+temps une requête garde sa place dans l'instance. Le débit par instance de DRAW-05 se lit sur ces logs et sur
 la métrique de tentatives du worker.
 
 **Pourquoi 5 instances.** Une instance ne fait qu'une transaction à la fois, soit

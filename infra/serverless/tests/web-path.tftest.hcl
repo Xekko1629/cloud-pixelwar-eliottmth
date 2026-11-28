@@ -149,9 +149,9 @@ run "proxies_serve_concurrent_requests" {
     condition = (
       module.discord_proxy[0].concurrency == 16 && module.web_proxy[0].concurrency == 16 &&
       module.tile_reader[0].concurrency == 16 && module.auth_proxy[0].concurrency == 16 &&
-      module.draw_worker[0].concurrency == 128 && module.draw_worker[0].max_instances == 5
+      module.draw_worker[0].concurrency == 512 && module.draw_worker[0].max_instances == 5
     )
-    error_message = "Stateless proxies serve 16 requests per instance; the draw-worker holds 128 pushes to group them (ADR-0014) and scales to 5 instances by default."
+    error_message = "Stateless proxies serve 16 requests per instance; the draw-worker holds 512 pushes, 4 groups of 128 (ADR-0014), and scales to 5 instances by default."
   }
 }
 

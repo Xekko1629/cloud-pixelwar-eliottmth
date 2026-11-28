@@ -321,8 +321,14 @@ Discord initial est de 3 secondes, avant activation réelle.
 Un échec d'initialisation produit `telemetry.initialization_failed` et laisse le
 métier continuer sans SDK, avec propagation minimale sûre. Cette dégradation est
 mémorisée pour l'instance : corriger puis renouveler l'instance pour réinitialiser.
-Les échecs d'opération SDK ou d'export produisent respectivement
-`telemetry.operation_failed` et `telemetry.export_failed`, sans URL ni Error.
+Les échecs d'opération SDK produisent `telemetry.operation_failed`, sans URL ni Error.
+Les exports produisent trois événements, aux champs bornés :
+
+| Événement | Champs | Sens |
+| --- | --- | --- |
+| `telemetry.export_failed` | `signal` (`traces`, `metrics`), `reason` (`http_<code>`, `timeout`, `other`) | Un export a échoué ; relevé dans l'exporteur lui-même. Le SDK n'en dit rien pour les traces (`forceFlush` résout quand même) et perd le code HTTP pour les métriques. |
+| `telemetry.flush_failed` | `flush_ms` | L'export après une requête a été rejeté (export de métriques échoué ou hors délai). |
+| `telemetry.flush_slow` | `flush_ms` | L'export après une requête a duré au moins 250 ms : la requête garde sa place Cloud Run pendant ce temps. |
 Une panne d'export ne transforme pas un succès métier en retry et ne réexécute
 jamais le callback métier ; une vraie erreur métier/SDK de publication reste
 réessayable. Les logs applicatifs préexistants conservent leur propre contrat
