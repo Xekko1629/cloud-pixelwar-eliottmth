@@ -12,7 +12,7 @@ import {
   type DrawCommand, type DrawOptions, type DrawResult, type PreparedDraw,
 } from './command';
 import { runDrawTransaction } from './retry';
-import { planTileChanges } from './tiles';
+import { planTileChanges, writeTile } from './tiles';
 
 export function validateConfig(config: GlobalConfigDocument): void {
   try {
@@ -122,8 +122,9 @@ export function createDrawProcessor(db: Firestore, options: DrawOptions = {}) {
 
       for (let index = 0; index < plans.length; index++) {
         if (!plans[index].applied.length) continue;
-        tx.set(ref(`${COLLECTIONS.colors}/${entries[index][0]}`), plans[index].colors);
-        tx.set(ref(`${COLLECTIONS.metadata}/${entries[index][0]}`), plans[index].metadata);
+        const id = entries[index][0];
+        writeTile(tx, { colors: ref(`${COLLECTIONS.colors}/${id}`), metadata: ref(`${COLLECTIONS.metadata}/${id}`) },
+          { ...plans[index], existed: snapshots[index * 2 + 1].exists });
       }
       for (const [region, group] of appliedRegions) {
         const id = `v${config.canvas_version}_${command.event_id}_${region}`;

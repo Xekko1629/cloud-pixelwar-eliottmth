@@ -1,4 +1,4 @@
-import { Timestamp, type Firestore } from '@google-cloud/firestore';
+import { FieldPath, Timestamp, type Firestore } from '@google-cloud/firestore';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import { compareEvents, decodeDelta, tileId } from '../grid';
 import { MAX_DRAW_AGE_MS, type DrawCommand, type DrawOptions } from './command';
@@ -25,7 +25,18 @@ function fakeStore(config: Record<string, unknown> = {}) {
     getAll: vi.fn(async (...refs) => refs.map(snapshot)),
     create: vi.fn((ref, data) => { writes.push(() => { if (store.has(ref.path)) throw new Error('exists'); store.set(ref.path, data); }); }),
     set: vi.fn((ref, data, settings) => { writes.push(() => { store.set(ref.path, settings?.merge ? { ...store.get(ref.path), ...data } : data); }); }),
-    update: vi.fn((ref, data) => { writes.push(() => { store.set(ref.path, { ...store.get(ref.path), ...data }); }); }),
+    // Object form, or the field paths of writeTile: (ref, field, value, field, value...).
+    update: vi.fn((ref, data, ...rest) => { writes.push(() => {
+      if (typeof data === 'object' && !(data instanceof FieldPath)) { store.set(ref.path, { ...store.get(ref.path), ...data }); return; }
+      const next: Record<string, unknown> = { ...store.get(ref.path) };
+      const pairs = [data, ...rest];
+      for (let i = 0; i < pairs.length; i += 2) {
+        const [head, key] = String(pairs[i]).replaceAll('`', '').split('.');
+        if (key === undefined) next[head] = pairs[i + 1];
+        else next[head] = { ...(next[head] as Record<string, unknown>), [key]: pairs[i + 1] };
+      }
+      store.set(ref.path, next);
+    }); }),
   };
   const db = {
     doc: (path: string) => ({ path }),
@@ -339,6 +350,7 @@ describe('createGroupDrawProcessor', () => {
     expect(timings).toEqual([{
       attempts: 2, read_processed_ms: expect.any(Number), read_people_ms: expect.any(Number),
       read_tiles_ms: expect.any(Number), work_ms: expect.any(Number), commit_ms: expect.any(Number), transaction_ms: expect.any(Number),
+      tile_fields: 0, tile_rewrites: 1, // A new tile, written whole.
     }]);
     const [timing] = timings as { work_ms: number; commit_ms: number; transaction_ms: number }[];
     expect(timing.work_ms + timing.commit_ms).toBeLessThanOrEqual(timing.transaction_ms + 1); // Rounding.

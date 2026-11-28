@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Timestamp, type Firestore } from '@google-cloud/firestore';
+import { FieldPath, Timestamp, type Firestore } from '@google-cloud/firestore';
 import { describe, expect, it, vi } from 'vitest';
 import { tileId } from '../grid';
 import { MAX_DRAW_AGE_MS, type DrawCommand, type DrawOptions } from './command';
@@ -25,7 +25,18 @@ function setup(options: DrawOptions = {}, root = '') {
     getAll: vi.fn(async (...refs) => refs.map(snapshot)),
     create: vi.fn((ref, data) => { writes.push(() => { store.set(ref.path, data); }); }),
     set: vi.fn((ref, data, settings) => { writes.push(() => { store.set(ref.path, settings?.merge ? { ...store.get(ref.path), ...data } : data); }); }),
-    update: vi.fn((ref, data) => { writes.push(() => { store.set(ref.path, { ...store.get(ref.path), ...data }); }); }),
+    // Object form, or the field paths of writeTile: (ref, field, value, field, value...).
+    update: vi.fn((ref, data, ...rest) => { writes.push(() => {
+      if (typeof data === 'object' && !(data instanceof FieldPath)) { store.set(ref.path, { ...store.get(ref.path), ...data }); return; }
+      const next: Record<string, unknown> = { ...store.get(ref.path) };
+      const pairs = [data, ...rest];
+      for (let i = 0; i < pairs.length; i += 2) {
+        const [head, key] = String(pairs[i]).replaceAll('`', '').split('.');
+        if (key === undefined) next[head] = pairs[i + 1];
+        else next[head] = { ...(next[head] as Record<string, unknown>), [key]: pairs[i + 1] };
+      }
+      store.set(ref.path, next);
+    }); }),
   };
   const db = {
     doc: (path: string) => ({ path }),
@@ -136,9 +147,11 @@ describe('transaction orchestration', () => {
   it('expands existing bounds and avoids rewriting unchanged bounds', async () => {
     const { process, config, tx } = setup();
     await process(input());
-    const count = tx.update.mock.calls.length;
+    // Tile metadata is updated field by field (writeTile): count only config/global.
+    const boundsUpdates = () => tx.update.mock.calls.filter(([ref]) => ref.path.endsWith('config/global')).length;
+    const count = boundsUpdates();
     await process(input());
-    expect(tx.update).toHaveBeenCalledTimes(count);
+    expect(boundsUpdates()).toBe(count);
     await process(input({ pixels: [{ x: -1, y: 1, color: 2 }] }));
     expect(config.bounds).toBe(null); // Original input object was not mutated.
     expect(tx.update.mock.calls.at(-1)?.[1]).toEqual({ bounds: { min_x: -1, min_y: 0, max_x: 0, max_y: 1 } });
