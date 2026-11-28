@@ -10,7 +10,7 @@ import {
   processingTime, storedResult,
   type DrawCommand, type DrawOptions, type DrawResult, type PreparedDraw,
 } from './command';
-import { planTileChanges } from './tiles';
+import { estimateTileBytes, planTileChanges } from './tiles';
 import { runDrawTransaction } from './retry';
 import { expandedBounds, validateConfig } from './transaction';
 
@@ -200,11 +200,13 @@ export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {
           const tile = tiles.get(id)!;
           // The previous command's planned documents are this one's input: last-write-wins
           // between commands of the group, exactly as between consecutive transactions.
+          // Validated once, when read from Firestore; its size is estimated once, below: per
+          // command, both walked the whole tile (7.3 s for 127 pixels on a full tile, 28/11).
           const plan = planTileChanges({ id, tx: tile.tx, ty: tile.ty, pixels: group.pixels, colors: tile.colors, metadata: tile.metadata },
-            command, config.canvas_version, now);
+            command, config.canvas_version, now, { trusted: tile.touched, estimate: false });
           if (!plan.applied.length) continue;
           tile.colors = plan.colors; tile.metadata = plan.metadata;
-          tile.estimated_bytes = plan.estimated_bytes; tile.touched = true;
+          tile.touched = true;
           applied.push(...plan.applied);
         }
         for (const pixel of applied) finalPixels.set(`${pixel.x},${pixel.y}`, pixel);
@@ -213,6 +215,7 @@ export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {
       }
 
       const touched = [...tiles.values()].filter((tile) => tile.touched);
+      for (const tile of touched) tile.estimated_bytes = estimateTileBytes(tile.metadata!, tile.colors!.colors);
       const estimatedBytes = touched.reduce((sum, tile) => sum + tile.estimated_bytes, 0)
         + allApplied.length * 5 + 16_384; // Headroom for config, users, results and document framing.
       if (estimatedBytes > settings.max_estimated_bytes) throw new DrawGroupTooLargeError();

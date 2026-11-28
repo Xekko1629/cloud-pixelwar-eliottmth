@@ -279,6 +279,39 @@ describe('createGroupDrawProcessor', () => {
     expect(tx.update.mock.calls.length).toBe(updates);
   });
 
+  it('matches one transaction per command on an almost full tile', async () => {
+    const single = fakeStore({ default_limit_per_minute: 10_000 }); const grouped = fakeStore({ default_limit_per_minute: 10_000 });
+    // 4,090 of the 4,096 pixels of tile (0, 0) already painted, 2 s ago.
+    const fill = Array.from({ length: 9 }, (_, part) => input({
+      occurred_at: new Date(now - 2000).toISOString(),
+      pixels: Array.from({ length: Math.min(500, 4090 - part * 500) }, (_, i) => ({ x: (part * 500 + i) % 64, y: Math.floor((part * 500 + i) / 64), color: 2 })),
+    }));
+    for (const { db } of [single, grouped]) for (const command of fill) await createDrawProcessor(db, { now: () => now })(command);
+    // Newer pixels over painted ones, older ones that lose, two on the same free pixel.
+    const pick = random(7);
+    const commands = Array.from({ length: 40 }, (_, i) => input({
+      occurred_at: new Date(now - [0, 1000, 3000][pick(3)]).toISOString(),
+      pixels: [{ x: i < 2 ? 63 : pick(64), y: i < 2 ? 63 : pick(64), color: 1 + pick(16) }],
+    }));
+    const one = createDrawProcessor(single.db, { now: () => now });
+    const sequential = [];
+    for (const command of [...commands].sort(compareEvents)) sequential.push(await one(command));
+    const results = await createGroupDrawProcessor(grouped.db, { now: () => now })(commands);
+    const byId = new Map(sequential.map((result) => [result.event_id, result]));
+    expect(results).toEqual(commands.map((command) => byId.get(command.event_id)));
+    expect(results.some((result) => result.applied_pixels === 0)).toBe(true); // Some lost to newer pixels.
+    expect(withoutDeltas(grouped.store)).toEqual(withoutDeltas(single.store));
+  });
+
+  it('still counts the planned tiles in the size budget, estimated once at the end', async () => {
+    // Without the tile (about 5 KiB for one pixel), the group would need 16,389 bytes only.
+    const { db } = fakeStore();
+    await expect(createGroupDrawProcessor(db, { now: () => now, max_estimated_bytes: 20_000 })([input()]))
+      .rejects.toBeInstanceOf(DrawGroupTooLargeError);
+    expect(await createGroupDrawProcessor(fakeStore().db, { now: () => now, max_estimated_bytes: 30_000 })([input()]))
+      .toMatchObject([{ applied_pixels: 1 }]);
+  });
+
   it('fits a full group of 128 pixels of one stroke in one transaction (MAX_DRAW_GROUP of the draw-worker)', async () => {
     const { db, store } = fakeStore({ default_limit_per_minute: 1000 });
     // A brush stroke: 128 neighbouring pixels across 2 tiles of 64 x 64.

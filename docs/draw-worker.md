@@ -216,6 +216,11 @@ Champs de ces deux lignes, pour savoir où passe le temps d'un groupe :
 attentes entre elles. `work_ms` nettement plus grand que la somme des lectures : le
 calcul, ou une instance dont le CPU est saturé.
 
+Dans un groupe, chaque tuile est validée une fois, à sa lecture dans Firestore, et sa
+taille est estimée une fois, avant l'écriture. Avant le 28/11, les deux étaient refaits
+à chaque commande, en parcourant toute la tuile : 127 pixels sur une tuile pleine
+coûtaient environ 12 s de calcul, contre 0,1 s maintenant (mesure locale, 28/11).
+
 Exemple de requête Cloud Logging :
 `resource.labels.service_name="draw-worker" AND jsonPayload.event_type="draw.group.committed" AND jsonPayload.attempts>1`.
 

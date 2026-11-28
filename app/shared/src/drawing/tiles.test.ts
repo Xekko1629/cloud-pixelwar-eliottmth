@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { Timestamp } from '@google-cloud/firestore';
 import { tileId } from '../grid';
 import { prepareDraw } from './command';
-import { planTileChanges, type TileChange } from './tiles';
+import { estimateTileBytes, planTileChanges, type TileChange } from './tiles';
 
 const now = Date.parse('2026-11-19T10:00:30.000Z');
 const command = (event_id = randomUUID(), time = now) => prepareDraw({
@@ -55,6 +55,19 @@ describe('tile planning', () => {
   it('refuses missing provenance for a colored pixel', () => {
     const input = painted(); input.metadata.pixels = {};
     expect(() => planTileChanges(input, command(), 1, now)).toThrow('Corrupt tile');
+  });
+  it('leaves the size estimate to estimateTileBytes on request, with the same value', () => {
+    const deferred = planTileChanges(tile(), command('00000000-0000-4000-8000-000000000001'), 1, now, { estimate: false });
+    const direct = planTileChanges(tile(), command('00000000-0000-4000-8000-000000000001'), 1, now);
+    expect(deferred.estimated_bytes).toBe(0);
+    expect(estimateTileBytes(deferred.metadata, deferred.colors.colors)).toBe(direct.estimated_bytes);
+  });
+  it('trusts documents it planned itself, but still refuses an unpaired tile', () => {
+    const input = painted(); input.metadata.pixels = {}; // Would be corrupt if read from Firestore.
+    input.pixels = [{ x: 1, y: 0, color: 3 }];
+    expect(planTileChanges(input, command(), 1, now, { trusted: true }).applied).toHaveLength(1);
+    Reflect.deleteProperty(input, 'metadata');
+    expect(() => planTileChanges(input, command(), 1, now, { trusted: true })).toThrow('Corrupt tile');
   });
   it('refuses provenance attached to an untouched pixel', () => {
     const input = painted(); input.colors.colors[0] = 0;
