@@ -19,6 +19,9 @@ export interface ObservabilityOptions {
   metricReader?: IMetricReader;
   writeLog?: (line: string) => void;
   exportTimeoutMillis?: number;
+  /** flushRequest() exports metrics at most this often (default 10 s); 0 at every request. */
+  metricFlushIntervalMillis?: number;
+  now?: () => number;
 }
 
 export function createObservability(options: ObservabilityOptions) {
@@ -26,6 +29,9 @@ export function createObservability(options: ObservabilityOptions) {
   if (!Number.isFinite(ratio) || ratio < 0 || ratio > 1) throw new Error('Sampling ratio must be between 0 and 1');
   const exportTimeout = options.exportTimeoutMillis ?? 2000;
   if (!Number.isSafeInteger(exportTimeout) || exportTimeout < 1 || exportTimeout > 10_000) throw new Error('Invalid export timeout');
+  const metricInterval = options.metricFlushIntervalMillis ?? 10_000;
+  if (!Number.isSafeInteger(metricInterval) || metricInterval < 0 || metricInterval > 600_000) throw new Error('Invalid metric flush interval');
+  const now = options.now ?? Date.now;
   const resource = resourceFromAttributes({
     'service.name': options.serviceName,
     'service.version': options.serviceVersion ?? 'development',
@@ -50,6 +56,23 @@ export function createObservability(options: ObservabilityOptions) {
     write: options.writeLog,
   });
   let closed = false;
+  let lastMetricFlush = -Infinity;
+  let traceFlush: Promise<void> | undefined;
+  let nextTraceFlush: Promise<void> | undefined;
+
+  /**
+   * Concurrent requests share one trace export: a caller joins the export in flight, or the
+   * single one queued behind it, which starts after its span ended. 128 requests at once make
+   * at most 2 exports instead of 128 (dev, 27/11: CPU at 60 % for 5 to 10 px/s).
+   */
+  function flushTraces(): Promise<void> {
+    if (!traceFlush) {
+      traceFlush = traces.forceFlush().finally(() => { traceFlush = undefined; });
+      return traceFlush;
+    }
+    nextTraceFlush ??= traceFlush.catch(() => undefined).then(() => { nextTraceFlush = undefined; return flushTraces(); });
+    return nextTraceFlush;
+  }
 
   async function observed<T>(name: string, kind: SpanKind, parent: Context, fields: LogFields, work: (operation: { correlationId: string; span: Span }) => Promise<T>): Promise<T> {
     if (closed) throw new Error('Observability has been shut down');
@@ -89,8 +112,21 @@ export function createObservability(options: ObservabilityOptions) {
     attributes(): Record<string, string> {
       return injectMessageContext(contextManager.active());
     },
+    /** Everything, now: tests and shutdown. */
     async flush(): Promise<void> {
       await Promise.all([traces.forceFlush(), metrics.forceFlush()]);
+    },
+    /**
+     * After each request, while Cloud Run still gives CPU: the spans always, the metrics at most
+     * every metricFlushIntervalMillis. Cloud Monitoring refuses points of one series written
+     * closer than that (FAILED_PRECONDITION, telemetry.export_failed); the values are cumulative,
+     * so the next export carries what a skipped one would have sent.
+     */
+    async flushRequest(): Promise<void> {
+      const at = now();
+      const metricsDue = at - lastMetricFlush >= metricInterval;
+      if (metricsDue) lastMetricFlush = at;
+      await Promise.all([flushTraces(), metricsDue ? metrics.forceFlush() : undefined]);
     },
     async shutdown(): Promise<void> {
       if (closed) return;

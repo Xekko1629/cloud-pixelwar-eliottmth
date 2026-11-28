@@ -179,7 +179,7 @@ describe('signed /draw to original-response update on local services', () => {
     expect(attempts.some((point) => point.attributes.outcome === 'expired' && point.attributes.reason === 'expired')).toBe(true);
   });
   it('still completes the business path if telemetry export fails after the draw', async () => {
-    const flush = vi.spyOn(observers.draw.runtime, 'flush').mockRejectedValue(new Error('synthetic-interaction-token'));
+    const flush = vi.spyOn(observers.draw.runtime, 'flushRequest').mockRejectedValue(new Error('synthetic-interaction-token'));
     try {
       const result = await pipeline(interaction());
       expect((await ref(`users/${result.actor.uid}`).get()).get('used_pixels')).toBe(1);

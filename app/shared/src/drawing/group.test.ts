@@ -303,8 +303,10 @@ describe('createGroupDrawProcessor', () => {
       [input(), input({ pixels: [{ x: 1, y: 0, color: 1 }] })]);
     expect(timings).toEqual([{
       attempts: 2, read_processed_ms: expect.any(Number), read_people_ms: expect.any(Number),
-      read_tiles_ms: expect.any(Number), transaction_ms: expect.any(Number),
+      read_tiles_ms: expect.any(Number), work_ms: expect.any(Number), commit_ms: expect.any(Number), transaction_ms: expect.any(Number),
     }]);
+    const [timing] = timings as { work_ms: number; commit_ms: number; transaction_ms: number }[];
+    expect(timing.work_ms + timing.commit_ms).toBeLessThanOrEqual(timing.transaction_ms + 1); // Rounding.
   });
 
   it('reports the timing of a failed group, and a throwing observer never fails the draw', async () => {

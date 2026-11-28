@@ -287,7 +287,7 @@ Ordre des étapes dans le handler :
 3. Valider l'enveloppe (section 1) et le `payload` du topic (section 3). Un `event_id` non UUID, un `occurred_at` qui ne respecte pas le format ou un champ manquant rendent le message invalide.
 4. Traiter le message (section 8 pour l'idempotence).
 5. Publier les résultats nécessaires.
-6. Appeler `await obs.flush()` **avant** la réponse. En cas d'échec de l'export, écrire un log sans transformer le succès métier en échec (`docs/observability.md`).
+6. Appeler `await obs.flushRequest()` **avant** la réponse. En cas d'échec de l'export, écrire un log sans transformer le succès métier en échec (`docs/observability.md`).
 7. Répondre.
 
 ### 4.3 Codes de retour

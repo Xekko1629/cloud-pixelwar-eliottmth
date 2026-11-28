@@ -73,18 +73,18 @@ describe('function instrumentation', () => {
   it('awaits flush before returning and never replays successful work after export failure', async () => {
     const { telemetry, runtime, write } = make();
     let finish!: () => void;
-    vi.spyOn(runtime, 'flush').mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
+    vi.spyOn(runtime, 'flushRequest').mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
     const work = vi.fn(async (op) => { op.outcome('published'); return 'saved'; });
     let returned = false; const pending = telemetry.message('pixel-draw', attributes, work).then((value) => { returned = true; return value; });
-    await vi.waitFor(() => expect(runtime.flush).toHaveBeenCalled()); expect(returned).toBe(false); finish();
+    await vi.waitFor(() => expect(runtime.flushRequest).toHaveBeenCalled()); expect(returned).toBe(false); finish();
     expect(await pending).toBe('saved');
-    vi.spyOn(runtime, 'flush').mockRejectedValue(new Error('synthetic-interaction-token'));
+    vi.spyOn(runtime, 'flushRequest').mockRejectedValue(new Error('synthetic-interaction-token'));
     expect(await telemetry.message('pixel-draw', attributes, work)).toBe('saved'); expect(work).toHaveBeenCalledTimes(2);
     expect(JSON.stringify(write.mock.calls)).toContain('telemetry.export_failed'); expect(JSON.stringify(write.mock.calls)).not.toContain('synthetic-interaction-token');
   });
   it('does not lose a business error if failure logging or export also fails', async () => {
     const { telemetry, runtime } = make(); const business = new Error('business failure');
-    vi.spyOn(runtime, 'flush').mockRejectedValue(new Error('export failed'));
+    vi.spyOn(runtime, 'flushRequest').mockRejectedValue(new Error('export failed'));
     await expect(telemetry.message('pixel-draw', attributes, async () => { throw business; })).rejects.toBe(business);
   });
   it('preserves business success if SDK wrapping fails before or after the callback', async () => {

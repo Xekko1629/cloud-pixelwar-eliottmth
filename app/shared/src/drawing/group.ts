@@ -1,4 +1,4 @@
-import { Timestamp, type DocumentReference, type Firestore } from '@google-cloud/firestore';
+import { Timestamp, type DocumentReference, type Firestore, type Transaction } from '@google-cloud/firestore';
 import {
   COLLECTIONS, DELTA_ENCODING_VERSION, compareEvents, countBatchDocuments, encodeDelta, evaluateRateLimit,
   groupPixelsByRegion, groupPixelsByTile, isInsideGrid, resolveRateLimit, RATE_LIMIT_WINDOW_MS,
@@ -47,6 +47,10 @@ export interface GroupTiming {
   read_processed_ms: number;
   read_people_ms: number;
   read_tiles_ms: number;
+  /** The last attempt: from its start to the end of our code (reads and computation). */
+  work_ms: number;
+  /** The last attempt: from the end of our code to Firestore's answer, i.e. the commit. */
+  commit_ms: number;
   transaction_ms: number;
 }
 
@@ -87,13 +91,12 @@ export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {
       if (!first) unique.set(command.event_id, command);
     }
 
-    const timing: GroupTiming = { attempts: 0, read_processed_ms: 0, read_people_ms: 0, read_tiles_ms: 0, transaction_ms: 0 };
+    const timing: GroupTiming = { attempts: 0, read_processed_ms: 0, read_people_ms: 0, read_tiles_ms: 0, work_ms: 0, commit_ms: 0, transaction_ms: 0 };
     const timed = async <T>(field: 'read_processed_ms' | 'read_people_ms' | 'read_tiles_ms', read: Promise<T>): Promise<T> => {
       const started = performance.now();
       try { return await read; } finally { timing[field] = Math.round(performance.now() - started); }
     };
-    const started = performance.now();
-    const results = await runDrawTransaction(db, async (tx) => {
+    const apply = async (tx: Transaction): Promise<Map<string, DrawResult>> => {
       timing.attempts += 1;
       timing.read_processed_ms = 0; timing.read_people_ms = 0; timing.read_tiles_ms = 0;
       const distinct = [...unique.values()];
@@ -300,8 +303,19 @@ export function createGroupDrawProcessor(db: Firestore, options: DrawOptions = {
         done.set(command.event_id, result);
       }
       return done;
+    };
+    const started = performance.now();
+    let workEnded = started;
+    const results = await runDrawTransaction(db, async (tx) => {
+      const workStarted = performance.now();
+      try { return await apply(tx); } finally {
+        workEnded = performance.now();
+        timing.work_ms = Math.round(workEnded - workStarted);
+      }
     }).finally(() => {
-      timing.transaction_ms = Math.round(performance.now() - started);
+      const ended = performance.now();
+      timing.transaction_ms = Math.round(ended - started);
+      timing.commit_ms = Math.round(ended - workEnded);
       try { onTiming?.(timing); } catch { /* Observability never fails a draw. */ }
     });
     return commands.map((command) => results.get(command.event_id)!);

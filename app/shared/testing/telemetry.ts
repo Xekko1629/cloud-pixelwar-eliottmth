@@ -8,6 +8,7 @@ export function memoryTelemetry(service: Parameters<typeof createFunctionTelemet
   const spans = new InMemorySpanExporter();
   const metrics = new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE);
   const runtime = createObservability({ serviceName: service, projectId: 'demo-pixelwar-test', environment: 'dev', region: 'europe-west1',
-    spanExporter: spans, metricReader: new PeriodicExportingMetricReader({ exporter: metrics, exportIntervalMillis: 60_000 }), writeLog });
+    spanExporter: spans, metricReader: new PeriodicExportingMetricReader({ exporter: metrics, exportIntervalMillis: 60_000 }), writeLog,
+    metricFlushIntervalMillis: 0 }); // Tests read the metrics after each operation.
   return { spans, metrics, runtime, telemetry: createFunctionTelemetry(service, { getRuntime: () => runtime, writeLog, now }) };
 }
