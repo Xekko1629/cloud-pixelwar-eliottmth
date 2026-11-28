@@ -93,18 +93,20 @@ describe('createGroupCommit', () => {
     expect(one.mock.calls.map(([input]) => input.event_id)).toEqual([1, 2, 3, 4].map((id) => command(id).event_id));
   });
 
-  it('fails every command of a contended group at once, without replaying them one by one', async () => {
+  it('splits a contended group once, then fails each contended half at once, never one by one', async () => {
     const first = gate();
     const one = vi.fn(async (input: DrawCommand) => { if (input.event_id === command(1).event_id) await first.promise; return result(input, 'one'); });
     const aborted = Object.assign(new Error('10 ABORTED'), { code: 10 });
-    const group = vi.fn(async () => { throw aborted; });
+    const group = vi.fn(async (_inputs: readonly DrawCommand[]): Promise<DrawResult[]> => { throw aborted; });
     const onGroup = vi.fn();
     const process = createGroupCommit(one, group, { max_group: 32, onGroup });
-    const answers = [1, 2, 3, 4].map((id) => process(command(id)).then((r) => r.event_id, (error: unknown) => error));
+    const answers = [1, 2, 3, 4, 5].map((id) => process(command(id)).then((r) => r.event_id, (error: unknown) => error));
     first.open();
-    expect(await Promise.all(answers)).toEqual([command(1).event_id, aborted, aborted, aborted]);
-    expect(one).toHaveBeenCalledTimes(1); // Only the first command, alone; never the 3 of the group.
-    expect(onGroup).toHaveBeenCalledWith(expect.objectContaining({ size: 3, outcome: 'contention' }));
+    expect(await Promise.all(answers)).toEqual([command(1).event_id, aborted, aborted, aborted, aborted]);
+    expect(one).toHaveBeenCalledTimes(1); // Only the first command, alone; never the 4 of the group.
+    expect(group.mock.calls.map(([inputs]) => inputs.length)).toEqual([4, 2, 2]); // Halves once, not quarters.
+    expect(onGroup.mock.calls.slice(1).map(([event]) => [event.size, event.outcome]))
+      .toEqual([[4, 'split'], [2, 'contention'], [2, 'contention']]);
     // The instance is free again at once: the next command is processed.
     expect(await process(command(5))).toMatchObject({ tag: 'one' });
   });
@@ -113,9 +115,40 @@ describe('createGroupCommit', () => {
     const first = gate();
     const one = vi.fn(async (input: DrawCommand) => { if (input.event_id === command(1).event_id) await first.promise; return result(input, 'one'); });
     const process = createGroupCommit(one, vi.fn(async () => { throw new Error('custom'); }), { max_group: 32, isContention: () => true });
-    const answers = [1, 2, 3].map((id) => process(command(id)).then(() => 'ok', () => 'refused'));
+    const answers = [1, 2, 3, 4, 5].map((id) => process(command(id)).then(() => 'ok', () => 'refused'));
     first.open();
-    expect(await Promise.all(answers)).toEqual(['ok', 'refused', 'refused']);
+    expect(await Promise.all(answers)).toEqual(['ok', 'refused', 'refused', 'refused', 'refused']);
+  });
+
+  it('commits the half that no longer collides and refuses only the other one', async () => {
+    const first = gate();
+    const one = vi.fn(async (input: DrawCommand) => { if (input.event_id === command(1).event_id) await first.promise; return result(input, 'one'); });
+    const aborted = Object.assign(new Error('10 ABORTED'), { code: 10 });
+    // Contention whenever command 5 is in the transaction: the whole group, then its half.
+    const group = vi.fn(async (inputs: readonly DrawCommand[]) => {
+      if (inputs.some((input) => input.event_id === command(5).event_id)) throw aborted;
+      return inputs.map((input) => result(input, 'group'));
+    });
+    const onGroup = vi.fn();
+    const process = createGroupCommit(one, group, { max_group: 32, onGroup });
+    const answers = [1, 2, 3, 4, 5].map((id) => process(command(id)).then((r) => (r as unknown as { tag: string }).tag, () => 'refused'));
+    first.open();
+    expect(await Promise.all(answers)).toEqual(['one', 'group', 'group', 'refused', 'refused']);
+    expect(onGroup.mock.calls.slice(1).map(([event]) => [event.size, event.outcome]))
+      .toEqual([[4, 'split'], [2, 'committed'], [2, 'contention']]);
+  });
+
+  it('sends a half of one command alone', async () => {
+    const first = gate();
+    const one = vi.fn(async (input: DrawCommand) => { if (input.event_id === command(1).event_id) await first.promise; return result(input, 'one'); });
+    const group = vi.fn(async () => { throw Object.assign(new Error('10 ABORTED'), { code: 10 }); });
+    const onGroup = vi.fn();
+    const process = createGroupCommit(one, group, { max_group: 32, onGroup });
+    const answers = [1, 2, 3, 4].map((id) => process(command(id)).then((r) => (r as unknown as { tag: string }).tag, () => 'refused'));
+    first.open();
+    expect(await Promise.all(answers)).toEqual(['one', 'refused', 'refused', 'one']);
+    expect(onGroup.mock.calls.slice(1).map(([event]) => [event.size, event.outcome]))
+      .toEqual([[3, 'split'], [2, 'contention'], [1, 'single']]);
   });
 
   it('falls back when a group returns a wrong number of results', async () => {

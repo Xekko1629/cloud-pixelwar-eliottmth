@@ -326,13 +326,21 @@ Les exports produisent trois événements, aux champs bornés :
 
 | Événement | Champs | Sens |
 | --- | --- | --- |
-| `telemetry.export_failed` | `signal` (`traces`, `metrics`), `reason` (`http_<code>`, `timeout`, `other`) | Un export a échoué ; relevé dans l'exporteur lui-même. Le SDK n'en dit rien pour les traces (`forceFlush` résout quand même) et perd le code HTTP pour les métriques. |
+| `telemetry.export_failed` | `signal` (`traces`, `metrics`), `reason` (`http_<code>`, `timeout`, `retryable_status`, `concurrency_limit`, `response_too_large`, `nothing_to_send`, `net_<code>`, `other`) | Un export a échoué ; relevé dans l'exporteur lui-même. Le SDK n'en dit rien pour les traces (`forceFlush` résout quand même) et perd le code HTTP pour les métriques. |
 | `telemetry.flush_failed` | `flush_ms` | L'export après une requête a été rejeté (export de métriques échoué ou hors délai). |
 | `telemetry.flush_slow` | `flush_ms` | L'export après une requête a duré au moins 250 ms : la requête garde sa place Cloud Run pendant ce temps. |
 Une panne d'export ne transforme pas un succès métier en retry et ne réexécute
 jamais le callback métier ; une vraie erreur métier/SDK de publication reste
 réessayable. Les logs applicatifs préexistants conservent leur propre contrat
 d'échec ; cette garantie de dégradation porte sur l'instrumentation ajoutée.
+
+Les raisons sans code HTTP viennent de messages fixes de
+`@opentelemetry/otlp-exporter-base` 0.300 : `retryable_status` (429 ou 5xx encore
+en échec après les reprises de l'exporteur, statut perdu), `concurrency_limit`
+(trop d'exports en cours à la fois), `timeout` (dont « Request timed out » du
+transport Node, classé `other` jusqu'au 28/11), `net_<code>` (erreur réseau Node,
+par exemple `net_econnreset`). Le message lui-même n'est jamais journalisé : il
+peut contenir le corps d'une réponse.
 
 Les tests vérifient les quatre spans parents/enfants, les logs corrélés, les
 labels, les duplications d'observations et un échec d'export après dessin, avec

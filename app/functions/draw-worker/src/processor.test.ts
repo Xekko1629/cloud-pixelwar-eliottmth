@@ -52,7 +52,7 @@ it('logs one line per group, with its wait and Firestore timing, and none for a 
   ]);
 });
 
-it('logs a contended group as a warning, with its timing', async () => {
+it('logs a contended group and its two halves as warnings, each with its own timing', async () => {
   const lines: string[] = [];
   let release!: () => void;
   const timing = { attempts: 10, read_processed_ms: 20, read_people_ms: 10, read_tiles_ms: 700, work_ms: 750, commit_ms: 60, transaction_ms: 9000 };
@@ -61,15 +61,20 @@ it('logs a contended group as a warning, with its timing', async () => {
     mocks.createGroup.mock.calls.at(-1)![2](timing);
     throw Object.assign(new Error('ABORTED'), { code: 10 });
   });
+  // Both halves contend again, without reporting a timing: none is borrowed from the group.
+  mocks.processGroup.mockRejectedValueOnce(Object.assign(new Error('ABORTED'), { code: 10 }));
+  mocks.processGroup.mockRejectedValueOnce(Object.assign(new Error('ABORTED'), { code: 10 }));
   const process = createLazyDrawProcessor('demo-pixelwar-test', (line) => lines.push(line));
   const first = process(command);
   await vi.waitFor(() => expect(release).toBeDefined());
-  const grouped = [process(command), process(command)].map((p) => p.catch(() => 'refused'));
+  const grouped = [1, 2, 3, 4].map(() => process(command).catch(() => 'refused'));
   release();
-  expect(await Promise.all(grouped)).toEqual(['refused', 'refused']);
+  expect(await Promise.all(grouped)).toEqual(['refused', 'refused', 'refused', 'refused']);
   await first;
+  const half = { severity: 'WARNING', function: 'draw-worker', event_type: 'draw.group.contention', group_size: 2, wait_ms: expect.any(Number) };
   expect(lines.map((line) => JSON.parse(line))).toEqual([
-    { severity: 'WARNING', function: 'draw-worker', event_type: 'draw.group.contention', group_size: 2, wait_ms: expect.any(Number), ...timing },
+    { severity: 'WARNING', function: 'draw-worker', event_type: 'draw.group.split', group_size: 4, wait_ms: expect.any(Number), ...timing },
+    half, half,
   ]);
 });
 

@@ -21,8 +21,12 @@ export interface GroupCommitOptions {
   now?: () => number;
 }
 
-/** contention: every command of the group is refused and redelivered later by Pub/Sub. */
-export type GroupOutcome = 'single' | 'committed' | 'fallback' | 'contention';
+/**
+ * split: the group failed on contention and is retried once as two halves, each one then
+ * reported with its own outcome. contention: every command of the group (or of a half) is
+ * refused and redelivered later by Pub/Sub.
+ */
+export type GroupOutcome = 'single' | 'committed' | 'fallback' | 'split' | 'contention';
 
 interface Waiting {
   command: DrawCommand;
@@ -41,8 +45,11 @@ interface Waiting {
  * (corrupt tile, reused event id, budget) then fails only its own request, which Pub/Sub
  * retries on its own. If it fails on contention (aborted on every attempt), its commands are
  * NOT replayed one by one, which would collide on the same tiles again and hold the instance
- * for minutes (dev, 27/11 18:38 UTC: 267 s of wait): they all fail at once, and Pub/Sub
- * redelivers them later, spread out by its backoff. Every promise settles only after the
+ * for minutes (dev, 27/11 18:38 UTC: 267 s of wait). The group is retried once as two
+ * halves instead, one after the other: a smaller transaction commits sooner, so it collides
+ * less (dev, 28/11 15:10: 9 groups of 128 refused, 1,152 pixels redelivered). At most three
+ * transactions for one group; a half that fails on contention again is refused at once, and
+ * Pub/Sub redelivers it later, spread out by its backoff. Every promise settles only after the
  * transaction that holds its pixel.
  */
 export function createGroupCommit(processOne: ProcessOne, processGroup: ProcessGroup, options: GroupCommitOptions): ProcessOne {
@@ -58,33 +65,42 @@ export function createGroupCommit(processOne: ProcessOne, processGroup: ProcessG
     try { item.resolve(await processOne(item.command)); } catch (error) { item.reject(error); }
   };
 
+  const commit = async (group: Waiting[], wait: number, splittable: boolean): Promise<void> => {
+    if (group.length === 1) { notify(1, 'single', wait); await alone(group[0]); return; }
+    let results: DrawResult[] | undefined;
+    let contention: unknown;
+    try {
+      results = await processGroup(group.map((item) => item.command));
+      if (results.length !== group.length) throw new Error('Draw group returned a wrong number of results');
+    } catch (error) {
+      results = undefined;
+      if (isContention(error)) contention = error;
+    }
+    if (contention !== undefined && splittable) {
+      notify(group.length, 'split', wait);
+      const middle = Math.ceil(group.length / 2);
+      await commit(group.slice(0, middle), wait, false);
+      await commit(group.slice(middle), wait, false);
+    } else if (contention !== undefined) {
+      notify(group.length, 'contention', wait);
+      for (const item of group) item.reject(contention);
+    } else if (results) {
+      notify(group.length, 'committed', wait);
+      group.forEach((item, index) => item.resolve(results![index]));
+    } else {
+      notify(group.length, 'fallback', wait);
+      // One after the other: in parallel they would contend on the same documents again.
+      for (const item of group) await alone(item);
+    }
+  };
+
   const drain = async () => {
     running = true;
     try {
       while (queue.length) {
         const group = queue.splice(0, options.max_group);
         const wait = Math.max(0, Math.round(now() - group[0].queued_at));
-        if (group.length === 1) { notify(1, 'single', wait); await alone(group[0]); continue; }
-        let results: DrawResult[] | undefined;
-        let contention: unknown;
-        try {
-          results = await processGroup(group.map((item) => item.command));
-          if (results.length !== group.length) throw new Error('Draw group returned a wrong number of results');
-        } catch (error) {
-          results = undefined;
-          if (isContention(error)) contention = error;
-        }
-        if (contention !== undefined) {
-          notify(group.length, 'contention', wait);
-          for (const item of group) item.reject(contention);
-        } else if (results) {
-          notify(group.length, 'committed', wait);
-          group.forEach((item, index) => item.resolve(results![index]));
-        } else {
-          notify(group.length, 'fallback', wait);
-          // One after the other: in parallel they would contend on the same documents again.
-          for (const item of group) await alone(item);
-        }
+        await commit(group, wait, true);
       }
     } finally {
       running = false;

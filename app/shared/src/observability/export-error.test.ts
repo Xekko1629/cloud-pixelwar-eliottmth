@@ -7,7 +7,15 @@ describe('telemetry export failures', () => {
     [Object.assign(new Error('Service Unavailable'), { code: 503 }), 'http_503'],
     [new Error('Timeout'), 'timeout'],
     [new Error('Request Time out'), 'timeout'],
-    [new Error('Request timed out'), 'other'],
+    [new Error('Request timed out'), 'timeout'], // http-transport-utils, Node.
+    [new Error('Export failed with retryable status'), 'retryable_status'],
+    [new Error('Concurrent export limit reached'), 'concurrency_limit'],
+    [new Error('Concurrency Limit reached'), 'concurrency_limit'], // bounded-queue-export-promise-handler.
+    [new Error('OTLP export response body exceeded size limit of 1 bytes'), 'response_too_large'],
+    [new Error('Nothing to send'), 'nothing_to_send'],
+    [Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }), 'net_econnreset'],
+    [Object.assign(new Error('x'), { code: 'econnreset' }), 'other'],
+    [new Error('Export failed with retryable status: body'), 'other'], // Never a prefix match of free text.
     [Object.assign(new Error('x'), { code: 14 }), 'other'], // gRPC code, not HTTP.
     [Object.assign(new Error('x'), { code: '503' }), 'other'],
     [undefined, 'other'],

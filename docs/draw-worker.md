@@ -196,8 +196,12 @@ réservée) compte toutes les sources.
 - Si elle échoue sur une **contention** (annulée à chacune des 10 tentatives), ses pixels
   ne sont **pas** rejoués un par un : ils retomberaient sur les mêmes tuiles, et l'instance
   restait bloquée plusieurs minutes (dev, 27/11 18:38 UTC : jusqu'à 267 s d'attente,
-  23 800 refus `429`). Tous ses pixels répondent `503` d'un coup ; Pub/Sub les relivre plus
-  tard, étalés par son délai de 10 à 60 s, et l'instance passe au groupe suivant.
+  23 800 refus `429`). Le groupe est retenté **une fois en deux moitiés**, l'une après
+  l'autre : une transaction plus petite valide plus vite, donc se heurte moins (dev,
+  28/11 15:10 : 9 groupes de 128 refusés, 1 152 pixels relivrés). Une moitié encore en
+  contention n'est pas recoupée : tous ses pixels répondent `503` d'un coup ; Pub/Sub les
+  relivre plus tard, étalés par son délai de 10 à 60 s, et l'instance passe au groupe
+  suivant. Au pire, un groupe occupe donc l'instance pendant trois transactions.
 
 Logs d'un groupe, une ligne par transaction (pas par pixel) :
 
@@ -205,9 +209,10 @@ Logs d'un groupe, une ligne par transaction (pas par pixel) :
 | --- | --- | --- |
 | `draw.group.committed` | INFO | Un groupe de `group_size` pixels a été écrit en une transaction |
 | `draw.group.fallback` | WARNING | Le groupe a échoué sur une erreur de données ; ses `group_size` pixels sont rejoués un par un |
-| `draw.group.contention` | WARNING | Le groupe a été annulé par Firestore à chaque tentative (contention) ; ses `group_size` pixels sont refusés (`503`) et relivrés plus tard par Pub/Sub, sans rejeu un par un |
+| `draw.group.split` | WARNING | Le groupe a été annulé par Firestore à chaque tentative (contention) ; il est retenté une fois en deux moitiés, l'une après l'autre, chacune journalisée avec sa propre issue |
+| `draw.group.contention` | WARNING | Une moitié a encore été annulée à chaque tentative ; ses `group_size` pixels sont refusés (`503`) et relivrés plus tard par Pub/Sub, sans rejeu un par un ni nouvelle coupe |
 
-Champs de ces deux lignes, pour savoir où passe le temps d'un groupe :
+Champs de ces lignes, pour savoir où passe le temps d'un groupe :
 
 | Champ | Sens |
 | --- | --- |
